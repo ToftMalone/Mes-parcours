@@ -59,6 +59,23 @@ class KmlExportTest {
     }
 
     @Test
+    fun `les pauses d un enregistrement ne creent pas d entrees separees`() {
+        // Une pause, une reprise et une fusion produisent le même signal : le point
+        // suivant ouvre un tronçon. Aucun des trois ne doit donner une entrée de plus
+        // dans le fichier — un parcours enregistré en trois fois reste un parcours.
+        val points = listOf(
+            point(1), point(2), point(3),
+            point(4, discontinuous = true), point(5),   // sortie de première pause
+            point(6, discontinuous = true), point(7)    // sortie de seconde pause
+        )
+
+        val kml = export(points)
+
+        assertEquals("un enregistrement reste une entrée", 1, kml.countOf("<Placemark>"))
+        assertEquals("une ligne par morceau enregistré", 3, kml.countOf("<LineString>"))
+    }
+
+    @Test
     fun `un troncon unique reste enveloppe de la meme facon`() {
         // L'écriture étant incrémentale, on ne sait pas en ouvrant la géométrie
         // combien de tronçons suivront : l'enveloppe est donc toujours la même.
