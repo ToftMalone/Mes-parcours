@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.9.8-thierry` (`versionCode` 8). Elle n'est écrite qu'une fois,
+- Version courante : `0.9.11-thierry` (`versionCode` 11). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
   - Jusqu'à la `1.0-thierry` **exclue** : une seule entrée, celle de la version
@@ -116,7 +116,41 @@ AppDatabase / TrackDao  ──  entités Track + TrackPoint
 - `ui/component/MapViewContainer` — pont osmdroid ↔ Compose (le plus gros fichier)
 - `util/` — `Importer`, `Exporter`, `MediaStoreExporter`, `AutoBackupManager`,
   `SolarTimes`, `TunnelDetector`, `Altitude`, `ElevationAccumulator`, `FormatUtils`,
-  préférences de style
+  `KmlColor`, préférences de style
+
+## Couleurs des parcours importés
+
+Un KML porte la couleur de chaque tracé ; l'application peut la conserver plutôt que
+d'appliquer une couleur unique. Le réglage est un interrupteur dans
+« Paramètres → Tracés », doublé d'un raccourci par appui long sur l'onglet
+« Importés » de l'historique.
+
+Trois pièges, chacun visible à l'écran s'il n'était pas traité :
+
+- **KML note ses couleurs en AABBGGRR**, Android attend ARGB. Recopier la valeur
+  échange le rouge et le bleu. `KmlColor.parse` convertit, `KmlColorTest` verrouille.
+- **La couleur appartient au point, pas au parcours** (`TrackPoint.segmentColor`). Un
+  export Google Earth réunit couramment des dizaines de voyages dans un seul fichier :
+  une couleur par parcours les peindrait tous pareil.
+- **Le style se résout, il ne se devine pas.** Un `<Placemark>` renvoie à un `<Style>`
+  par identifiant, éventuellement via un `<StyleMap>` qui distingue l'apparence au
+  repos de celle au survol. Prendre le premier `<LineStyle>` venu ramène parfois la
+  couleur de survol, que l'utilisateur ne voit jamais. `KmlStyleTable` fait la
+  résolution, avec une profondeur bornée contre les renvois circulaires.
+
+Le répertoire des styles est relevé par une **première lecture du fichier**, avant les
+points : un style déclaré après le trajet qui l'utilise arriverait sinon trop tard,
+les points étant déjà écrits en base. Cette passe ignore les `<coordinates>`, son
+empreinte reste donc de quelques dizaines d'entrées quelle que soit la taille du
+fichier.
+
+Un tracé sans couleur — tous les GPX, et les KML sans style de ligne — retombe sur
+la couleur de la palette. Sans ce repli il serait dessiné en noir, donc invisible sur
+le fond de carte sombre. Une couleur totalement transparente est refusée pour la même
+raison.
+
+Corollaire à l'affichage : `buildSegmentsFromPoints` coupe aussi sur **changement de
+couleur**, une polyligne osmdroid n'en portant qu'une.
 
 `TrackRepository` est la **source de vérité** de l'état en direct (`isTracking`,
 `livePoints`, `liveStats`, `gpsStatus`…). Le service écrit, l'interface lit.
@@ -130,11 +164,16 @@ pourquoi. À relire avant d'y toucher.
    instances = deux jeux de `StateFlow` et de suivis d'invalidation Room : le
    service alimente l'une pendant que l'écran observe l'autre, et l'interface cesse
    silencieusement de se mettre à jour.
-2. **Migration Room 4→5 obligatoire.** La base est construite avec
-   `fallbackToDestructiveMigration()` : retirer `MIGRATION_4_5` effacerait tous les
-   parcours des utilisateurs existants. Toute nouvelle version de schéma doit venir
-   avec sa migration explicite. **Vital** depuis le passage aux mises à jour sur
-   place : plus rien ne rattrape un oubli, voir « Identité de l'application ».
+2. **Toutes les migrations Room sont obligatoires.** La base est construite avec
+   `fallbackToDestructiveMigration()` : retirer l'une des migrations déclarées —
+   `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6` (`Track.sourceColor`),
+   `MIGRATION_6_7` (`TrackPoint.segmentColor`) — effacerait tous les parcours des
+   utilisateurs existants. Toute nouvelle version de schéma doit venir avec la sienne.
+   **Vital** depuis le passage aux mises à jour sur place : plus rien ne rattrape un
+   oubli, voir « Identité de l'application ».
+   Sur `track_points`, préférer une colonne **nullable et sans valeur par défaut** :
+   SQLite se contente alors de modifier le schéma, là où une valeur par défaut
+   réécrirait toutes les lignes — plusieurs millions sur une trace importée.
 3. **Affichage par fenêtre de vue.** `getDisplayPoints()` renvoie une silhouette
    sous-échantillonnée + le détail de la zone visible. Ces points servent
    **uniquement à dessiner**. Ne jamais exporter depuis eux : l'export passe par
@@ -293,39 +332,31 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 55 tests unitaires : `SolarTimesTest` (9), `AltitudeSmootherTest` (7),
-  `TrackSegmentsTest` (7), `UpdateManifestTest` (7), `TunnelDetectorTest` (6),
-  `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`
-  (4), plus trois tests d'échafaudage hérités (`ExampleUnitTest`,
-  `ExampleRobolectricTest`, `GreetingScreenshotTest` avec Roborazzi).
+- 70 tests unitaires : `SolarTimesTest` (9), `KmlColorTest` (8), `UpdateManifestTest`
+  (7), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7),
+  `TunnelDetectorTest` (6), `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest`
+  (6), `MergeTracksTest` (4), plus trois tests d'échafaudage hérités
+  (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
+  Roborazzi).
 - Sous git depuis le premier commit de l'état `0.9.8-thierry`, branche `main`.
 
 ## Où en est le projet
 
+### Ce qui est en place
+
+- Le dépôt existe et il est **public** : `https://github.com/ToftMalone/Mes-parcours`,
+  branche par défaut `main`. Sa visibilité n'est pas un détail — `update.json` est
+  téléchargé sans jeton, et un dépôt privé répondait 404, ce qui rendait toute la
+  recherche de mise à jour inopérante en silence.
+- **Le trousseau de signature existe** et les quatre secrets du dépôt sont renseignés.
+  `assembleRelease` produit donc un APK signé, en local comme en intégration continue.
+- **Deux versions ont été publiées** (`v0.9.9-thierry`, `v0.9.10-thierry`) : la chaîne
+  de publication a tourné en vrai, `update.json` répond à l'URL attendue, et une
+  application installée détecte désormais les versions suivantes toute seule.
+
 ### En attente d'une action de l'auteur
 
-- **Le dépôt est privé, donc la mise à jour ne marchera pas.** `UpdateConfig` pointe
-  bien sur `ToftMalone/Mes-parcours`, mais `releases/latest/download/update.json` est
-  téléchargé sans jeton : sur un dépôt privé GitHub répond 404, `UpdateChecker`
-  renvoie `null` et l'échec est silencieux par conception. L'application ne proposera
-  donc jamais de mise à jour tant que le dépôt n'est pas **public** — ou tant que
-  `update.json` et l'APK ne sont pas hébergés ailleurs, avec l'URL changée dans
-  `UpdateConfig`. C'est le seul point qui rende du code déjà écrit inopérant.
-- **Le trousseau de signature n'existe pas encore**, et les quatre secrets du dépôt ne
-  sont pas renseignés. Voir « Publier une version ». Tant que c'est le cas, seul
-  `assembleDebug` fonctionne, et le workflow de publication échouerait dès l'étape
-  « Restituer le trousseau de signature ».
-- **Aucune version n'a encore été publiée** : pas de tag, pas de publication GitHub,
-  aucune exécution du workflow. La chaîne de publication n'a donc jamais tourné en
-  vrai.
-
-### Ce qui est fait
-
-- Le dépôt existe : `https://github.com/ToftMalone/Mes-parcours`, branche par défaut
-  `main`, remote `origin` configuré, historique poussé.
-- `UpdateConfig.GITHUB_OWNER` / `GITHUB_REPO` sont renseignés (voir la réserve
-  ci-dessus sur la visibilité du dépôt).
-- `.github/workflows/release.yml` est en place, avec son garde-fou tag ↔ `versionName`.
+- Rien ne bloque plus la chaîne de publication.
 
 ### À vérifier sur le terrain, rien n'a été modifié
 
