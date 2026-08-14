@@ -1,17 +1,22 @@
-name: Compiler un APK de debug
+name: Compiler un APK
 
-# Produit un APK de debug installable, joint à l'exécution comme artefact.
+# Produit un APK installable, joint à l'exécution comme artefact.
 #
 # Utile quand on ne peut pas compiler soi-même : machine sans SDK Android, session
 # distante sans accès à dl.google.com. Le runner GitHub, lui, a le SDK préinstallé.
 #
-# Se lance à la main (onglet Actions → « Compiler un APK de debug » → Run workflow),
-# ou automatiquement à chaque poussée sur une branche de travail.
+# Toujours un APK de debug. Et un APK de release signé en plus, dès lors que le
+# secret KEYSTORE_BASE64 existe — inutile de revenir modifier ce fichier le jour où
+# le trousseau est créé, l'étape s'allume d'elle-même.
+#
+# Se lance à la main (onglet Actions → « Compiler un APK » → Run workflow), ou
+# automatiquement à chaque poussée sur main ou sur une branche de travail.
 
 on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - 'claude/**'
 
 jobs:
@@ -44,31 +49,82 @@ jobs:
       - name: Préparer Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Lire la version
+        id: version
+        run: |
+          set -euo pipefail
+          echo "nom=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)" >> "${GITHUB_OUTPUT}"
+
       - name: Compiler l'APK de debug
         run: ./gradlew --no-daemon assembleDebug
 
-      - name: Renommer l'APK
+      - name: Renommer l'APK de debug
         # Le nom par défaut (app-debug.apk) ne dit ni quelle application ni quelle
         # version : sur un téléphone qui en accumule plusieurs, c'est illisible.
-        id: apk
-        run: |
-          set -euo pipefail
-          VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          APK_NAME="mes-parcours-${VERSION_NAME}-debug.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "${APK_NAME}"
-          echo "name=${APK_NAME}" >> "${GITHUB_OUTPUT}"
+        # Renommer le fichier lui-même, et pas seulement l'artefact : c'est le nom
+        # du fichier qui survit à la décompression, donc celui qu'on verra.
+        run: cp app/build/outputs/apk/debug/app-debug.apk "mes-parcours-${{ steps.version.outputs.nom }}-debug.apk"
 
-      - name: Joindre l'APK à l'exécution
+      - name: Joindre l'APK de debug
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.apk.outputs.name }}
-          path: ${{ steps.apk.outputs.name }}
+          name: mes-parcours-${{ steps.version.outputs.nom }}-debug.apk
+          path: mes-parcours-${{ steps.version.outputs.nom }}-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # ------------------------------------------------------------------
+      # APK de release, seulement si le trousseau de signature est disponible.
+      #
+      # Le contexte `secrets` n'est lisible ni dans un `if` d'étape ni dans un `if`
+      # de job : on le fait donc transiter par une sortie d'étape, seule voie qui
+      # permette de sauter proprement la suite quand le secret est absent.
+      # ------------------------------------------------------------------
+
+      - name: Vérifier la présence du trousseau
+        id: signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "disponible=oui" >> "${GITHUB_OUTPUT}"
+          else
+            echo "disponible=non" >> "${GITHUB_OUTPUT}"
+            echo "::notice::Pas de secret KEYSTORE_BASE64 : seul l'APK de debug est produit. Voir CLAUDE.md, « Publier une version »."
+          fi
+
+      - name: Restituer le trousseau de signature
+        if: steps.signature.outputs.disponible == 'oui'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: printf '%s' "${KEYSTORE_BASE64}" | base64 -d > "${RUNNER_TEMP}/upload.jks"
+
+      - name: Compiler l'APK de release signé
+        if: steps.signature.outputs.disponible == 'oui'
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Renommer l'APK de release
+        if: steps.signature.outputs.disponible == 'oui'
+        run: cp app/build/outputs/apk/release/app-release.apk "mes-parcours-${{ steps.version.outputs.nom }}-release.apk"
+
+      - name: Joindre l'APK de release
+        if: steps.signature.outputs.disponible == 'oui'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mes-parcours-${{ steps.version.outputs.nom }}-release.apk
+          path: mes-parcours-${{ steps.version.outputs.nom }}-release.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Lancer les tests
-        # Après la mise en ligne de l'APK, à dessein : un test qui échoue doit
-        # colorer l'exécution en rouge sans priver pour autant du fichier compilé.
+        # Après la mise en ligne des APK, à dessein : un test qui échoue doit
+        # colorer l'exécution en rouge sans priver pour autant des fichiers compilés.
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Joindre les rapports de test

@@ -54,10 +54,19 @@ lui-même fonctionne, et `maven.google.com` est joignable : seul le SDK manque, 
 rien ne permet de l'installer depuis là.
 
 Le détour, c'est `.github/workflows/debug-apk.yml` : le runner GitHub a le SDK, il
-compile l'APK de debug, le joint à l'exécution et enchaîne les tests. C'est ce qui
-permet de vérifier une modification faite en session web — et d'en récupérer un APK
+compile, joint les APK à l'exécution et enchaîne les tests. C'est ce qui permet de
+vérifier une modification faite en session web — et d'en récupérer un APK
 installable — sans machine de développement sous la main. Se lance à la main depuis
-l'onglet Actions, ou à chaque poussée sur une branche `claude/**`.
+l'onglet Actions, ou à chaque poussée sur `main` ou sur une branche `claude/**`.
+
+Toujours un APK de debug ; **et un APK de release signé en plus dès que le secret
+`KEYSTORE_BASE64` existe.** L'étape s'allume d'elle-même le jour où le trousseau est
+créé, il n'y aura pas à retoucher le workflow. Le contexte `secrets` n'étant lisible
+dans aucun `if`, la présence du secret transite par une sortie d'étape — c'est la
+seule voie qui permette de sauter proprement la compilation signée quand il manque.
+
+Ce workflow ne pose ni tag ni publication GitHub : il sert à essayer une version.
+La vraie publication reste `release.yml`, déclenchée par un tag annoté.
 
 **Attention à la clé de debug de l'APK produit en CI.** `debug.keystore` n'étant pas
 versionné, le runner n'en a pas et AGP en fabrique un neuf **à chaque exécution**.
