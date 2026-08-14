@@ -51,8 +51,23 @@ itérations une fois les dépendances en cache.
 de SDK Android, et la politique réseau de la session bloque `dl.google.com` — donc
 aussi bien `sdkmanager` que le téléchargement de la plateforme d'API 36. Gradle
 lui-même fonctionne, et `maven.google.com` est joignable : seul le SDK manque, et
-rien ne permet de l'installer depuis là. Une modification faite dans une session web
-doit donc être compilée et testée sur la machine de l'auteur avant d'être crue.
+rien ne permet de l'installer depuis là.
+
+Le détour, c'est `.github/workflows/debug-apk.yml` : le runner GitHub a le SDK, il
+compile l'APK de debug, le joint à l'exécution et enchaîne les tests. C'est ce qui
+permet de vérifier une modification faite en session web — et d'en récupérer un APK
+installable — sans machine de développement sous la main. Se lance à la main depuis
+l'onglet Actions, ou à chaque poussée sur une branche `claude/**`.
+
+**Attention à la clé de debug de l'APK produit en CI.** `debug.keystore` n'étant pas
+versionné, le runner n'en a pas et AGP en fabrique un neuf **à chaque exécution**.
+Deux APK de debug issus de deux exécutions ne portent donc pas la même signature, et
+aucun ne porte celle de la machine de l'auteur : les installer l'un par-dessus
+l'autre échoue avec « package signatures do not match », et il faut désinstaller —
+donc perdre les parcours enregistrés. Un APK de CI sert à essayer une version sur un
+téléphone, pas à mettre à jour une installation existante. Verser un `debug.keystore`
+fixe au dépôt lèverait la limite (une clé de debug n'est pas un secret), au prix de
+la règle actuelle qui le garde dehors.
 
 ## Carte du code
 
