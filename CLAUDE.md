@@ -47,6 +47,28 @@ Le SDK Android est indiqué par `local.properties` (non versionné). La variante
 Sur Windows, préférer `.\gradlew.bat` ; `--offline` accélère nettement les
 itérations une fois les dépendances en cache.
 
+**Ni l'un ni l'autre ne tourne dans Claude Code sur le web.** Le conteneur n'a pas
+de SDK Android, et la politique réseau de la session bloque `dl.google.com` — donc
+aussi bien `sdkmanager` que le téléchargement de la plateforme d'API 36. Gradle
+lui-même fonctionne, et `maven.google.com` est joignable : seul le SDK manque, et
+rien ne permet de l'installer depuis là.
+
+Le détour, c'est `.github/workflows/debug-apk.yml` : le runner GitHub a le SDK, il
+compile l'APK de debug, le joint à l'exécution et enchaîne les tests. C'est ce qui
+permet de vérifier une modification faite en session web — et d'en récupérer un APK
+installable — sans machine de développement sous la main. Se lance à la main depuis
+l'onglet Actions, ou à chaque poussée sur une branche `claude/**`.
+
+**Attention à la clé de debug de l'APK produit en CI.** `debug.keystore` n'étant pas
+versionné, le runner n'en a pas et AGP en fabrique un neuf **à chaque exécution**.
+Deux APK de debug issus de deux exécutions ne portent donc pas la même signature, et
+aucun ne porte celle de la machine de l'auteur : les installer l'un par-dessus
+l'autre échoue avec « package signatures do not match », et il faut désinstaller —
+donc perdre les parcours enregistrés. Un APK de CI sert à essayer une version sur un
+téléphone, pas à mettre à jour une installation existante. Verser un `debug.keystore`
+fixe au dépôt lèverait la limite (une clé de debug n'est pas un secret), au prix de
+la règle actuelle qui le garde dehors.
+
 ## Carte du code
 
 ```
@@ -255,16 +277,28 @@ inverser, et l'assombrir la rendrait illisible.
 
 ### En attente d'une action de l'auteur
 
-- **`UpdateConfig.GITHUB_OWNER` et `GITHUB_REPO` sont vides.** Tant qu'ils le sont,
-  la recherche de mise à jour n'émet aucune requête et l'application se comporte comme
-  avant. À renseigner une fois le dépôt créé.
+- **Le dépôt est privé, donc la mise à jour ne marchera pas.** `UpdateConfig` pointe
+  bien sur `ToftMalone/Mes-parcours`, mais `releases/latest/download/update.json` est
+  téléchargé sans jeton : sur un dépôt privé GitHub répond 404, `UpdateChecker`
+  renvoie `null` et l'échec est silencieux par conception. L'application ne proposera
+  donc jamais de mise à jour tant que le dépôt n'est pas **public** — ou tant que
+  `update.json` et l'APK ne sont pas hébergés ailleurs, avec l'URL changée dans
+  `UpdateConfig`. C'est le seul point qui rende du code déjà écrit inopérant.
 - **Le trousseau de signature n'existe pas encore**, et les quatre secrets du dépôt ne
   sont pas renseignés. Voir « Publier une version ». Tant que c'est le cas, seul
-  `assembleDebug` fonctionne.
-- **Le dépôt n'a pas de remote.** Rien n'a jamais été poussé.
-- Le dépôt devra être **public** : le mécanisme de mise à jour télécharge
-  `update.json` et l'APK par une URL ouverte, sans jeton. Sinon, héberger ces deux
-  fichiers ailleurs et changer l'URL dans `UpdateConfig`.
+  `assembleDebug` fonctionne, et le workflow de publication échouerait dès l'étape
+  « Restituer le trousseau de signature ».
+- **Aucune version n'a encore été publiée** : pas de tag, pas de publication GitHub,
+  aucune exécution du workflow. La chaîne de publication n'a donc jamais tourné en
+  vrai.
+
+### Ce qui est fait
+
+- Le dépôt existe : `https://github.com/ToftMalone/Mes-parcours`, branche par défaut
+  `main`, remote `origin` configuré, historique poussé.
+- `UpdateConfig.GITHUB_OWNER` / `GITHUB_REPO` sont renseignés (voir la réserve
+  ci-dessus sur la visibilité du dépôt).
+- `.github/workflows/release.yml` est en place, avec son garde-fou tag ↔ `versionName`.
 
 ### À vérifier sur le terrain, rien n'a été modifié
 
