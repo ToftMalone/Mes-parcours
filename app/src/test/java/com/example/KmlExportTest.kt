@@ -75,7 +75,11 @@ class KmlExportTest {
         // entrées, ce que la fusion cherchait précisément à supprimer.
         val kml = export(listOf(point(1), point(2, discontinuous = true)))
 
-        assertEquals(1, kml.countOf("<name>Voyages</name>"))
+        // Compté dans le Placemark seul : l'en-tête <Document> porte lui aussi le nom
+        // du parcours, et le compter sur le fichier entier ferait échouer un test que
+        // le code satisfait pourtant.
+        val placemark = kml.substringAfter("<Placemark>").substringBefore("</Placemark>")
+        assertEquals(1, placemark.countOf("<name>Voyages</name>"))
         assertTrue("aucun nom numéroté attendu", !kml.contains("Voyages ("))
     }
 
