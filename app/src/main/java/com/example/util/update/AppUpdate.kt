@@ -14,11 +14,11 @@ import java.net.URL
  */
 object UpdateConfig {
 
-    /** Compte GitHub hébergeant les publications. À renseigner. */
-    const val GITHUB_OWNER = ""
+    /** Compte GitHub hébergeant les publications. */
+    const val GITHUB_OWNER = "ToftMalone"
 
-    /** Dépôt GitHub hébergeant les publications. À renseigner. */
-    const val GITHUB_REPO = ""
+    /** Dépôt GitHub hébergeant les publications. */
+    const val GITHUB_REPO = "Mes-parcours"
 
     /** Nom du fichier décrivant la version, joint à chaque publication. */
     const val MANIFEST_ASSET = "update.json"
