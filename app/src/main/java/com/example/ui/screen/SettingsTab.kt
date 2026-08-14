@@ -113,6 +113,7 @@ fun SettingsTab(
 
             SettingsGroupHeader(title = "Tracés", icon = Icons.Default.Timeline)
             TrackThicknessSettingsCard()
+            ImportedTrackColorCard()
 
             SettingsGroupHeader(title = "Sauvegarde", icon = Icons.Default.CloudSync)
             AutoBackupSettingsCard()
@@ -538,6 +539,40 @@ fun NightModeSettingsCard() {
 // ---------------------------------------------------------------------------
 // Tracés
 // ---------------------------------------------------------------------------
+
+/**
+ * Couleurs des parcours importés.
+ *
+ * Ce choix n'existait que derrière un appui long sur l'onglet « Importés » de
+ * l'historique : un geste que rien n'annonce, sur un onglet précis parmi deux. Qui
+ * ouvrait la palette depuis « Enregistrés » n'y voyait rien — et pour cause, un
+ * parcours enregistré ne vient d'aucun fichier. Le réglage restait donc introuvable
+ * pour qui ne l'avait pas vu faire. Sa place est ici, là où on cherche les réglages ;
+ * le geste de l'historique n'est plus qu'un raccourci.
+ */
+@Composable
+fun ImportedTrackColorCard() {
+    val context = LocalContext.current
+    var fromFile by remember {
+        mutableStateOf(TrackStylePreferences.isImportedColorFromFile(context))
+    }
+
+    SettingsCard(modifier = Modifier.testTag("imported_track_color_card")) {
+        SettingsToggleRow(
+            emoji = "🎨",
+            title = "Garder les couleurs des fichiers",
+            description = "Chaque parcours importé reprend la couleur que portait son " +
+                    "fichier, celle choisie dans Google Earth. Les fichiers qui n'en " +
+                    "portent pas, les GPX notamment, gardent la couleur de la palette.",
+            checked = fromFile,
+            onCheckedChange = { checked ->
+                fromFile = checked
+                TrackStylePreferences.setImportedColorFromFile(context, checked)
+            },
+            switchTestTag = "imported_color_from_file_switch"
+        )
+    }
+}
 
 /**
  * Réglage de l'épaisseur du trait des tracés, avec aperçu en direct.
@@ -1017,6 +1052,7 @@ private val RELEASES = listOf(
     Release(
         version = "0.9.11-thierry",
         changes = listOf(
+            "Paramètres : Le choix « Garder les couleurs des fichiers » a désormais sa place dans les réglages, section Tracés. Il n'existait que derrière un appui long sur l'onglet « Importés » de l'historique, donc introuvable pour qui ne connaissait pas le geste",
             "Palette de couleurs : L'appui long fonctionne désormais sur tout l'onglet, et non plus sur les seules lettres de son titre. Sur un grand écran, appuyer sur l'onglet n'ouvrait rien tant qu'on n'avait pas visé le mot lui-même",
             "Parcours importés : Chaque trajet garde SA couleur d'origine. Un fichier Google Earth qui réunit plusieurs voyages les affiche chacun de la couleur que vous lui aviez donnée, au lieu de les peindre tous pareil",
             "Couleurs : Le choix se fait dans la palette, par appui long sur l'onglet « Importés ». La première pastille, en dégradé, active les couleurs d'origine",
