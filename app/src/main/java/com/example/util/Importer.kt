@@ -23,6 +23,13 @@ private const val KML_BYTES_PER_POINT = 25
 private const val MAX_NAME_LENGTH = 512
 
 /**
+ * Longueur maximale retenue pour une couleur lue dans le fichier. Une couleur KML
+ * fait huit caractères ; la marge absorbe les espaces, et la borne évite qu'un
+ * fichier malformé fasse enfler le tampon.
+ */
+private const val MAX_COLOR_LENGTH = 32
+
+/**
  * Importe un GPX/KML sans jamais simplifier la trace : chaque point présent dans
  * le fichier devient un TrackPoint. Aucun sous-échantillonnage, aucun lissage.
  *
@@ -49,7 +56,9 @@ object Importer {
         val avgSpeed: Double,
         val elevationGain: Double,
         val elevationLoss: Double,
-        val pointCount: Int
+        val pointCount: Int,
+        /** Couleur de tracé lue dans le fichier (ARGB), null si le fichier n'en portait pas. */
+        val sourceColor: Int? = null
     )
 
     private data class FileMeta(
@@ -78,7 +87,7 @@ object Importer {
 
         val meta = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             if (isKml) {
-                TrackMeta(parseKML(inputStream, defaultName, fileMeta.size, sink), "Randonnée")
+                parseKML(inputStream, defaultName, fileMeta.size, sink)
             } else {
                 parseGPX(inputStream, defaultName, sink)
             }
@@ -99,7 +108,8 @@ object Importer {
             avgSpeed = if (duration > 0) sink.totalDistance / duration else 0.0,
             elevationGain = sink.elevationGain,
             elevationLoss = sink.elevationLoss,
-            pointCount = sink.count
+            pointCount = sink.count,
+            sourceColor = meta.sourceColor
         )
     }
 
@@ -199,7 +209,7 @@ object Importer {
         defaultName: String,
         fileSize: Long,
         sink: PointSink
-    ): String {
+    ): TrackMeta {
         // Le KML ne porte pas d'horodatage : on garde la convention historique d'un
         // point par seconde, calée pour que la trace se termine à l'instant présent.
         val estimatedPoints = (fileSize / KML_BYTES_PER_POINT).coerceAtLeast(1L)
@@ -209,7 +219,7 @@ object Importer {
         factory.isNamespaceAware = false
         factory.newSAXParser().parse(inputStream, handler)
 
-        return handler.trackName
+        return TrackMeta(handler.trackName, "Randonnée", handler.lineColor)
     }
 
     // ------------------------------------------------------------- Divers
@@ -278,7 +288,9 @@ object Importer {
 
 private data class TrackMeta(
     val name: String,
-    val activityType: String
+    val activityType: String,
+    /** Couleur de tracé portée par le fichier, quand il en porte une. */
+    val sourceColor: Int? = null
 )
 
 /**
@@ -373,10 +385,29 @@ private class KmlHandler(
     var trackName: String = defaultName
         private set
 
+    /**
+     * Couleur du premier `<LineStyle>` rencontré, convertie en ARGB.
+     *
+     * On retient la première et on ignore les suivantes. Un KML de Google Earth
+     * décrit couramment le même tracé deux fois — un `<Style>` normal et un
+     * `<StyleMap>` de survol, souvent d'une autre couleur — et il n'existe pas de
+     * règle simple pour désigner « la bonne » sans résoudre les `<styleUrl>`. La
+     * première déclarée est celle du tracé au repos, donc celle que l'utilisateur
+     * voit dans Google Earth.
+     *
+     * Les autres styles (`<PolyStyle>`, `<IconStyle>`) sont écartés : ils colorent
+     * des surfaces et des épingles, pas la ligne du parcours.
+     */
+    var lineColor: Int? = null
+        private set
+
     private var nameResolved = false
     private var inName = false
     private var inCoordinates = false
+    private var inLineStyle = false
+    private var inLineStyleColor = false
     private val nameBuffer = StringBuilder()
+    private val colorBuffer = StringBuilder()
 
     private var clock = startClock
 
@@ -402,6 +433,11 @@ private class KmlHandler(
                 tokenizer.reset()
                 sink.startNewSegment()
             }
+            "linestyle" -> inLineStyle = true
+            "color" -> if (inLineStyle && lineColor == null) {
+                inLineStyleColor = true
+                colorBuffer.setLength(0)
+            }
         }
     }
 
@@ -410,6 +446,8 @@ private class KmlHandler(
             tokenizer.feed(ch, start, length)
         } else if (inName && nameBuffer.length < MAX_NAME_LENGTH) {
             nameBuffer.append(ch, start, minOf(length, MAX_NAME_LENGTH - nameBuffer.length))
+        } else if (inLineStyleColor && colorBuffer.length < MAX_COLOR_LENGTH) {
+            colorBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - colorBuffer.length))
         }
     }
 
@@ -427,6 +465,17 @@ private class KmlHandler(
             "coordinates" -> if (inCoordinates) {
                 tokenizer.finish()
                 inCoordinates = false
+            }
+            "color" -> if (inLineStyleColor) {
+                inLineStyleColor = false
+                // Refusée si illisible ou transparente : on retombe alors sur la
+                // couleur de la palette plutôt que sur un tracé invisible.
+                KmlColor.parse(colorBuffer.toString())?.let { lineColor = it }
+                colorBuffer.setLength(0)
+            }
+            "linestyle" -> {
+                inLineStyle = false
+                inLineStyleColor = false
             }
         }
     }

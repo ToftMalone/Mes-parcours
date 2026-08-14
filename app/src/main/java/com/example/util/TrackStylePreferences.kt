@@ -12,6 +12,7 @@ object TrackStylePreferences {
     private const val KEY_THICKNESS_LEVEL = "pref_track_thickness_level"
     private const val KEY_COLOR_RECORDED = "pref_track_color_recorded"
     private const val KEY_COLOR_IMPORTED = "pref_track_color_imported"
+    private const val KEY_IMPORTED_FROM_FILE = "pref_track_color_imported_from_file"
 
     /** Violet, couleur historique des parcours enregistrés. */
     const val DEFAULT_COLOR_RECORDED = 0xFF8B5CF6.toInt()
@@ -78,4 +79,29 @@ object TrackStylePreferences {
     fun setImportedColor(context: Context, color: Int) {
         prefs(context).edit().putInt(KEY_COLOR_IMPORTED, color).apply()
     }
+
+    /**
+     * Faut-il dessiner chaque parcours importé avec la couleur que portait son
+     * fichier — celle choisie dans Google Earth — plutôt qu'avec la couleur unique
+     * de la palette ?
+     *
+     * Désactivé par défaut : l'affichage d'un parcours déjà importé ne doit pas
+     * changer tout seul à la mise à jour de l'application.
+     */
+    fun isImportedColorFromFile(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_IMPORTED_FROM_FILE, false)
+
+    fun setImportedColorFromFile(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_IMPORTED_FROM_FILE, enabled).apply()
+    }
+
+    /**
+     * Couleur à employer pour un parcours importé.
+     *
+     * Le repli sur [fallback] n'est pas un détail : un GPX ne porte jamais de
+     * couleur, et un KML peut n'en porter aucune. Sans repli, ces parcours seraient
+     * dessinés en noir — soit invisibles sur le fond de carte sombre.
+     */
+    fun resolveImportedColor(fromFile: Boolean, sourceColor: Int?, fallback: Int): Int =
+        if (fromFile && sourceColor != null) sourceColor else fallback
 }

@@ -96,6 +96,11 @@ fun HistoryTab(
     var recordedColor by remember { mutableStateOf(TrackStylePreferences.getRecordedColor(context)) }
     var importedColor by remember { mutableStateOf(TrackStylePreferences.getImportedColor(context)) }
 
+    // Les parcours importés gardent-ils la couleur de leur fichier d'origine ?
+    var importedColorFromFile by remember {
+        mutableStateOf(TrackStylePreferences.isImportedColorFromFile(context))
+    }
+
     // Catégorie dont la palette est ouverte : 0 = enregistrés, 1 = importés, null = fermée.
     var colorPickerCategory by remember { mutableStateOf<Int?>(null) }
 
@@ -355,7 +360,13 @@ fun HistoryTab(
                     items(importedTracks, key = { it.id }) { track ->
                         TrackHistoryCard(
                             track = track,
-                            trackColor = Color(importedColor),
+                            trackColor = Color(
+                                TrackStylePreferences.resolveImportedColor(
+                                    fromFile = importedColorFromFile,
+                                    sourceColor = track.sourceColor,
+                                    fallback = importedColor
+                                )
+                            ),
                             onClick = { onNavigateToDetails(track.id) },
                             onDeleteClick = { trackToDelete = track },
                             onResumeClick = {
@@ -394,18 +405,48 @@ fun HistoryTab(
                 )
             },
             text = {
-                ColorPaletteRow(
-                    selectedColor = if (isRecorded) recordedColor else importedColor,
-                    onColorSelected = { color ->
-                        if (isRecorded) {
-                            recordedColor = color
-                            TrackStylePreferences.setRecordedColor(context, color)
-                        } else {
-                            importedColor = color
-                            TrackStylePreferences.setImportedColor(context, color)
+                Column {
+                    ColorPaletteRow(
+                        selectedColor = if (isRecorded) recordedColor else importedColor,
+                        onColorSelected = { color ->
+                            if (isRecorded) {
+                                recordedColor = color
+                                TrackStylePreferences.setRecordedColor(context, color)
+                            } else {
+                                importedColor = color
+                                TrackStylePreferences.setImportedColor(context, color)
+                                // Choisir une couleur franche, c'est renoncer à celle
+                                // du fichier : sans quoi la pastille se sélectionnerait
+                                // sans que le tracé change à l'écran.
+                                importedColorFromFile = false
+                                TrackStylePreferences.setImportedColorFromFile(context, false)
+                            }
+                        },
+                        // Seuls les parcours importés viennent d'un fichier.
+                        showFileColorOption = !isRecorded,
+                        isFileColorSelected = importedColorFromFile,
+                        onFileColorSelected = {
+                            importedColorFromFile = true
+                            TrackStylePreferences.setImportedColorFromFile(context, true)
                         }
+                    )
+
+                    if (!isRecorded) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (importedColorFromFile) {
+                                "Chaque parcours garde la couleur de son fichier. " +
+                                    "Ceux qui n'en portent pas — les GPX, notamment — " +
+                                    "utilisent la couleur choisie ici."
+                            } else {
+                                "La première pastille garde les couleurs d'origine des " +
+                                    "fichiers, telles que Google Earth les a enregistrées."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                )
+                }
             },
             confirmButton = {
                 Button(
@@ -786,11 +827,18 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
  * Rangée de pastilles de couleur, affichée dans la boîte de dialogue ouverte par
  * un appui long sur une catégorie. La couleur retenue s'applique aux tracés sur
  * la carte et aux fiches de l'historique.
+ *
+ * Pour les parcours importés, une pastille supplémentaire ouvre la rangée : elle ne
+ * porte pas une couleur mais un dégradé, parce qu'elle en désigne autant qu'il y a
+ * de fichiers. C'est le choix « garder les couleurs d'origine ».
  */
 @Composable
 fun ColorPaletteRow(
     selectedColor: Int,
-    onColorSelected: (Int) -> Unit
+    onColorSelected: (Int) -> Unit,
+    showFileColorOption: Boolean = false,
+    isFileColorSelected: Boolean = false,
+    onFileColorSelected: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -800,8 +848,40 @@ fun ColorPaletteRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (showFileColorOption) {
+            Box(
+                modifier = Modifier
+                    .size(if (isFileColorSelected) 38.dp else 32.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.sweepGradient(
+                            listOf(
+                                Color(0xFFD32F2F),
+                                Color(0xFFFF9800),
+                                Color(0xFFFFEB3B),
+                                Color(0xFF39FF14),
+                                Color(0xFF2196F3),
+                                Color(0xFF8B5CF6),
+                                Color(0xFFD32F2F)
+                            )
+                        )
+                    )
+                    .border(
+                        width = if (isFileColorSelected) 3.dp else 1.dp,
+                        color = if (isFileColorSelected) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                        shape = CircleShape
+                    )
+                    .clickable { onFileColorSelected() }
+                    .testTag("color_swatch_from_file")
+            )
+        }
+
         TrackStylePreferences.COLOR_PALETTE.forEach { color ->
-            val isSelected = color == selectedColor
+            // Aucune pastille franche n'est sélectionnée tant que les couleurs
+            // d'origine sont retenues : deux choix cochés à la fois se liraient
+            // comme un bug.
+            val isSelected = !isFileColorSelected && color == selectedColor
             Box(
                 modifier = Modifier
                     .size(if (isSelected) 38.dp else 32.dp)

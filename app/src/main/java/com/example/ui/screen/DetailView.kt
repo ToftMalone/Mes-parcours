@@ -213,6 +213,7 @@ fun DetailView(
                         modifier = Modifier.fillMaxSize(),
                         isInteractivityEnabled = false,
                         isImported = currentTrack.isImported,
+                        sourceColor = currentTrack.sourceColor,
                         onViewportChanged = { viewModel.updateMapViewport(it) }
                     )
                 } else {

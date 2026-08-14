@@ -340,7 +340,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                             maxSpeed = summary.maxSpeed,
                             avgSpeed = summary.avgSpeed,
                             elevationGain = summary.elevationGain,
-                            elevationLoss = summary.elevationLoss
+                            elevationLoss = summary.elevationLoss,
+                            sourceColor = summary.sourceColor
                         )
                     )
                     trackId

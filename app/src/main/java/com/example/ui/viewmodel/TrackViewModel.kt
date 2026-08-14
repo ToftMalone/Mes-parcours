@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.LiveStats
+import com.example.data.model.MapTrack
 import com.example.data.model.MapViewport
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
@@ -212,15 +213,19 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         repository.updateGpsAccuracy(accuracy)
     }
 
-    /** Tracés à superposer sur la carte : (parcours importé ?, points à dessiner). */
-    val selectedImportedPoints: StateFlow<List<Pair<Boolean, List<TrackPoint>>>> = combine(
+    /** Tracés à superposer sur la carte, chacun avec de quoi choisir sa couleur. */
+    val selectedImportedPoints: StateFlow<List<MapTrack>> = combine(
         repository.getSelectedImportedTracksFlow(),
         _mapViewport.debounce(VIEWPORT_DEBOUNCE_MS)
     ) { tracks, viewport -> tracks to viewport }
     .flatMapLatest { (tracks, viewport) ->
         flow {
             val allPoints = tracks.map { track ->
-                track.isImported to repository.getDisplayPoints(track.id, viewport)
+                MapTrack(
+                    isImported = track.isImported,
+                    sourceColor = track.sourceColor,
+                    points = repository.getDisplayPoints(track.id, viewport)
+                )
             }
             emit(allPoints)
         }

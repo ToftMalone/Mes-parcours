@@ -30,8 +30,8 @@ android {
     applicationId = "com.toche.mesparcours"
     minSdk = 24
     targetSdk = 36
-    versionCode = 8
-    versionName = "0.9.8-thierry"
+    versionCode = 9
+    versionName = "0.9.9-thierry"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

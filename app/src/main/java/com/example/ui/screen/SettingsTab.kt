@@ -1015,15 +1015,11 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.8-thierry",
+        version = "0.9.9-thierry",
         changes = listOf(
-            "Nouveau nom : L'application s'appelle désormais « Mes parcours »",
-            "Altitude : Corrigée — elle était systématiquement trop haute d'une cinquantaine de mètres, le GPS la donnant par rapport à l'ellipsoïde et non au niveau de la mer",
-            "Altitude : Stabilisée, et « — » s'affiche désormais au lieu d'un « 0 m » trompeur quand le GPS n'en fournit pas",
-            "Dénivelé : Recalculé — les montées régulières n'étaient pas comptées, et le bruit du GPS en inventait à l'arrêt",
-            "Carte en thème sombre : Les couleurs de Mapnik sont conservées, seulement assombries — vert foncé pour le gazon et les parcs, bleu profond pour l'eau",
-            "Carte : Le tracé se charge entièrement quand la carte suit vos déplacements, sans avoir à la faire glisser à la main",
-            "Panneau de limitation de vitesse : Retiré définitivement, les données disponibles ne permettaient pas d'afficher une limitation fiable"
+            "Parcours importés : Ils peuvent désormais garder les couleurs de leur fichier d'origine, telles que Google Earth les a enregistrées — chaque tracé retrouve la couleur que vous lui aviez donnée",
+            "Couleurs : Le choix se fait dans la palette, par appui long sur l'onglet « Importés ». La première pastille, en dégradé, active les couleurs d'origine",
+            "Couleurs : Les parcours sans couleur dans leur fichier — les GPX, notamment — continuent d'utiliser la couleur choisie dans la palette"
         )
     )
 )

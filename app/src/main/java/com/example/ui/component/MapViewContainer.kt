@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.data.model.MapTrack
 import com.example.data.model.MapViewport
 import com.example.data.model.TrackPoint
 import com.example.ui.screen.AlertState
@@ -183,7 +184,7 @@ private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Uni
 // Helper class attached as tag to the MapView for lightweight dynamic access
 private class MapState(
     var points: List<TrackPoint> = emptyList(),
-    var overlayTracks: List<Pair<Boolean, List<TrackPoint>>> = emptyList(),
+    var overlayTracks: List<MapTrack> = emptyList(),
     var currentUserLocation: TrackPoint? = null,
     var isImported: Boolean = false,
     var isCurrentTracking: Boolean = false,
@@ -197,7 +198,10 @@ private class MapState(
     // Apparence choisie par l'utilisateur : tout changement invalide les polylignes en cache.
     var strokeWidth: Float = 12f,
     var recordedColor: Int = 0,
-    var importedColor: Int = 0
+    var importedColor: Int = 0,
+    var importedColorFromFile: Boolean = false,
+    /** Couleur d'origine du parcours affiché en plein écran, s'il en a une. */
+    var sourceColor: Int? = null
 )
 
 private fun createBlueDotIcon(context: Context): android.graphics.drawable.Drawable {
@@ -252,8 +256,9 @@ fun MapViewContainer(
     isInteractivityEnabled: Boolean = true,
     recenterTrigger: Int = 0,
     currentUserLocation: TrackPoint? = null,
-    overlayTracks: List<Pair<Boolean, List<TrackPoint>>> = emptyList(),
+    overlayTracks: List<MapTrack> = emptyList(),
     isImported: Boolean = false,
+    sourceColor: Int? = null,
     isCurrentTracking: Boolean = false,
     zoomBannerTopPadding: androidx.compose.ui.unit.Dp = 110.dp,
     isAutoFollowActive: Boolean = false,
@@ -367,10 +372,13 @@ fun MapViewContainer(
                 val strokeWidth = TrackStylePreferences.getStrokeWidth(map.context)
                 val recordedColor = TrackStylePreferences.getRecordedColor(map.context)
                 val importedColor = TrackStylePreferences.getImportedColor(map.context)
+                val importedColorFromFile = TrackStylePreferences.isImportedColorFromFile(map.context)
 
                 val styleChanged = state.strokeWidth != strokeWidth ||
                                    state.recordedColor != recordedColor ||
-                                   state.importedColor != importedColor
+                                   state.importedColor != importedColor ||
+                                   state.importedColorFromFile != importedColorFromFile ||
+                                   state.sourceColor != sourceColor
 
                 val configChanged = state.isImported != isImported ||
                                     state.isCurrentTracking != isCurrentTracking ||
@@ -406,6 +414,8 @@ fun MapViewContainer(
                     state.strokeWidth = strokeWidth
                     state.recordedColor = recordedColor
                     state.importedColor = importedColor
+                    state.importedColorFromFile = importedColorFromFile
+                    state.sourceColor = sourceColor
                     map.tag = state
 
                     rebuildMapOverlays(map, state, isZoomedOut)
@@ -416,7 +426,7 @@ fun MapViewContainer(
         var showWarningDialog by remember { mutableStateOf(false) }
 
         // Floating Overlay Banner when zoomed out too much with tracks loaded
-        val hasTracks = points.isNotEmpty() || overlayTracks.any { it.second.isNotEmpty() }
+        val hasTracks = points.isNotEmpty() || overlayTracks.any { it.points.isNotEmpty() }
         val showZoomBanner = hasTracks && isZoomedOutTooMuch
 
         var bannerAlertState by remember { mutableStateOf<AlertState?>(null) }
@@ -994,11 +1004,20 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
     var cachedOverlayPolylines = state.cachedOverlayTrackPolylines
     if (cachedOverlayPolylines == null) {
         val buildList = mutableListOf<Polyline>()
-        for ((isOverlayImported, trackPoints) in state.overlayTracks) {
+        for (overlayTrack in state.overlayTracks) {
+            val trackPoints = overlayTrack.points
             if (trackPoints.isNotEmpty()) {
                 val segments = buildSegmentsFromPoints(trackPoints)
 
-                val overlayColor = if (isOverlayImported) state.importedColor else state.recordedColor
+                val overlayColor = if (overlayTrack.isImported) {
+                    TrackStylePreferences.resolveImportedColor(
+                        fromFile = state.importedColorFromFile,
+                        sourceColor = overlayTrack.sourceColor,
+                        fallback = state.importedColor
+                    )
+                } else {
+                    state.recordedColor
+                }
 
                 for (segmentPoints in segments) {
                     if (segmentPoints.isNotEmpty()) {
@@ -1030,7 +1049,11 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
 
             val trackLineColor = when {
                 state.isCurrentTracking -> Color.parseColor("#D32F2F") // Rouge pendant l'enregistrement
-                state.isImported -> state.importedColor
+                state.isImported -> TrackStylePreferences.resolveImportedColor(
+                    fromFile = state.importedColorFromFile,
+                    sourceColor = state.sourceColor,
+                    fallback = state.importedColor
+                )
                 else -> state.recordedColor
             }
 

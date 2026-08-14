@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 
-@Database(entities = [Track::class, TrackPoint::class], version = 5, exportSchema = false)
+@Database(entities = [Track::class, TrackPoint::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract val trackDao: TrackDao
 
@@ -33,6 +33,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Ajoute la colonne `sourceColor`, la couleur de tracé lue dans le fichier
+         * importé.
+         *
+         * Même exigence que la migration précédente : sans elle,
+         * fallbackToDestructiveMigration() effacerait tous les parcours de
+         * l'utilisateur au premier lancement de la nouvelle version. La colonne est
+         * nullable et sans valeur par défaut — les parcours déjà en base n'ont pas
+         * de couleur d'origine, et c'est bien ce qu'il faut enregistrer.
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tracks` ADD COLUMN `sourceColor` INTEGER")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 // Re-vérification sous le verrou : sans elle, deux appels simultanés
@@ -45,7 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "my_tracks_db"
                 )
-                    .addMigrations(MIGRATION_4_5)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
