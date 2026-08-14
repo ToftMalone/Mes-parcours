@@ -1,0 +1,81 @@
+name: Compiler un APK de debug
+
+# Produit un APK de debug installable, joint à l'exécution comme artefact.
+#
+# Utile quand on ne peut pas compiler soi-même : machine sans SDK Android, session
+# distante sans accès à dl.google.com. Le runner GitHub, lui, a le SDK préinstallé.
+#
+# Se lance à la main (onglet Actions → « Compiler un APK de debug » → Run workflow),
+# ou automatiquement à chaque poussée sur une branche de travail.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  compiler:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer le JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Préparer le SDK Android
+        # Accepte les licences et met sdkmanager dans le PATH. Le runner porte déjà
+        # un SDK, mais pas forcément la plateforme exacte visée par compileSdk.
+        uses: android-actions/setup-android@v3
+
+      - name: Installer la plateforme visée
+        # compileSdk vaut 36.1 : un niveau d'API mineur, dont le paquet peut porter
+        # l'un ou l'autre nom selon la version des outils. On tente les deux sans
+        # faire échouer l'étape — si la plateforme est déjà là, il n'y a rien à faire.
+        run: |
+          sdkmanager --install "platforms;android-36" || true
+          sdkmanager --install "platforms;android-36.1" || true
+
+      - name: Préparer Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compiler l'APK de debug
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Renommer l'APK
+        # Le nom par défaut (app-debug.apk) ne dit ni quelle application ni quelle
+        # version : sur un téléphone qui en accumule plusieurs, c'est illisible.
+        id: apk
+        run: |
+          set -euo pipefail
+          VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          APK_NAME="mes-parcours-${VERSION_NAME}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "${APK_NAME}"
+          echo "name=${APK_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Joindre l'APK à l'exécution
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.name }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Lancer les tests
+        # Après la mise en ligne de l'APK, à dessein : un test qui échoue doit
+        # colorer l'exécution en rouge sans priver pour autant du fichier compilé.
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Joindre les rapports de test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-de-test
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
