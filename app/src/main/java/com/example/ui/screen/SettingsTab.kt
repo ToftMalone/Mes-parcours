@@ -1015,13 +1015,13 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.10-thierry",
+        version = "0.9.11-thierry",
         changes = listOf(
-            "Parcours importés : Chaque trajet garde désormais SA couleur d'origine. Un fichier Google Earth qui réunit plusieurs voyages les affiche chacun de la couleur que vous lui aviez donnée, au lieu de les peindre tous pareil",
-            "Couleurs : Le style de chaque tracé est suivi jusqu'à sa définition, y compris lorsque Google Earth le décrit à deux endroits différents du fichier",
+            "Palette de couleurs : L'appui long fonctionne désormais sur tout l'onglet, et non plus sur les seules lettres de son titre. Sur un grand écran, appuyer sur l'onglet n'ouvrait rien tant qu'on n'avait pas visé le mot lui-même",
+            "Parcours importés : Chaque trajet garde SA couleur d'origine. Un fichier Google Earth qui réunit plusieurs voyages les affiche chacun de la couleur que vous lui aviez donnée, au lieu de les peindre tous pareil",
             "Couleurs : Le choix se fait dans la palette, par appui long sur l'onglet « Importés ». La première pastille, en dégradé, active les couleurs d'origine",
-            "Couleurs : Les tracés sans couleur dans leur fichier — les GPX, notamment — continuent d'utiliser la couleur choisie dans la palette",
-            "Les fichiers importés avant cette version n'ont pas leurs couleurs : elles n'avaient jamais été enregistrées. Les réimporter suffit à les retrouver"
+            "Couleurs : Les tracés sans couleur dans leur fichier — les GPX, notamment — gardent la couleur choisie dans la palette",
+            "Les fichiers importés avant la version 0.9.10 n'ont pas leurs couleurs : elles n'avaient jamais été enregistrées. Les réimporter suffit à les retrouver"
         )
     )
 )
