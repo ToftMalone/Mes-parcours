@@ -1,0 +1,113 @@
+name: Publier une version
+
+# Publier une version se résume à poser un tag annoté :
+#
+#   git tag -a v0.9.9-thierry -m "Nouveautés" -m "Première nouveauté" -m "Deuxième"
+#   git push origin v0.9.9-thierry
+#
+# Ce workflow compile l'APK signé, fabrique update.json et crée la publication
+# GitHub. L'application des utilisateurs détecte alors la nouvelle version au
+# démarrage suivant.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Nécessaire pour créer la publication et y joindre les fichiers.
+permissions:
+  contents: write
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+        with:
+          # Le message du tag sert de notes de version : il faut l'historique.
+          fetch-depth: 0
+
+      - name: Installer le JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Préparer Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Lancer les tests
+        # Une version ne doit jamais être publiée si la suite de tests échoue.
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Restituer le trousseau de signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "::error::Le secret KEYSTORE_BASE64 est absent. Voir CLAUDE.md, section « Publier une version »."
+            exit 1
+          fi
+          printf '%s' "${KEYSTORE_BASE64}" | base64 -d > "${RUNNER_TEMP}/upload.jks"
+
+      - name: Compiler la version signée
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Préparer l'APK et update.json
+        id: prepare
+        run: |
+          set -euo pipefail
+
+          VERSION_CODE=$(grep -oP 'versionCode = \K\d+' app/build.gradle.kts)
+          VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+
+          # Garde-fou : publier un tag sans avoir incrémenté la version produirait
+          # une publication que personne ne pourrait installer par-dessus.
+          if [ "v${VERSION_NAME}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Le tag ${GITHUB_REF_NAME} ne correspond pas à versionName ${VERSION_NAME}. Attendu : v${VERSION_NAME}"
+            exit 1
+          fi
+
+          APK_NAME="mes-parcours-${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "${APK_NAME}"
+
+          # Les notes affichées dans l'application viennent du corps du tag annoté,
+          # une puce par ligne non vide.
+          NOTES=$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}" || true)
+          NOTES_JSON=$(printf '%s' "${NOTES}" | grep -v '^[[:space:]]*$' | jq -R . | jq -s . || echo '[]')
+
+          jq -n \
+            --argjson versionCode "${VERSION_CODE}" \
+            --arg versionName "${VERSION_NAME}" \
+            --arg apkUrl "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${APK_NAME}" \
+            --argjson notes "${NOTES_JSON}" \
+            '{versionCode: $versionCode, versionName: $versionName, apkUrl: $apkUrl, notes: $notes}' \
+            > update.json
+
+          echo "apk=${APK_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "versionName=${VERSION_NAME}" >> "${GITHUB_OUTPUT}"
+
+          echo "update.json produit :"
+          cat update.json
+
+      - name: Créer la publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # update.json doit porter exactement ce nom : l'application le cherche à
+          # l'URL releases/latest/download/update.json.
+          gh release create "${GITHUB_REF_NAME}" \
+            "${{ steps.prepare.outputs.apk }}" \
+            update.json \
+            --title "Mes parcours ${{ steps.prepare.outputs.versionName }}" \
+            --notes-from-tag

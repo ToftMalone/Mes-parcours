@@ -301,6 +301,59 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
 - L'installation silencieuse est impossible pour une application ordinaire : le
   système affiche toujours son écran de confirmation.
 
+## Publier une version
+
+Tout passe par un **tag annoté**. `.github/workflows/release.yml` s'occupe du reste :
+tests, compilation signée, `update.json`, publication GitHub.
+
+```bash
+git tag -a v0.9.9-thierry -m "Nouveautés" -m "Première nouveauté" -m "Deuxième"
+git push origin v0.9.9-thierry
+```
+
+Le corps du tag devient les notes affichées dans la boîte de dialogue de mise à jour,
+une puce par ligne. Le workflow **refuse de publier** si le tag ne correspond pas au
+`versionName` de `app/build.gradle.kts` : sans ce garde-fou, on publierait une version
+que personne ne pourrait installer par-dessus la précédente.
+
+### Secrets du dépôt à renseigner
+
+| Secret | Contenu |
+| --- | --- |
+| `KEYSTORE_BASE64` | Le trousseau `.jks` encodé en base64 |
+| `STORE_PASSWORD` | Mot de passe du trousseau |
+| `KEY_PASSWORD` | Mot de passe de la clé |
+| `KEY_ALIAS` | Alias de la clé (`upload` par défaut) |
+
+```bash
+base64 -w 0 my-upload-key.jks > keystore.base64.txt
+```
+
+### Compiler une version signée en local
+
+Créer à la racine un fichier `keystore.properties`, **jamais versionné** :
+
+```properties
+storeFile=C:/chemin/vers/my-upload-key.jks
+storePassword=…
+keyAlias=upload
+keyPassword=…
+```
+
+`app/build.gradle.kts` le lit en priorité, puis retombe sur les variables
+d'environnement — c'est cette seconde voie qu'emprunte l'intégration continue. Aucun
+mot de passe n'apparaît donc jamais dans le code ni dans l'historique git.
+
+### Créer le trousseau, une fois pour toutes
+
+```bash
+keytool -genkeypair -v -keystore my-upload-key.jks -keyalg RSA -keysize 4096 -validity 10000 -alias upload
+```
+
+**À sauvegarder ailleurs que sur la machine de développement.** Le perdre rend toute
+mise à jour ultérieure impossible à installer : il faudrait repartir d'une
+désinstallation, donc de la perte des parcours des utilisateurs.
+
 ## Identité de l'application : gelée
 
 Le projet est passé aux **mises à jour sur place**, qui conservent les parcours de

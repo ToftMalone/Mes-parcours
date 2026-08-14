@@ -1,3 +1,20 @@
+import java.util.Properties
+
+/**
+ * Secrets de signature, cherchés d'abord dans `keystore.properties` — fichier local
+ * jamais versionné — puis dans l'environnement, voie qu'emprunte l'intégration
+ * continue où les valeurs viennent des secrets du dépôt.
+ *
+ * Aucun mot de passe n'apparaît donc dans le code ni dans l'historique git.
+ */
+val keystoreProperties = Properties().apply {
+  val file = rootProject.file("keystore.properties")
+  if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingSecret(propertyName: String, environmentName: String): String? =
+  keystoreProperties.getProperty(propertyName) ?: System.getenv(environmentName)
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -21,11 +38,14 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      // Secrets de signature : d'abord keystore.properties, un fichier local jamais
+      // versionné, puis l'environnement — c'est cette seconde voie qu'emprunte
+      // l'intégration continue, où les valeurs viennent des secrets du dépôt.
+      // Aucun mot de passe n'apparaît donc dans le code ni dans l'historique git.
+      storeFile = file(signingSecret("storeFile", "KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks")
+      storePassword = signingSecret("storePassword", "STORE_PASSWORD")
+      keyAlias = signingSecret("keyAlias", "KEY_ALIAS") ?: "upload"
+      keyPassword = signingSecret("keyPassword", "KEY_PASSWORD")
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")

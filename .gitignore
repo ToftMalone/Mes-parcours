@@ -15,8 +15,9 @@
 .cxx
 local.properties
 
-# Trousseaux de signature. Le build attend my-upload-key.jks à la racine, et sa fuite
-# permettrait à un tiers de publier une mise à jour que l'application installerait.
+# Trousseaux de signature et mots de passe associés. Leur fuite permettrait à un tiers
+# de publier une mise à jour que l'application installerait comme légitime.
 *.jks
 *.keystore
 debug.keystore
+keystore.properties
