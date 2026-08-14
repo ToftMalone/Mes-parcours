@@ -1052,7 +1052,7 @@ private val RELEASES = listOf(
     Release(
         version = "0.9.11-thierry",
         changes = listOf(
-            "Export KML : Un parcours fusionné ne forme plus qu'une seule entrée dans le fichier, contenant une ligne par trace réunie. Google Earth affichait jusqu'ici autant d'entrées numérotées qu'il y avait de traces, alors qu'on venait justement de les fusionner",
+            "Export KML : Un parcours ne forme plus qu'une seule entrée dans le fichier, qu'il vienne d'une fusion ou d'un enregistrement interrompu par des pauses. Chaque morceau y reste une ligne distincte. Google Earth affichait jusqu'ici autant d'entrées numérotées qu'il y avait de morceaux",
             "Paramètres : Le choix « Garder les couleurs des fichiers » a désormais sa place dans les réglages, section Tracés. Il n'existait que derrière un appui long sur l'onglet « Importés » de l'historique, donc introuvable pour qui ne connaissait pas le geste",
             "Palette de couleurs : L'appui long fonctionne désormais sur tout l'onglet, et non plus sur les seules lettres de son titre. Sur un grand écran, appuyer sur l'onglet n'ouvrait rien tant qu'on n'avait pas visé le mot lui-même",
             "Parcours importés : Chaque trajet garde SA couleur d'origine. Un fichier Google Earth qui réunit plusieurs voyages les affiche chacun de la couleur que vous lui aviez donnée, au lieu de les peindre tous pareil",
