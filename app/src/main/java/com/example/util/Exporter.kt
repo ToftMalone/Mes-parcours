@@ -71,16 +71,30 @@ object Exporter {
     }
 
     /**
-     * Un Placemark par tronçon continu.
+     * Un seul Placemark, dont la géométrie est un `<MultiGeometry>` réunissant un
+     * `<LineString>` par tronçon continu.
      *
-     * Tout écrire dans un seul bloc <coordinates> perdait les ruptures : après une
-     * pause ou la reprise d'une trace, réimporter le fichier reliait les tronçons
-     * par une ligne droite.
+     * Deux exigences à tenir ensemble :
+     *
+     * - **Les ruptures doivent survivre.** Tout écrire dans un unique bloc
+     *   `<coordinates>` les perdrait : après une pause, une reprise ou une fusion,
+     *   réimporter le fichier relierait les tronçons par une ligne droite.
+     * - **Le parcours doit rester d'un seul tenant.** La version précédente ouvrait
+     *   un Placemark par tronçon, nommés « Nom », « Nom (2) »… : un parcours fusionné
+     *   à partir de dix traces se présentait comme dix entrées distinctes dans Google
+     *   Earth, alors que l'utilisateur venait justement de les réunir.
+     *
+     * `<MultiGeometry>` répond aux deux : une seule entrée, des lignes distinctes.
+     *
+     * Un tronçon unique donne un `<MultiGeometry>` d'un seul `<LineString>`. C'est
+     * valide, et l'uniformité vaut mieux ici qu'un cas particulier : l'écriture étant
+     * incrémentale, on ne sait pas au moment d'ouvrir la géométrie combien de
+     * tronçons suivront.
      */
     class KmlWriter(private val out: Appendable) {
         private var trackName = ""
-        private var segmentOpen = false
-        private var segmentIndex = 0
+        private var placemarkOpen = false
+        private var lineOpen = false
 
         fun start(track: Track) {
             trackName = track.name
@@ -98,43 +112,59 @@ object Exporter {
         }
 
         fun add(pt: TrackPoint) {
-            if (pt.isDiscontinuous && segmentOpen) {
-                closeSegment()
+            // Le Placemark n'est ouvert qu'à l'arrivée du premier point : une trace
+            // vide ne doit pas produire une entrée sans géométrie.
+            if (!placemarkOpen) {
+                openPlacemark()
             }
-            if (!segmentOpen) {
-                openSegment()
+            if (pt.isDiscontinuous && lineOpen) {
+                closeLine()
+            }
+            if (!lineOpen) {
+                openLine()
             }
             // Format des coordonnées KML : longitude,latitude,altitude
-            out.append("          ${pt.longitude},${pt.latitude},${pt.altitude}\n")
+            out.append("            ${pt.longitude},${pt.latitude},${pt.altitude}\n")
         }
 
         fun finish() {
-            if (segmentOpen) {
-                closeSegment()
+            if (lineOpen) {
+                closeLine()
+            }
+            if (placemarkOpen) {
+                closePlacemark()
             }
             out.append("  </Document>\n")
             out.append("</kml>")
         }
 
-        private fun openSegment() {
-            segmentIndex++
-            val label = if (segmentIndex > 1) "$trackName ($segmentIndex)" else trackName
+        private fun openPlacemark() {
             out.append("    <Placemark>\n")
-            out.append("      <name>${escapeXml(label)}</name>\n")
+            out.append("      <name>${escapeXml(trackName)}</name>\n")
             out.append("      <styleUrl>#routeStyle</styleUrl>\n")
-            out.append("      <LineString>\n")
-            out.append("        <extrude>0</extrude>\n")
-            out.append("        <tessellate>1</tessellate>\n")
-            out.append("        <altitudeMode>clampToGround</altitudeMode>\n")
-            out.append("        <coordinates>\n")
-            segmentOpen = true
+            out.append("      <MultiGeometry>\n")
+            placemarkOpen = true
         }
 
-        private fun closeSegment() {
-            out.append("        </coordinates>\n")
-            out.append("      </LineString>\n")
+        private fun closePlacemark() {
+            out.append("      </MultiGeometry>\n")
             out.append("    </Placemark>\n")
-            segmentOpen = false
+            placemarkOpen = false
+        }
+
+        private fun openLine() {
+            out.append("        <LineString>\n")
+            out.append("          <extrude>0</extrude>\n")
+            out.append("          <tessellate>1</tessellate>\n")
+            out.append("          <altitudeMode>clampToGround</altitudeMode>\n")
+            out.append("          <coordinates>\n")
+            lineOpen = true
+        }
+
+        private fun closeLine() {
+            out.append("          </coordinates>\n")
+            out.append("        </LineString>\n")
+            lineOpen = false
         }
     }
 
