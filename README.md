@@ -96,4 +96,4 @@ invariants à respecter.
 
 ## Licence
 
-Code libre. Développé par Toche, pour son père Thierry.
+Code libre. Développé par ToftMalone avec Claude.
