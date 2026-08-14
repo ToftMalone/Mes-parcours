@@ -249,7 +249,57 @@ inverser, et l'assombrir la rendrait illisible.
   `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`
   (4), plus trois tests d'échafaudage hérités (`ExampleUnitTest`,
   `ExampleRobolectricTest`, `GreetingScreenshotTest` avec Roborazzi).
-- **Le projet n'est pas sous contrôle de version** — aucun dépôt git.
+- Sous git depuis le premier commit de l'état `0.9.8-thierry`, branche `main`.
+
+## Où en est le projet
+
+### En attente d'une action de l'auteur
+
+- **`UpdateConfig.GITHUB_OWNER` et `GITHUB_REPO` sont vides.** Tant qu'ils le sont,
+  la recherche de mise à jour n'émet aucune requête et l'application se comporte comme
+  avant. À renseigner une fois le dépôt créé.
+- **Le trousseau de signature n'existe pas encore**, et les quatre secrets du dépôt ne
+  sont pas renseignés. Voir « Publier une version ». Tant que c'est le cas, seul
+  `assembleDebug` fonctionne.
+- **Le dépôt n'a pas de remote.** Rien n'a jamais été poussé.
+- Le dépôt devra être **public** : le mécanisme de mise à jour télécharge
+  `update.json` et l'APK par une URL ouverte, sans jeton. Sinon, héberger ces deux
+  fichiers ailleurs et changer l'URL dans `UpdateConfig`.
+
+### À vérifier sur le terrain, rien n'a été modifié
+
+- **Le mode 3D pivote sans arrêt.** Le cap est calculé entre deux positions
+  consécutives avec un seuil de 1,5 m — sous le plancher de bruit du GPS — puis
+  appliqué sans lissage : à faible vitesse, l'orientation suit le bruit. Prédiction à
+  confirmer : le défaut doit se calmer nettement en voiture et s'affoler à l'arrêt. Si
+  c'est le cas, conditionner la mise à jour du cap à la vitesse (`TrackPoint.speed`
+  existe) et lisser par interpolation sur l'arc le plus court, ce qui règle du même
+  coup le passage par le nord.
+
+### En attente d'arbitrage
+
+- `VIEWPORT_MARGIN` est passé de 0,35 à 0,60 à la demande de l'auteur. À évaluer.
+  Surveiller l'effet indirect documenté au-dessus de la constante : la zone élargie
+  sert aussi à `coversMostOfTrack`, donc l'affichage se rabat plus tôt sur la seule
+  silhouette. Si le tracé paraît plus grossier, mesurer cette couverture sur la zone
+  réellement visible plutôt que sur la zone élargie.
+- Le correctif de republication de la zone visible pendant le suivi automatique
+  n'agit que sur les traces de plus de 60 000 points ; en deçà, tout est chargé d'un
+  coup. Reste à savoir si le symptôme rapporté concerne bien ce cas, et si « les
+  traits » désignent le tracé ou le fond de carte.
+- **Deuxième levier disponible** pour le même sujet : ne plus réinterroger la base
+  quand la zone visible reste incluse dans ce qui est déjà chargé. Gratuit en
+  performance. Subtilité : ne pas sauter le rechargement lors d'un zoom avant, sous
+  peine de perdre le gain de détail attendu.
+- `Importer` cumule le dénivelé **sans seuil**, alors que l'enregistrement et la
+  reprise passent par `ElevationAccumulator`. À harmoniser, mais cela changerait les
+  statistiques des futurs imports.
+- `FormatUtils` sait tout formater en miles et en pieds, `MainActivity` lit
+  `pref_is_metric` au démarrage, mais **aucun écran n'écrit cette préférence** : le
+  support impérial est inatteignable. Soit ajouter un réglage, soit retirer le code.
+- Aucune coupure automatique sur saut de distance anormal. Une trace importée dont le
+  fichier ne sépare pas ses tronçons apparaît donc d'un seul tenant, sans que
+  l'application puisse le deviner.
 
 ## Poids mort identifié
 

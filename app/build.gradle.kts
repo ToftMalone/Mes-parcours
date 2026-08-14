@@ -63,7 +63,12 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      // Le trousseau de debug n'est pas versionné : sur un clone frais il est absent.
+      // On ne l'impose donc que s'il est là, sinon AGP applique sa clé de debug par
+      // défaut — sans quoi `assembleDebug` échouerait sur toute nouvelle machine.
+      if (rootProject.file("debug.keystore").exists()) {
+        signingConfig = signingConfigs.getByName("debugConfig")
+      }
     }
   }
   compileOptions {

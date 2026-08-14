@@ -49,11 +49,9 @@ En ligne de commande :
 ./gradlew testDebugUnitTest
 ```
 
-> **Signature de debug.** La variante `debug` est signée avec `debug.keystore`,
-> attendu à la racine du projet mais volontairement non versionné. Si ce fichier
-> est absent, retirez la ligne `signingConfig = signingConfigs.getByName("debugConfig")`
-> du bloc `debug` de `app/build.gradle.kts` : Gradle utilisera alors la clé de
-> debug par défaut d'Android.
+> **Signature de debug.** `debug.keystore` n'est pas versionné. S'il est absent,
+> le build retombe automatiquement sur la clé de debug par défaut d'Android : il
+> n'y a rien à modifier.
 
 ## Compiler une version de publication
 

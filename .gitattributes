@@ -1,0 +1,17 @@
+# Fins de ligne normalisées : LF dans le dépôt, conversion locale selon la plateforme.
+# Sans cela, un aller-retour Windows/Linux fait apparaître des fichiers entiers comme
+# modifiés — et l'intégration continue tourne sous Linux.
+* text=auto
+
+# Le script Gradle est exécuté par /bin/sh sur les machines d'intégration continue.
+# Des fins de ligne CRLF y casseraient la ligne shebang : « bad interpreter ».
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Binaires : jamais convertis, sous peine de corruption.
+*.png binary
+*.webp binary
+*.jar binary
+*.jks binary
+*.keystore binary
+*.apk binary
