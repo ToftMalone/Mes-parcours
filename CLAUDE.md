@@ -414,11 +414,13 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
 
 ## Publier une version
 
-Tout passe par un **tag annoté**. `.github/workflows/release.yml` s'occupe du reste :
-tests, compilation signée, `update.json`, publication GitHub.
+`.github/workflows/release.yml` fait tout : tests, compilation signée, `update.json`,
+publication GitHub. Deux façons de le déclencher, pour un résultat identique.
+
+**Par un tag annoté**, depuis un poste de développement :
 
 ```bash
-git tag -a v0.9.9-thierry -m "Nouveautés" -m "Première nouveauté" -m "Deuxième"
+git tag -a v0.9.9-thierry -m "Titre" -m "Première nouveauté" -m "Deuxième"
 git push origin v0.9.9-thierry
 ```
 
@@ -426,6 +428,20 @@ Le corps du tag devient les notes affichées dans la boîte de dialogue de mise 
 une puce par ligne. Le workflow **refuse de publier** si le tag ne correspond pas au
 `versionName` de `app/build.gradle.kts` : sans ce garde-fou, on publierait une version
 que personne ne pourrait installer par-dessus la précédente.
+
+**À la main** (onglet Actions → « Publier une version » → Run workflow), en saisissant
+les notes, une par ligne. Le tag est alors déduit du `versionName` et créé par la
+publication elle-même.
+
+Cette seconde voie n'est pas un confort : **créer un tag exige des droits d'écriture
+sur les références qu'une session Claude Code sur le web n'a pas.** Elle peut pousser
+du code sur une branche, mais `git push origin <tag>` lui revient en HTTP 403. Sans ce
+déclenchement manuel, publier exigerait une machine de développement sous la main — ce
+qui vide de son sens la possibilité de développer depuis le web.
+
+Le garde-fou tag ↔ `versionName` n'a rien à vérifier sur cette voie, le tag étant
+déduit de la version. Il est remplacé par un refus de republier une version déjà
+publiée, qui joue le même rôle : forcer l'incrément avant de repartir.
 
 ### Secrets du dépôt à renseigner
 

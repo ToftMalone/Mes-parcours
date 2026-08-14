@@ -1,19 +1,33 @@
 name: Publier une version
 
-# Publier une version se résume à poser un tag annoté :
+# Deux façons de publier, pour un même résultat : APK signé, update.json, et la
+# publication GitHub que l'application interroge pour proposer la mise à jour.
 #
-#   git tag -a v0.9.9-thierry -m "Nouveautés" -m "Première nouveauté" -m "Deuxième"
-#   git push origin v0.9.9-thierry
+# 1. Poser un tag annoté — la voie canonique depuis un poste de développement :
 #
-# Ce workflow compile l'APK signé, fabrique update.json et crée la publication
-# GitHub. L'application des utilisateurs détecte alors la nouvelle version au
-# démarrage suivant.
+#      git tag -a v0.9.9-thierry -m "Titre" -m "Première nouveauté" -m "Deuxième"
+#      git push origin v0.9.9-thierry
+#
+#    Le corps du tag devient les notes de version, une puce par ligne.
+#
+# 2. Lancer le workflow à la main (onglet Actions), en saisissant les notes. Le tag
+#    est alors déduit du versionName et créé par la publication elle-même.
+#
+#    Cette seconde voie n'est pas un raccourci de confort : créer un tag exige des
+#    droits d'écriture sur les références que tout environnement n'a pas — une
+#    session distante peut pousser du code et se voir refuser un tag. Sans elle, il
+#    faudrait un poste de développement sous la main pour publier quoi que ce soit.
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      notes:
+        description: "Notes de version, une nouveauté par ligne"
+        required: true
+        type: string
 
 # Nécessaire pour créer la publication et y joindre les fichiers.
 permissions:
@@ -35,6 +49,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Préparer le SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: Installer la plateforme visée
+        run: |
+          sdkmanager --install "platforms;android-36" || true
+          sdkmanager --install "platforms;android-36.1" || true
 
       - name: Préparer Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -62,42 +84,60 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: ./gradlew --no-daemon assembleRelease
 
-      - name: Préparer l'APK et update.json
+      - name: Préparer l'APK, les notes et update.json
         id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_NOTES: ${{ inputs.notes }}
         run: |
           set -euo pipefail
 
           VERSION_CODE=$(grep -oP 'versionCode = \K\d+' app/build.gradle.kts)
           VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          TAG="v${VERSION_NAME}"
 
-          # Garde-fou : publier un tag sans avoir incrémenté la version produirait
-          # une publication que personne ne pourrait installer par-dessus.
-          if [ "v${VERSION_NAME}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Le tag ${GITHUB_REF_NAME} ne correspond pas à versionName ${VERSION_NAME}. Attendu : v${VERSION_NAME}"
-            exit 1
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            # Garde-fou : publier un tag sans avoir incrémenté la version produirait
+            # une publication que personne ne pourrait installer par-dessus.
+            if [ "${TAG}" != "${GITHUB_REF_NAME}" ]; then
+              echo "::error::Le tag ${GITHUB_REF_NAME} ne correspond pas à versionName ${VERSION_NAME}. Attendu : ${TAG}"
+              exit 1
+            fi
+            # Les notes viennent du corps du tag annoté, une puce par ligne non vide.
+            NOTES=$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}" || true)
+          else
+            # Déclenchement manuel : le tag étant déduit du versionName, il ne peut
+            # pas diverger de la version compilée — le garde-fou ci-dessus n'aurait
+            # rien à vérifier. Reste à refuser d'écraser une version déjà publiée.
+            if gh release view "${TAG}" >/dev/null 2>&1; then
+              echo "::error::La version ${TAG} est déjà publiée. Incrémentez versionCode et versionName dans app/build.gradle.kts avant de republier."
+              exit 1
+            fi
+            NOTES="${DISPATCH_NOTES}"
           fi
+
+          printf '%s\n' "${NOTES}" | grep -v '^[[:space:]]*$' | sed 's/^/- /' > notes.md
+          NOTES_JSON=$(printf '%s\n' "${NOTES}" | grep -v '^[[:space:]]*$' | jq -R . | jq -s . || echo '[]')
 
           APK_NAME="mes-parcours-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "${APK_NAME}"
 
-          # Les notes affichées dans l'application viennent du corps du tag annoté,
-          # une puce par ligne non vide.
-          NOTES=$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}" || true)
-          NOTES_JSON=$(printf '%s' "${NOTES}" | grep -v '^[[:space:]]*$' | jq -R . | jq -s . || echo '[]')
-
           jq -n \
             --argjson versionCode "${VERSION_CODE}" \
             --arg versionName "${VERSION_NAME}" \
-            --arg apkUrl "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${APK_NAME}" \
+            --arg apkUrl "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APK_NAME}" \
             --argjson notes "${NOTES_JSON}" \
             '{versionCode: $versionCode, versionName: $versionName, apkUrl: $apkUrl, notes: $notes}' \
             > update.json
 
           echo "apk=${APK_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "versionName=${VERSION_NAME}" >> "${GITHUB_OUTPUT}"
 
           echo "update.json produit :"
           cat update.json
+          echo "Notes de version :"
+          cat notes.md
 
       - name: Créer la publication
         env:
@@ -106,8 +146,13 @@ jobs:
           set -euo pipefail
           # update.json doit porter exactement ce nom : l'application le cherche à
           # l'URL releases/latest/download/update.json.
-          gh release create "${GITHUB_REF_NAME}" \
+          #
+          # --target n'a d'effet que si le tag n'existe pas encore : gh le crée alors
+          # sur ce commit. Sur un déclenchement par tag, le tag existe déjà et
+          # l'option est sans effet.
+          gh release create "${{ steps.prepare.outputs.tag }}" \
             "${{ steps.prepare.outputs.apk }}" \
             update.json \
+            --target "${GITHUB_SHA}" \
             --title "Mes parcours ${{ steps.prepare.outputs.versionName }}" \
-            --notes-from-tag
+            --notes-file notes.md
