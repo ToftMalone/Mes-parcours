@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 
-@Database(entities = [Track::class, TrackPoint::class], version = 6, exportSchema = false)
+@Database(entities = [Track::class, TrackPoint::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract val trackDao: TrackDao
 
@@ -49,6 +49,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Ajoute `segmentColor` sur les points : la couleur ne suffisait pas au niveau
+         * du parcours, un seul fichier KML pouvant réunir des dizaines de trajets de
+         * couleurs différentes.
+         *
+         * `ALTER TABLE … ADD COLUMN` sur une colonne nullable et sans valeur par défaut
+         * ne touche que le schéma dans SQLite : la table n'est pas réécrite. C'est ce
+         * qui rend la migration instantanée même sur une base de plusieurs millions de
+         * points, là où une colonne avec valeur par défaut les réécrirait toutes.
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `track_points` ADD COLUMN `segmentColor` INTEGER")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 // Re-vérification sous le verrou : sans elle, deux appels simultanés
@@ -61,7 +77,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "my_tracks_db"
                 )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

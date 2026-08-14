@@ -40,7 +40,7 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals(1, segments.size)
-        assertEquals(10, segments[0].size)
+        assertEquals(10, segments[0].points.size)
     }
 
     @Test
@@ -53,10 +53,10 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals("deux tronçons attendus", 2, segments.size)
-        assertEquals(3, segments[0].size)
-        assertEquals(3, segments[1].size)
+        assertEquals(3, segments[0].points.size)
+        assertEquals(3, segments[1].points.size)
         // Aucun point commun : rien ne relie la fin du premier au début du second.
-        assertEquals(6, segments.sumOf { it.size })
+        assertEquals(6, segments.sumOf { it.points.size })
     }
 
     @Test
@@ -69,7 +69,7 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals(3, segments.size)
-        assertEquals(listOf(2, 3, 2), segments.map { it.size })
+        assertEquals(listOf(2, 3, 2), segments.map { it.points.size })
     }
 
     @Test
@@ -79,7 +79,7 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals(1, segments.size)
-        assertEquals(3, segments[0].size)
+        assertEquals(3, segments[0].points.size)
     }
 
     @Test
@@ -90,7 +90,7 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals(2, segments.size)
-        assertEquals(listOf(2, 2), segments.map { it.size })
+        assertEquals(listOf(2, 2), segments.map { it.points.size })
     }
 
     @Test
@@ -104,7 +104,7 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals("le tracé doit rester d'un seul morceau", 1, segments.size)
-        assertEquals(10, segments[0].size)
+        assertEquals(10, segments[0].points.size)
     }
 
     @Test
@@ -117,6 +117,6 @@ class TrackSegmentsTest {
         val segments = buildSegmentsFromPoints(points)
 
         assertEquals(1, segments.size)
-        assertEquals(2, segments[0].size)
+        assertEquals(2, segments[0].points.size)
     }
 }

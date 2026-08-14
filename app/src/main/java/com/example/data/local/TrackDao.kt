@@ -124,8 +124,8 @@ interface TrackDao {
      * relire les lignes que l'on vient d'écrire.
      */
     @Query(
-        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous) " +
-                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous " +
+        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor) " +
+                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor " +
                 "FROM track_points WHERE trackId = :sourceId AND id <= :maxSourceId ORDER BY id ASC"
     )
     suspend fun copyPointsInto(destinationId: Long, sourceId: Long, maxSourceId: Long)

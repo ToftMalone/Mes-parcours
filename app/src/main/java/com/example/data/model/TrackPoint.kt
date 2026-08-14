@@ -30,5 +30,15 @@ data class TrackPoint(
     val altitude: Double = 0.0, // in meters
     val speed: Float = 0f, // in m/s
     val timestamp: Long,
-    val isDiscontinuous: Boolean = false
+    val isDiscontinuous: Boolean = false,
+    /**
+     * Couleur du tronçon auquel ce point appartient (ARGB), ou null si son fichier
+     * d'origine n'en indiquait pas.
+     *
+     * Portée par le point et non par le parcours : un seul fichier KML exporté depuis
+     * Google Earth peut réunir des dizaines de trajets, chacun de sa couleur. Une
+     * couleur par parcours les peindrait tous pareil, ce qui reviendrait à perdre
+     * l'information qu'on cherche justement à conserver.
+     */
+    val segmentColor: Int? = null
 )

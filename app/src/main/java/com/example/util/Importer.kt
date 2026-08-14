@@ -29,6 +29,15 @@ private const val MAX_NAME_LENGTH = 512
  */
 private const val MAX_COLOR_LENGTH = 32
 
+/** Longueur maximale retenue pour un identifiant de style ou une clé de `<Pair>`. */
+private const val MAX_STYLE_ID_LENGTH = 256
+
+/** Nom d'élément KML sans préfixe de namespace, en minuscules. */
+private fun kmlTagOf(localName: String?, qName: String?): String {
+    val raw = if (!localName.isNullOrEmpty()) localName else qName ?: return ""
+    return raw.substringAfterLast(':').lowercase(Locale.US)
+}
+
 /**
  * Importe un GPX/KML sans jamais simplifier la trace : chaque point présent dans
  * le fichier devient un TrackPoint. Aucun sous-échantillonnage, aucun lissage.
@@ -85,9 +94,25 @@ object Importer {
 
         val sink = PointSink(trackId, onBatch)
 
+        // Les styles KML sont relevés par une première lecture, avant les points.
+        //
+        // Un <Placemark> désigne son style par un identifiant, et le <Style>
+        // correspondant peut être écrit plus loin dans le fichier — via un <StyleMap>
+        // qui, lui, renvoie encore ailleurs. En une seule passe, un trajet dont le
+        // style est déclaré après lui resterait sans couleur, et ses points sont déjà
+        // écrits en base quand on l'apprend : impossible de revenir dessus.
+        //
+        // Cette passe ne retient que les styles, jamais les coordonnées : quelques
+        // dizaines d'entrées, quelle que soit la taille du fichier.
+        val styleTable = if (isKml) {
+            context.contentResolver.openInputStream(uri)?.use { scanKmlStyles(it) } ?: KmlStyleTable()
+        } else {
+            KmlStyleTable()
+        }
+
         val meta = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             if (isKml) {
-                parseKML(inputStream, defaultName, fileMeta.size, sink)
+                parseKML(inputStream, defaultName, fileMeta.size, sink, styleTable)
             } else {
                 parseGPX(inputStream, defaultName, sink)
             }
@@ -208,19 +233,34 @@ object Importer {
         inputStream: InputStream,
         defaultName: String,
         fileSize: Long,
-        sink: PointSink
+        sink: PointSink,
+        styleTable: KmlStyleTable
     ): TrackMeta {
         // Le KML ne porte pas d'horodatage : on garde la convention historique d'un
         // point par seconde, calée pour que la trace se termine à l'instant présent.
         val estimatedPoints = (fileSize / KML_BYTES_PER_POINT).coerceAtLeast(1L)
-        val handler = KmlHandler(sink, defaultName, System.currentTimeMillis() - estimatedPoints * 1000L)
+        val handler = KmlHandler(
+            sink,
+            defaultName,
+            System.currentTimeMillis() - estimatedPoints * 1000L,
+            styleTable
+        )
 
-        val factory = SAXParserFactory.newInstance()
-        factory.isNamespaceAware = false
-        factory.newSAXParser().parse(inputStream, handler)
+        newSaxParser().parse(inputStream, handler)
 
-        return TrackMeta(handler.trackName, "Randonnée", handler.lineColor)
+        return TrackMeta(handler.trackName, "Randonnée", handler.firstLineColor)
     }
+
+    /** Première lecture : on ne relève que les styles, jamais les coordonnées. */
+    private fun scanKmlStyles(inputStream: InputStream): KmlStyleTable {
+        val handler = KmlStyleHandler()
+        newSaxParser().parse(inputStream, handler)
+        return handler.table
+    }
+
+    private fun newSaxParser() = SAXParserFactory.newInstance()
+        .apply { isNamespaceAware = false }
+        .newSAXParser()
 
     // ------------------------------------------------------------- Divers
 
@@ -337,7 +377,14 @@ private class PointSink(
         }
     }
 
-    fun add(latitude: Double, longitude: Double, altitude: Double, speed: Float, timestamp: Long) {
+    fun add(
+        latitude: Double,
+        longitude: Double,
+        altitude: Double,
+        speed: Float,
+        timestamp: Long,
+        segmentColor: Int? = null
+    ) {
         if (hasPrevious) {
             totalDistance += haversineMeters(prevLat, prevLon, latitude, longitude)
             val eleDiff = altitude - prevAlt
@@ -355,7 +402,8 @@ private class PointSink(
                 altitude = altitude,
                 speed = speed,
                 timestamp = timestamp,
-                isDiscontinuous = segmentIndex > 0 && pointsInSegment == 0
+                isDiscontinuous = segmentIndex > 0 && pointsInSegment == 0,
+                segmentColor = segmentColor
             )
         )
 
@@ -376,38 +424,145 @@ private class PointSink(
     }
 }
 
+/**
+ * Première lecture d'un KML : relève les `<Style>` et les `<StyleMap>` du document.
+ *
+ * Ne conserve que des identifiants et des couleurs — quelques dizaines d'entrées même
+ * pour un fichier de plusieurs centaines de mégaoctets, puisque les `<coordinates>`
+ * sont ignorées.
+ */
+private class KmlStyleHandler : DefaultHandler() {
+
+    val table = KmlStyleTable()
+
+    private var styleId: String? = null
+    private var styleMapId: String? = null
+
+    private var inLineStyle = false
+    private var inColor = false
+    private val colorBuffer = StringBuilder()
+    private var styleColor: Int? = null
+
+    // Un <StyleMap> distingue l'apparence au repos de celle au survol. Seule la
+    // première nous intéresse : c'est celle que l'utilisateur voit dans Google Earth.
+    private var inPair = false
+    private var inKey = false
+    private var inStyleUrl = false
+    private val keyBuffer = StringBuilder()
+    private val styleUrlBuffer = StringBuilder()
+    private var normalStyleUrl: String? = null
+
+    override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
+        when (kmlTagOf(localName, qName)) {
+            "style" -> {
+                styleId = attributes?.getValue("id")
+                styleColor = null
+            }
+            "stylemap" -> {
+                styleMapId = attributes?.getValue("id")
+                normalStyleUrl = null
+            }
+            "linestyle" -> inLineStyle = true
+            "color" -> if (inLineStyle) {
+                inColor = true
+                colorBuffer.setLength(0)
+            }
+            "pair" -> {
+                inPair = true
+                keyBuffer.setLength(0)
+                styleUrlBuffer.setLength(0)
+            }
+            "key" -> if (inPair) inKey = true
+            "styleurl" -> if (inPair) inStyleUrl = true
+        }
+    }
+
+    override fun characters(ch: CharArray, start: Int, length: Int) {
+        when {
+            inColor && colorBuffer.length < MAX_COLOR_LENGTH ->
+                colorBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - colorBuffer.length))
+            inKey && keyBuffer.length < MAX_STYLE_ID_LENGTH ->
+                keyBuffer.append(ch, start, minOf(length, MAX_STYLE_ID_LENGTH - keyBuffer.length))
+            inStyleUrl && styleUrlBuffer.length < MAX_STYLE_ID_LENGTH ->
+                styleUrlBuffer.append(ch, start, minOf(length, MAX_STYLE_ID_LENGTH - styleUrlBuffer.length))
+        }
+    }
+
+    override fun endElement(uri: String?, localName: String?, qName: String?) {
+        when (kmlTagOf(localName, qName)) {
+            "color" -> if (inColor) {
+                inColor = false
+                KmlColor.parse(colorBuffer.toString())?.let { styleColor = it }
+                colorBuffer.setLength(0)
+            }
+            "linestyle" -> {
+                inLineStyle = false
+                inColor = false
+            }
+            "key" -> inKey = false
+            "styleurl" -> inStyleUrl = false
+            "pair" -> {
+                if (inPair && keyBuffer.toString().trim().equals("normal", ignoreCase = true)) {
+                    normalStyleUrl = styleUrlBuffer.toString()
+                }
+                inPair = false
+            }
+            "style" -> {
+                table.putStyle(styleId, styleColor)
+                styleId = null
+                styleColor = null
+            }
+            "stylemap" -> {
+                table.putStyleMap(styleMapId, normalStyleUrl)
+                styleMapId = null
+                normalStyleUrl = null
+            }
+        }
+    }
+}
+
 private class KmlHandler(
     private val sink: PointSink,
     defaultName: String,
-    startClock: Long
+    startClock: Long,
+    private val styleTable: KmlStyleTable
 ) : DefaultHandler() {
 
     var trackName: String = defaultName
         private set
 
     /**
-     * Couleur du premier `<LineStyle>` rencontré, convertie en ARGB.
-     *
-     * On retient la première et on ignore les suivantes. Un KML de Google Earth
-     * décrit couramment le même tracé deux fois — un `<Style>` normal et un
-     * `<StyleMap>` de survol, souvent d'une autre couleur — et il n'existe pas de
-     * règle simple pour désigner « la bonne » sans résoudre les `<styleUrl>`. La
-     * première déclarée est celle du tracé au repos, donc celle que l'utilisateur
-     * voit dans Google Earth.
-     *
-     * Les autres styles (`<PolyStyle>`, `<IconStyle>`) sont écartés : ils colorent
-     * des surfaces et des épingles, pas la ligne du parcours.
+     * Couleur du premier tracé rencontré. Sert de couleur représentative du fichier —
+     * la pastille de la fiche dans l'historique, qui n'a de place que pour une.
      */
-    var lineColor: Int? = null
+    var firstLineColor: Int? = null
         private set
 
     private var nameResolved = false
     private var inName = false
     private var inCoordinates = false
+    private val nameBuffer = StringBuilder()
+
+    // ------------------------------------------------------------------
+    // Couleur du tracé en cours.
+    //
+    // Elle vient soit d'un <styleUrl> résolu dans le répertoire relevé à la
+    // première lecture, soit d'un <Style> écrit directement dans le <Placemark>.
+    // Le second l'emporte : un style local est plus précis qu'un renvoi.
+    // ------------------------------------------------------------------
+
+    private var inPlacemark = false
+    private var inStyleUrl = false
     private var inLineStyle = false
     private var inLineStyleColor = false
-    private val nameBuffer = StringBuilder()
+    private val styleUrlBuffer = StringBuilder()
     private val colorBuffer = StringBuilder()
+
+    private var referencedColor: Int? = null
+    private var inlineColor: Int? = null
+
+    /** Couleur retenue pour les points en cours d'émission. */
+    private val currentColor: Int? get() = inlineColor ?: referencedColor
 
     private var clock = startClock
 
@@ -417,42 +572,57 @@ private class KmlHandler(
             longitude = lon,
             altitude = ele,
             speed = 0f,
-            timestamp = clock
+            timestamp = clock,
+            segmentColor = currentColor
         )
         clock += 1000L
     }
 
     override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
-        when (tagOf(localName, qName)) {
+        when (kmlTagOf(localName, qName)) {
             "name" -> if (!nameResolved) {
                 inName = true
                 nameBuffer.setLength(0)
             }
+            "placemark" -> {
+                inPlacemark = true
+                referencedColor = null
+                inlineColor = null
+            }
+            "styleurl" -> if (inPlacemark) {
+                inStyleUrl = true
+                styleUrlBuffer.setLength(0)
+            }
+            "linestyle" -> if (inPlacemark) inLineStyle = true
+            "color" -> if (inLineStyle) {
+                inLineStyleColor = true
+                colorBuffer.setLength(0)
+            }
             "coordinates" -> {
                 inCoordinates = true
                 tokenizer.reset()
+                // Chaque géométrie ouvre un tronçon : deux trajets d'un même fichier
+                // ne doivent jamais être reliés par un trait, et c'est aussi ce qui
+                // permet à chacun de porter sa propre couleur.
                 sink.startNewSegment()
-            }
-            "linestyle" -> inLineStyle = true
-            "color" -> if (inLineStyle && lineColor == null) {
-                inLineStyleColor = true
-                colorBuffer.setLength(0)
             }
         }
     }
 
     override fun characters(ch: CharArray, start: Int, length: Int) {
-        if (inCoordinates) {
-            tokenizer.feed(ch, start, length)
-        } else if (inName && nameBuffer.length < MAX_NAME_LENGTH) {
-            nameBuffer.append(ch, start, minOf(length, MAX_NAME_LENGTH - nameBuffer.length))
-        } else if (inLineStyleColor && colorBuffer.length < MAX_COLOR_LENGTH) {
-            colorBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - colorBuffer.length))
+        when {
+            inCoordinates -> tokenizer.feed(ch, start, length)
+            inName && nameBuffer.length < MAX_NAME_LENGTH ->
+                nameBuffer.append(ch, start, minOf(length, MAX_NAME_LENGTH - nameBuffer.length))
+            inStyleUrl && styleUrlBuffer.length < MAX_STYLE_ID_LENGTH ->
+                styleUrlBuffer.append(ch, start, minOf(length, MAX_STYLE_ID_LENGTH - styleUrlBuffer.length))
+            inLineStyleColor && colorBuffer.length < MAX_COLOR_LENGTH ->
+                colorBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - colorBuffer.length))
         }
     }
 
     override fun endElement(uri: String?, localName: String?, qName: String?) {
-        when (tagOf(localName, qName)) {
+        when (kmlTagOf(localName, qName)) {
             "name" -> if (inName) {
                 inName = false
                 val text = nameBuffer.toString().trim()
@@ -462,28 +632,40 @@ private class KmlHandler(
                 }
                 nameBuffer.setLength(0)
             }
-            "coordinates" -> if (inCoordinates) {
-                tokenizer.finish()
-                inCoordinates = false
+            "styleurl" -> if (inStyleUrl) {
+                inStyleUrl = false
+                referencedColor = styleTable.resolve(styleUrlBuffer.toString())
+                rememberFirstColor()
+                styleUrlBuffer.setLength(0)
             }
             "color" -> if (inLineStyleColor) {
                 inLineStyleColor = false
                 // Refusée si illisible ou transparente : on retombe alors sur la
                 // couleur de la palette plutôt que sur un tracé invisible.
-                KmlColor.parse(colorBuffer.toString())?.let { lineColor = it }
+                KmlColor.parse(colorBuffer.toString())?.let {
+                    inlineColor = it
+                    rememberFirstColor()
+                }
                 colorBuffer.setLength(0)
             }
             "linestyle" -> {
                 inLineStyle = false
                 inLineStyleColor = false
             }
+            "coordinates" -> if (inCoordinates) {
+                tokenizer.finish()
+                inCoordinates = false
+            }
+            "placemark" -> {
+                inPlacemark = false
+                referencedColor = null
+                inlineColor = null
+            }
         }
     }
 
-    /** Nom d'élément sans préfixe de namespace, en minuscules. */
-    private fun tagOf(localName: String?, qName: String?): String {
-        val raw = if (!localName.isNullOrEmpty()) localName else qName ?: return ""
-        return raw.substringAfterLast(':').lowercase(Locale.US)
+    private fun rememberFirstColor() {
+        if (firstLineColor == null) firstLineColor = currentColor
     }
 }
 

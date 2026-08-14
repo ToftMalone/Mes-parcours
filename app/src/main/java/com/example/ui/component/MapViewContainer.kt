@@ -966,14 +966,22 @@ private fun drawMarkers(map: MapView, state: MapState) {
  * C'est ce qui fait qu'une trace reprise, mise en pause puis relancée, ou issue d'une
  * fusion, apparaît comme un seul parcours mais sans trait reliant ses morceaux.
  */
-internal fun buildSegmentsFromPoints(trackPoints: List<TrackPoint>): List<List<GeoPoint>> {
-    val segments = mutableListOf<List<GeoPoint>>()
+internal fun buildSegmentsFromPoints(trackPoints: List<TrackPoint>): List<MapSegment> {
+    val segments = mutableListOf<MapSegment>()
     var curSegment = mutableListOf<GeoPoint>()
+    var curColor: Int? = null
     var prevTime = 0L
     var prevId = 0L
+    var prevColor: Int? = null
+    var hasPrevious = false
 
     for (pt in trackPoints) {
         if (pt.latitude == 0.0 && pt.longitude == 0.0) continue
+
+        // Un changement de couleur coupe le tronçon même sans rupture déclarée : une
+        // polyligne n'a qu'une couleur, et deux trajets voisins d'un même fichier
+        // KML se retrouveraient sinon peints du même trait.
+        val colorChanged = hasPrevious && pt.segmentColor != prevColor
 
         // Le saut de temps ne signale une pause d'enregistrement que si les deux points
         // se suivent réellement. Sur une trace dense affichée en niveau de détail réduit,
@@ -985,19 +993,31 @@ internal fun buildSegmentsFromPoints(trackPoints: List<TrackPoint>): List<List<G
                 prevTime > 0L && pt.timestamp > 0L &&
                 (pt.timestamp - prevTime > 15_000L)
 
-        if ((pt.isDiscontinuous || isTimeGap) && curSegment.isNotEmpty()) {
-            segments.add(curSegment)
+        if ((pt.isDiscontinuous || isTimeGap || colorChanged) && curSegment.isNotEmpty()) {
+            segments.add(MapSegment(curColor, curSegment))
             curSegment = mutableListOf()
         }
+        if (curSegment.isEmpty()) curColor = pt.segmentColor
         curSegment.add(GeoPoint(pt.latitude, pt.longitude))
         prevTime = pt.timestamp
         prevId = pt.id
+        prevColor = pt.segmentColor
+        hasPrevious = true
     }
     if (curSegment.isNotEmpty()) {
-        segments.add(curSegment)
+        segments.add(MapSegment(curColor, curSegment))
     }
     return segments
 }
+
+/**
+ * Un morceau de tracé d'un seul tenant, et la couleur que son fichier d'origine lui
+ * donnait — null s'il n'en donnait pas.
+ */
+internal data class MapSegment(
+    val sourceColor: Int?,
+    val points: List<GeoPoint>
+)
 
 private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
     // 1. Draw overlay (imported/merged) tracks if cached is null
@@ -1009,23 +1029,26 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
             if (trackPoints.isNotEmpty()) {
                 val segments = buildSegmentsFromPoints(trackPoints)
 
-                val overlayColor = if (overlayTrack.isImported) {
-                    TrackStylePreferences.resolveImportedColor(
-                        fromFile = state.importedColorFromFile,
-                        sourceColor = overlayTrack.sourceColor,
-                        fallback = state.importedColor
-                    )
-                } else {
-                    state.recordedColor
-                }
+                for (segment in segments) {
+                    if (segment.points.isNotEmpty()) {
+                        // La couleur se décide tronçon par tronçon : un même fichier
+                        // importé peut réunir des dizaines de trajets, chacun de la
+                        // sienne.
+                        val segmentColor = if (overlayTrack.isImported) {
+                            TrackStylePreferences.resolveImportedColor(
+                                fromFile = state.importedColorFromFile,
+                                sourceColor = segment.sourceColor,
+                                fallback = state.importedColor
+                            )
+                        } else {
+                            state.recordedColor
+                        }
 
-                for (segmentPoints in segments) {
-                    if (segmentPoints.isNotEmpty()) {
                         val polyline = Polyline().apply {
-                            outlinePaint.color = overlayColor
+                            outlinePaint.color = segmentColor
                             outlinePaint.strokeWidth = state.strokeWidth
                             outlinePaint.strokeCap = Paint.Cap.ROUND
-                            setPoints(segmentPoints)
+                            setPoints(segment.points)
                         }
                         buildList.add(polyline)
                     }
@@ -1047,23 +1070,25 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
         if (state.points.isNotEmpty()) {
             val segments = buildSegmentsFromPoints(state.points)
 
-            val trackLineColor = when {
-                state.isCurrentTracking -> Color.parseColor("#D32F2F") // Rouge pendant l'enregistrement
-                state.isImported -> TrackStylePreferences.resolveImportedColor(
-                    fromFile = state.importedColorFromFile,
-                    sourceColor = state.sourceColor,
-                    fallback = state.importedColor
-                )
-                else -> state.recordedColor
-            }
+            for (segment in segments) {
+                if (segment.points.isNotEmpty()) {
+                    // Le rouge de l'enregistrement en cours prime sur tout : c'est le
+                    // seul signal qui distingue la trace en train de s'écrire.
+                    val trackLineColor = when {
+                        state.isCurrentTracking -> Color.parseColor("#D32F2F")
+                        state.isImported -> TrackStylePreferences.resolveImportedColor(
+                            fromFile = state.importedColorFromFile,
+                            sourceColor = segment.sourceColor ?: state.sourceColor,
+                            fallback = state.importedColor
+                        )
+                        else -> state.recordedColor
+                    }
 
-            for (segmentPoints in segments) {
-                if (segmentPoints.isNotEmpty()) {
                     val polyline = Polyline().apply {
                         outlinePaint.color = trackLineColor
                         outlinePaint.strokeWidth = state.strokeWidth
                         outlinePaint.strokeCap = Paint.Cap.ROUND
-                        setPoints(segmentPoints)
+                        setPoints(segment.points)
                     }
                     buildList.add(polyline)
                 }
