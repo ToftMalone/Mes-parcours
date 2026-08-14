@@ -23,6 +23,10 @@ jobs:
   compiler:
     runs-on: ubuntu-latest
 
+    # Nécessaire pour reverser les APK compilés sur main.
+    permissions:
+      contents: write
+
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
@@ -121,6 +125,59 @@ jobs:
           path: mes-parcours-${{ steps.version.outputs.nom }}-release.apk
           if-no-files-found: error
           retention-days: 30
+
+      # ------------------------------------------------------------------
+      # Versement des APK dans le dépôt, à leur emplacement de compilation.
+      #
+      # `app/build` est ignoré par git, et le reste : on force l'ajout du seul
+      # fichier voulu plutôt que de percer le .gitignore. Sans quoi les
+      # compilations locales de l'auteur se présenteraient toutes à valider.
+      #
+      # « [skip ci] » dans le message est indispensable : cette poussée-ci
+      # relancerait sinon le workflow, qui repousserait, indéfiniment.
+      # ------------------------------------------------------------------
+
+      - name: Verser les APK au dépôt
+        if: github.ref == 'refs/heads/main'
+        env:
+          VERSION: ${{ steps.version.outputs.nom }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for tentative in 1 2 3; do
+            # On repart systématiquement de la pointe distante, en gardant les
+            # fichiers compilés : le commit produit s'applique donc toujours
+            # proprement, sans jamais avoir à fusionner deux versions binaires
+            # d'un même APK — un conflit que git ne saurait pas trancher.
+            git fetch --quiet origin main
+            git reset --quiet --mixed origin/main
+
+            git add --force app/build/outputs/apk/debug/app-debug.apk
+            if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+              git add --force app/build/outputs/apk/release/app-release.apk
+            fi
+
+            if git diff --cached --quiet; then
+              echo "APK identiques à ceux du dépôt, rien à verser."
+              exit 0
+            fi
+
+            git commit --quiet \
+              -m "APK compilés pour ${VERSION} [skip ci]" \
+              -m "Versés par l'intégration continue depuis ${GITHUB_SHA}."
+
+            if git push --quiet origin HEAD:main; then
+              echo "APK versés sur main."
+              exit 0
+            fi
+            echo "Poussée refusée (main a bougé), nouvelle tentative ${tentative}/3."
+          done
+
+          echo "::error::Impossible de verser les APK sur main après trois tentatives."
+          exit 1
 
       - name: Lancer les tests
         # Après la mise en ligne des APK, à dessein : un test qui échoue doit

@@ -68,6 +68,24 @@ seule voie qui permette de sauter proprement la compilation signée quand il man
 Ce workflow ne pose ni tag ni publication GitHub : il sert à essayer une version.
 La vraie publication reste `release.yml`, déclenchée par un tag annoté.
 
+**Les APK sont aussi reversés sur `main`**, à leur emplacement de compilation
+(`app/build/outputs/apk/debug/app-debug.apk`, et l'équivalent en release), à la
+demande de l'auteur qui veut les récupérer depuis l'arborescence GitHub sans passer
+par les artefacts. Trois conséquences à connaître :
+
+- `app/build` reste ignoré par git ; c'est `git add --force` qui verse le seul
+  fichier voulu. Percer le `.gitignore` ferait au contraire remonter toutes les
+  compilations locales de l'auteur à chaque `git status`.
+- Le message de commit porte `[skip ci]`, sans quoi cette poussée relancerait le
+  workflow, qui repousserait, sans fin.
+- Ces APK sont **tracés** : après une compilation locale, `git status` les
+  signalera modifiés. `git update-index --skip-worktree <chemin>` les fait taire
+  sur une machine donnée.
+
+Le poids s'accumule dans l'historique — une vingtaine de Mio par version, que git
+ne saura plus oublier sans réécriture. C'est le prix accepté du téléchargement
+direct depuis l'arborescence.
+
 **Attention à la clé de debug de l'APK produit en CI.** `debug.keystore` n'étant pas
 versionné, le runner n'en a pas et AGP en fabrique un neuf **à chaque exécution**.
 Deux APK de debug issus de deux exécutions ne portent donc pas la même signature, et
