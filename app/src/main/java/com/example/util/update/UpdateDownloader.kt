@@ -1,0 +1,155 @@
+package com.example.util.update
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.coroutines.coroutineContext
+
+/**
+ * Téléchargement de l'APK d'une nouvelle version, puis passage de relais à
+ * l'installateur d'Android.
+ *
+ * L'installation silencieuse est impossible pour une application ordinaire : le
+ * système affiche toujours son propre écran de confirmation. Tout ce que l'on peut
+ * faire, c'est lui présenter le fichier.
+ */
+object UpdateDownloader {
+
+    private const val TIMEOUT_MS = 15_000
+    private const val BUFFER_SIZE = 64 * 1024
+
+    /**
+     * Dossier de destination, propre à l'application : aucune permission de stockage
+     * n'est nécessaire, et le fichier disparaît avec l'application.
+     */
+    private fun downloadDir(context: Context): File? =
+        context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+
+    private fun apkFile(context: Context, update: AvailableUpdate): File? {
+        val dir = downloadDir(context) ?: return null
+        if (!dir.exists() && !dir.mkdirs()) return null
+        return File(dir, "mes-parcours-${update.versionCode}.apk")
+    }
+
+    /**
+     * Télécharge l'APK en signalant l'avancement de 0 à 1.
+     *
+     * Renvoie null si le téléchargement échoue. L'écriture se fait dans un fichier
+     * temporaire renommé à la fin : un téléchargement interrompu ne laisse jamais un
+     * APK tronqué que l'on tenterait ensuite d'installer.
+     */
+    suspend fun download(
+        context: Context,
+        update: AvailableUpdate,
+        onProgress: (Float) -> Unit
+    ): File? = withContext(Dispatchers.IO) {
+        val target = apkFile(context, update) ?: return@withContext null
+        val partial = File(target.parentFile, target.name + ".part")
+
+        var connection: HttpURLConnection? = null
+        try {
+            connection = (URL(update.apkUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                instanceFollowRedirects = true
+            }
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
+
+            val total = connection.contentLength.toLong()
+            var downloaded = 0L
+
+            partial.delete()
+            connection.inputStream.use { input ->
+                partial.outputStream().use { output ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    while (true) {
+                        // Rend le téléchargement annulable : fermer la boîte de
+                        // dialogue annule la coroutine, et l'on s'arrête ici.
+                        coroutineContext.ensureActive()
+
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        if (total > 0) onProgress((downloaded.toFloat() / total).coerceIn(0f, 1f))
+                    }
+                    output.flush()
+                }
+            }
+
+            // Taille annoncée non respectée : le fichier est incomplet.
+            if (total > 0 && partial.length() != total) {
+                partial.delete()
+                return@withContext null
+            }
+
+            target.delete()
+            if (!partial.renameTo(target)) {
+                partial.delete()
+                return@withContext null
+            }
+            onProgress(1f)
+            target
+        } catch (e: Exception) {
+            partial.delete()
+            null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /**
+     * Depuis Android 8, installer un APK exige que l'utilisateur ait autorisé cette
+     * application précise à installer des applications inconnues.
+     */
+    fun canRequestInstall(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
+        }
+
+    /** Écran de réglages où accorder cette autorisation. */
+    fun unknownSourcesSettingsIntent(context: Context): Intent =
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+            .setData(Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
+     * Intention ouvrant l'installateur système sur l'APK téléchargé.
+     *
+     * Le fichier est exposé par le FileProvider : passer un `file://` déclencherait
+     * une FileUriExposedException depuis Android 7.
+     */
+    fun installIntent(context: Context, apk: File): Intent {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            apk
+        )
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+    /** Supprime les APK déjà téléchargés : ils ne servent plus après installation. */
+    fun clearDownloads(context: Context) {
+        val dir = downloadDir(context) ?: return
+        dir.listFiles()
+            ?.filter { it.name.startsWith("mes-parcours-") }
+            ?.forEach { it.delete() }
+    }
+}

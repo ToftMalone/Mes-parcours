@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Sleek dark slate map canvas -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Subtle map grid lines -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,27H108 M0,54H108 M0,81H108 M27,0V108 M54,0V108 M81,0V108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#1E293B" />
+
+    <!-- Subtle map road contour lines for minimalist map feel -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,38 Q30,42 54,25 T108,18"
+        android:strokeWidth="1.2"
+        android:strokeColor="#1E293B" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M18,108 Q35,70 70,54 T92,0"
+        android:strokeWidth="1.2"
+        android:strokeColor="#1E293B" />
+</vector>

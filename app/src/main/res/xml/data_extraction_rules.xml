@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   L'historique des parcours est une donnée de localisation : elle ne doit pas
+   partir dans la sauvegarde cloud Google. Le transfert direct d'appareil à
+   appareil reste autorisé, il ne quitte pas la main de l'utilisateur.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="my_tracks_db" />
+        <exclude domain="database" path="my_tracks_db-wal" />
+        <exclude domain="database" path="my_tracks_db-shm" />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

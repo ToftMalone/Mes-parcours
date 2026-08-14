@@ -1,0 +1,61 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Red Track Path Shadow/Glow -->
+    <path
+        android:pathData="M 28 80 C 32 66, 42 66, 46 54 C 50 42, 58 48, 68 38"
+        android:strokeWidth="9"
+        android:strokeColor="#EF4444"
+        android:strokeAlpha="0.25"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Main Red Recorded Track Line -->
+    <path
+        android:pathData="M 28 80 C 32 66, 42 66, 46 54 C 50 42, 58 48, 68 38"
+        android:strokeWidth="5"
+        android:strokeColor="#EF4444"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Start Point Dot (White dot with subtle ring) -->
+    <path
+        android:pathData="M 28 80 m -4,0 a 4,4 0 1,1 8,0 a 4,4 0 1,1 -8,0"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M 28 80 m -2,0 a 2,2 0 1,1 4,0 a 2,2 0 1,1 -4,0"
+        android:fillColor="#EF4444" />
+
+    <!-- Blue Location Point Outer Glow Ring -->
+    <path
+        android:pathData="M 68 38 m -16,0 a 16,16 0 1,1 32,0 a 16,16 0 1,1 -32,0"
+        android:fillColor="#3B82F6"
+        android:fillAlpha="0.22" />
+
+    <!-- Blue Location Point Pulse Ring -->
+    <path
+        android:pathData="M 68 38 m -11,0 a 11,11 0 1,1 22,0 a 11,11 0 1,1 -22,0"
+        android:fillColor="#3B82F6"
+        android:fillAlpha="0.35" />
+
+    <!-- Blue Location Point White Border -->
+    <path
+        android:pathData="M 68 38 m -7,0 a 7,7 0 1,1 14,0 a 7,7 0 1,1 -14,0"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Blue Location Point Main Body -->
+    <path
+        android:pathData="M 68 38 m -5.5,0 a 5.5,5.5 0 1,1 11,0 a 5.5,5.5 0 1,1 -11,0"
+        android:fillColor="#2563EB" />
+
+    <!-- Blue Location Point Inner Light Core -->
+    <path
+        android:pathData="M 68 38 m -2,0 a 2,2 0 1,1 4,0 a 2,2 0 1,1 -4,0"
+        android:fillColor="#93C5FD" />
+
+</vector>

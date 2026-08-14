@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+       Uniquement le sous-dossier dédié aux fichiers à partager, et non tout le
+       cache : celui-ci contient aussi le cache de tuiles et d'autres données
+       internes qui n'ont pas à être exposées via le ContentProvider.
+    -->
+    <cache-path name="shared_files" path="exports/" />
+
+    <!--
+       APK des mises à jour téléchargées. Nécessaire pour les présenter à
+       l'installateur d'Android : lui passer un file:// lèverait une
+       FileUriExposedException depuis Android 7.
+    -->
+    <external-files-path name="updates" path="Download/" />
+</paths>
