@@ -12,6 +12,7 @@ object TrackStylePreferences {
     private const val KEY_THICKNESS_LEVEL = "pref_track_thickness_level"
     private const val KEY_COLOR_RECORDED = "pref_track_color_recorded"
     private const val KEY_COLOR_IMPORTED = "pref_track_color_imported"
+    private const val KEY_COLOR_MERGED = "pref_track_color_merged"
     private const val KEY_IMPORTED_FROM_FILE = "pref_track_color_imported_from_file"
 
     /** Violet, couleur historique des parcours enregistrés. */
@@ -19,6 +20,9 @@ object TrackStylePreferences {
 
     /** Vert fluo, couleur historique des parcours importés. */
     const val DEFAULT_COLOR_IMPORTED = 0xFF39FF14.toInt()
+
+    /** Orange, pour distinguer d'emblée les parcours fusionnés des deux autres. */
+    const val DEFAULT_COLOR_MERGED = 0xFFFF9800.toInt()
 
     /** Niveau d'épaisseur : un libellé et la largeur du trait en pixels. */
     data class ThicknessLevel(val label: String, val strokeWidth: Float)
@@ -78,6 +82,13 @@ object TrackStylePreferences {
 
     fun setImportedColor(context: Context, color: Int) {
         prefs(context).edit().putInt(KEY_COLOR_IMPORTED, color).apply()
+    }
+
+    fun getMergedColor(context: Context): Int =
+        prefs(context).getInt(KEY_COLOR_MERGED, DEFAULT_COLOR_MERGED)
+
+    fun setMergedColor(context: Context, color: Int) {
+        prefs(context).edit().putInt(KEY_COLOR_MERGED, color).apply()
     }
 
     /**

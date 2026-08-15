@@ -223,6 +223,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             val allPoints = tracks.map { track ->
                 MapTrack(
                     isImported = track.isImported,
+                    isMerged = track.isMerged,
                     sourceColor = track.sourceColor,
                     points = repository.getDisplayPoints(track.id, viewport)
                 )

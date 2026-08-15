@@ -9,6 +9,8 @@ package com.example.data.model
  */
 data class MapTrack(
     val isImported: Boolean,
+    /** Un parcours fusionné forme sa propre catégorie, avec sa propre couleur. */
+    val isMerged: Boolean,
     /** Couleur lue dans le fichier importé, null s'il n'en portait pas. */
     val sourceColor: Int?,
     val points: List<TrackPoint>

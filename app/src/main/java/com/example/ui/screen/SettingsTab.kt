@@ -1050,14 +1050,13 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.12-thierry",
+        version = "0.9.13-thierry",
         changes = listOf(
-            "Historique : L'onglet « Importés » est de retour. Il avait disparu de l'écran dans la version précédente, poussé hors de la rangée par l'onglet voisin",
-            "Fusion : Le choix du parcours de destination ne vous est plus demandé. Le plus ancien de la sélection accueille les autres — c'était déjà la proposition par défaut, et ce choix ne changeait ni le tracé, ni les statistiques, ni le nom du résultat",
+            "Historique : L'onglet « Fusionnés » est de retour, à côté de « Enregistrés » et « Importés ». Un parcours fusionné y est rangé au lieu de se perdre parmi ceux dont il est issu, et il a sa propre couleur — orange par défaut, modifiable par appui long sur l'onglet",
+            "Fusion : Le choix du parcours de destination ne vous est plus demandé. Le plus ancien de la sélection accueille les autres — ce choix ne changeait ni le tracé, ni les statistiques, ni le nom du résultat",
             "Export KML : Un parcours ne forme qu'une seule entrée dans le fichier, qu'il vienne d'une fusion ou d'un enregistrement interrompu par des pauses. Chaque morceau y reste une ligne distincte",
             "Parcours importés : Chaque trajet garde SA couleur d'origine, celle que vous lui aviez donnée dans Google Earth",
-            "Paramètres : Le choix « Garder les couleurs des fichiers » se trouve dans les réglages, section Tracés",
-            "Les fichiers importés avant la version 0.9.10 n'ont pas leurs couleurs : elles n'avaient jamais été enregistrées. Les réimporter suffit à les retrouver"
+            "Les fusions faites avec les versions précédentes restent dans leur ancienne catégorie : rien ne permet de les reconnaître après coup. Seules les nouvelles fusions rejoignent l'onglet"
         )
     )
 )

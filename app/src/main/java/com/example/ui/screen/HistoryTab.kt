@@ -90,18 +90,19 @@ fun HistoryTab(
     val isTracking by viewModel.isTracking.collectAsState()
     var trackToDelete by remember { mutableStateOf<Track?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Enregistrés, 1 = Importés
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Enregistrés, 1 = Importés, 2 = Fusionnés
 
     // Couleur d'affichage de chaque catégorie, modifiable par appui long sur l'onglet.
     var recordedColor by remember { mutableStateOf(TrackStylePreferences.getRecordedColor(context)) }
     var importedColor by remember { mutableStateOf(TrackStylePreferences.getImportedColor(context)) }
+    var mergedColor by remember { mutableStateOf(TrackStylePreferences.getMergedColor(context)) }
 
     // Les parcours importés gardent-ils la couleur de leur fichier d'origine ?
     var importedColorFromFile by remember {
         mutableStateOf(TrackStylePreferences.isImportedColorFromFile(context))
     }
 
-    // Catégorie dont la palette est ouverte : 0 = enregistrés, 1 = importés, null = fermée.
+    // Catégorie dont la palette est ouverte : 0, 1 ou 2 comme les onglets ; null = fermée.
     var colorPickerCategory by remember { mutableStateOf<Int?>(null) }
 
     val filePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -123,11 +124,16 @@ fun HistoryTab(
         }
     }
 
-    // Deux catégories seulement. Les parcours issus d'anciennes fusions (isMerged
-    // encore à true en base) réapparaissent dans leur catégorie d'origine au lieu
-    // de disparaître avec l'onglet "Fusionnés".
-    val recordedTracks = tracks.filter { !it.isImported }
-    val importedTracks = tracks.filter { it.isImported }
+    // Trois catégories qui ne se recouvrent pas : un parcours fusionné quitte celle
+    // dont il venait, sinon il apparaîtrait deux fois dans l'historique.
+    //
+    // Les fusions faites entre le retrait de l'onglet et son retour portent isMerged
+    // à false en base : elles restent donc dans leur catégorie d'origine. Rien ne
+    // permet de les reconnaître après coup, et les déplacer d'office serait pire que
+    // de les laisser où l'utilisateur les a vues jusqu'ici.
+    val mergedTracks = tracks.filter { it.isMerged }
+    val recordedTracks = tracks.filter { !it.isImported && !it.isMerged }
+    val importedTracks = tracks.filter { it.isImported && !it.isMerged }
 
     if (tracks.isEmpty()) {
         EmptyHistoryState(onImportClick = { filePickerLauncher.launch("*/*") })
@@ -240,6 +246,23 @@ fun HistoryTab(
                             )
                         }
                     )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = {
+                            Text(
+                                text = "Fusionnés (${mergedTracks.size})",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { selectedTab = 2 },
+                                        onLongPress = { colorPickerCategory = 2 }
+                                    )
+                                }
+                            )
+                        }
+                    )
                 }
             }
 
@@ -316,7 +339,9 @@ fun HistoryTab(
                         )
                     }
                 }
-            } else {
+            }
+
+            if (selectedTab == 1) {
                 if (importedTracks.isEmpty()) {
                     item {
                         Card(
@@ -398,18 +423,65 @@ fun HistoryTab(
                     }
                 }
             }
+
+            if (selectedTab == 2) {
+                if (mergedTracks.isEmpty()) {
+                    item {
+                        MergedEmptyState()
+                    }
+                } else {
+                    items(mergedTracks, key = { it.id }) { track ->
+                        TrackHistoryCard(
+                            track = track,
+                            // Un parcours fusionné à partir de fichiers garde les
+                            // couleurs de ceux-ci quand le réglage le demande ; sinon
+                            // il prend la couleur de sa propre catégorie.
+                            trackColor = Color(
+                                TrackStylePreferences.resolveImportedColor(
+                                    fromFile = importedColorFromFile,
+                                    sourceColor = track.sourceColor,
+                                    fallback = mergedColor
+                                )
+                            ),
+                            onClick = { onNavigateToDetails(track.id) },
+                            onDeleteClick = { trackToDelete = track },
+                            onResumeClick = {
+                                if (isTracking) {
+                                    Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    viewModel.resumeTrack(context, track.id) {
+                                        Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
+                                        onResumeTrack(track.id)
+                                    }
+                                }
+                            },
+                            showMapSelection = true,
+                            isSelectedForMap = track.isSelectedForMap,
+                            onMapSelectionToggle = { isChecked ->
+                                viewModel.toggleTrackSelectionForMap(track)
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 
     // Palette de couleurs, ouverte par appui long sur un onglet de catégorie
     colorPickerCategory?.let { category ->
-        val isRecorded = category == 0
+        // Les parcours enregistrés ne viennent d'aucun fichier : eux seuls n'ont pas
+        // de couleur d'origine à conserver, et la pastille en dégradé n'a donc rien
+        // à leur proposer.
+        val comesFromFiles = category != 0
         AlertDialog(
             onDismissRequest = { colorPickerCategory = null },
             title = {
                 Text(
-                    text = if (isRecorded) "Couleur des parcours enregistrés"
-                           else "Couleur des parcours importés",
+                    text = when (category) {
+                        0 -> "Couleur des parcours enregistrés"
+                        1 -> "Couleur des parcours importés"
+                        else -> "Couleur des parcours fusionnés"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -417,14 +489,27 @@ fun HistoryTab(
             text = {
                 Column {
                     ColorPaletteRow(
-                        selectedColor = if (isRecorded) recordedColor else importedColor,
+                        selectedColor = when (category) {
+                            0 -> recordedColor
+                            1 -> importedColor
+                            else -> mergedColor
+                        },
                         onColorSelected = { color ->
-                            if (isRecorded) {
-                                recordedColor = color
-                                TrackStylePreferences.setRecordedColor(context, color)
-                            } else {
-                                importedColor = color
-                                TrackStylePreferences.setImportedColor(context, color)
+                            when (category) {
+                                0 -> {
+                                    recordedColor = color
+                                    TrackStylePreferences.setRecordedColor(context, color)
+                                }
+                                1 -> {
+                                    importedColor = color
+                                    TrackStylePreferences.setImportedColor(context, color)
+                                }
+                                else -> {
+                                    mergedColor = color
+                                    TrackStylePreferences.setMergedColor(context, color)
+                                }
+                            }
+                            if (comesFromFiles) {
                                 // Choisir une couleur franche, c'est renoncer à celle
                                 // du fichier : sans quoi la pastille se sélectionnerait
                                 // sans que le tracé change à l'écran.
@@ -432,8 +517,7 @@ fun HistoryTab(
                                 TrackStylePreferences.setImportedColorFromFile(context, false)
                             }
                         },
-                        // Seuls les parcours importés viennent d'un fichier.
-                        showFileColorOption = !isRecorded,
+                        showFileColorOption = comesFromFiles,
                         isFileColorSelected = importedColorFromFile,
                         onFileColorSelected = {
                             importedColorFromFile = true
@@ -441,7 +525,7 @@ fun HistoryTab(
                         }
                     )
 
-                    if (!isRecorded) {
+                    if (comesFromFiles) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = if (importedColorFromFile) {
@@ -829,6 +913,51 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Importer GPX / KML", style = MaterialTheme.typography.labelLarge)
             }
+        }
+    }
+}
+
+/**
+ * Écran vide de l'onglet « Fusionnés ».
+ *
+ * Il dit surtout ce qu'il faut faire pour le remplir : la fusion ne se trouve pas
+ * dans l'historique mais dans les outils, et rien ne le laisserait deviner.
+ */
+@Composable
+private fun MergedEmptyState() {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Timeline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Aucun parcours fusionné",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Réunissez plusieurs parcours en un seul depuis l'onglet " +
+                        "« Outils », et le résultat apparaîtra ici.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

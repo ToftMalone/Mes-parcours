@@ -401,10 +401,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 elevationGain = totalElevationGain,
                 elevationLoss = totalElevationLoss,
                 isRecording = false,
-                // isImported n'est pas recalculé : le parcours de destination garde sa
-                // catégorie d'origine (enregistré ou importé). Il n'y a plus de
-                // catégorie "Fusionnés", la trace fusionnée reste là où elle était.
-                isMerged = false
+                // isImported n'est pas recalculé : la provenance du parcours d'accueil
+                // reste vraie. Mais le résultat porte désormais sa propre catégorie —
+                // l'historique a un onglet « Fusionnés » — et c'est isMerged qui l'y
+                // range, en le retirant de sa catégorie d'origine.
+                isMerged = true
             )
 
             trackDao.updateTrack(updatedDestinationTrack)

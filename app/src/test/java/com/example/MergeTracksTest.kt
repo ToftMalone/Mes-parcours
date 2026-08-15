@@ -136,6 +136,20 @@ class MergeTracksTest {
     }
 
     @Test
+    fun `le resultat d une fusion est marque comme fusionne`() = runBlocking {
+        // C'est ce marquage seul qui range le parcours dans l'onglet « Fusionnés » de
+        // l'historique, et qui l'y range *à la place* de sa catégorie d'origine. Sans
+        // lui, la fusion se perd parmi les parcours dont elle est issue.
+        val first = createTrack("a", startTime = 1_000_000L, marker = 1.0, count = 2)
+        val second = createTrack("b", startTime = 2_000_000L, marker = 2.0, count = 2)
+
+        repository.mergeAndSaveTracks(listOf(first, second), first, "Fusion")
+
+        val merged = db.trackDao.getTrackById(first)!!
+        assertTrue("le résultat doit porter la catégorie « fusionné »", merged.isMerged)
+    }
+
+    @Test
     fun `un parcours sans point ne perturbe pas la fusion`() = runBlocking {
         val empty = db.trackDao.insertTrack(Track(name = "vide", startTime = 1_000_000L))
         val withPoints = createTrack("plein", startTime = 2_000_000L, marker = 2.0, count = 3)
