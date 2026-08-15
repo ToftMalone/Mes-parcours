@@ -198,18 +198,28 @@ fun HistoryTab(
                 ) {
                     // Appui long sur un onglet : choix de la couleur de la catégorie.
                     //
-                    // La zone sensible couvre tout l'onglet, et non les seules lettres
-                    // du libellé. Posé sur le Text, le geste ne répondait que sur la
-                    // largeur du mot : sur un grand écran, l'onglet est bien plus large
-                    // que son texte, et appuyer « sur l'onglet » ne déclenchait rien.
+                    // Le geste reste posé sur le Text, donc sensible sur les seules
+                    // lettres du libellé. L'élargir à tout l'onglet par un Box en
+                    // fillMaxWidth a été essayé et retiré : dans le créneau `text` d'un
+                    // Tab, cette largeur est réclamée sur la rangée entière, le premier
+                    // onglet la prend toute, et le second sort de l'écran — que la
+                    // rangée rogne. L'onglet « Importés » disparaissait purement et
+                    // simplement. Le réglage est de toute façon atteignable depuis
+                    // l'écran des paramètres, qui est sa vraie place.
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
                         text = {
-                            CategoryTabLabel(
-                                label = "Enregistrés (${recordedTracks.size})",
-                                onTap = { selectedTab = 0 },
-                                onLongPress = { colorPickerCategory = 0 }
+                            Text(
+                                text = "Enregistrés (${recordedTracks.size})",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { selectedTab = 0 },
+                                        onLongPress = { colorPickerCategory = 0 }
+                                    )
+                                }
                             )
                         }
                     )
@@ -217,10 +227,16 @@ fun HistoryTab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
                         text = {
-                            CategoryTabLabel(
-                                label = "Importés (${importedTracks.size})",
-                                onTap = { selectedTab = 1 },
-                                onLongPress = { colorPickerCategory = 1 }
+                            Text(
+                                text = "Importés (${importedTracks.size})",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { selectedTab = 1 },
+                                        onLongPress = { colorPickerCategory = 1 }
+                                    )
+                                }
                             )
                         }
                     )
@@ -814,40 +830,6 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
                 Text("Importer GPX / KML", style = MaterialTheme.typography.labelLarge)
             }
         }
-    }
-}
-
-/**
- * Libellé d'un onglet de catégorie, sensible sur toute sa surface.
- *
- * La hauteur minimale de 48 dp est celle que Material impose à une cible tactile.
- * Combinée à la largeur pleine, elle fait de l'onglet entier la zone d'appui long,
- * alors que le geste ne répondait auparavant que sur les lettres du libellé.
- */
-@Composable
-private fun CategoryTabLabel(
-    label: String,
-    onTap: () -> Unit,
-    onLongPress: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { onTap() },
-                    onLongPress = { onLongPress() }
-                )
-            }
-            .testTag("category_tab_$label"),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleSmall
-        )
     }
 }
 

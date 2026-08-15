@@ -1050,14 +1050,12 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.11-thierry",
+        version = "0.9.12-thierry",
         changes = listOf(
-            "Export KML : Un parcours ne forme plus qu'une seule entrée dans le fichier, qu'il vienne d'une fusion ou d'un enregistrement interrompu par des pauses. Chaque morceau y reste une ligne distincte. Google Earth affichait jusqu'ici autant d'entrées numérotées qu'il y avait de morceaux",
-            "Paramètres : Le choix « Garder les couleurs des fichiers » a désormais sa place dans les réglages, section Tracés. Il n'existait que derrière un appui long sur l'onglet « Importés » de l'historique, donc introuvable pour qui ne connaissait pas le geste",
-            "Palette de couleurs : L'appui long fonctionne désormais sur tout l'onglet, et non plus sur les seules lettres de son titre. Sur un grand écran, appuyer sur l'onglet n'ouvrait rien tant qu'on n'avait pas visé le mot lui-même",
-            "Parcours importés : Chaque trajet garde SA couleur d'origine. Un fichier Google Earth qui réunit plusieurs voyages les affiche chacun de la couleur que vous lui aviez donnée, au lieu de les peindre tous pareil",
-            "Couleurs : Le choix se fait dans la palette, par appui long sur l'onglet « Importés ». La première pastille, en dégradé, active les couleurs d'origine",
-            "Couleurs : Les tracés sans couleur dans leur fichier — les GPX, notamment — gardent la couleur choisie dans la palette",
+            "Historique : L'onglet « Importés » est de retour. Il avait disparu de l'écran dans la version précédente, poussé hors de la rangée par l'onglet voisin",
+            "Export KML : Un parcours ne forme qu'une seule entrée dans le fichier, qu'il vienne d'une fusion ou d'un enregistrement interrompu par des pauses. Chaque morceau y reste une ligne distincte",
+            "Parcours importés : Chaque trajet garde SA couleur d'origine, celle que vous lui aviez donnée dans Google Earth",
+            "Paramètres : Le choix « Garder les couleurs des fichiers » se trouve dans les réglages, section Tracés",
             "Les fichiers importés avant la version 0.9.10 n'ont pas leurs couleurs : elles n'avaient jamais été enregistrées. Les réimporter suffit à les retrouver"
         )
     )
