@@ -1053,6 +1053,7 @@ private val RELEASES = listOf(
         version = "0.9.12-thierry",
         changes = listOf(
             "Historique : L'onglet « Importés » est de retour. Il avait disparu de l'écran dans la version précédente, poussé hors de la rangée par l'onglet voisin",
+            "Fusion : Le choix du parcours de destination ne vous est plus demandé. Le plus ancien de la sélection accueille les autres — c'était déjà la proposition par défaut, et ce choix ne changeait ni le tracé, ni les statistiques, ni le nom du résultat",
             "Export KML : Un parcours ne forme qu'une seule entrée dans le fichier, qu'il vienne d'une fusion ou d'un enregistrement interrompu par des pauses. Chaque morceau y reste une ligne distincte",
             "Parcours importés : Chaque trajet garde SA couleur d'origine, celle que vous lui aviez donnée dans Google Earth",
             "Paramètres : Le choix « Garder les couleurs des fichiers » se trouve dans les réglages, section Tracés",

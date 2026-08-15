@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -115,7 +114,7 @@ private fun ToolsMenu(
             ToolMenuEntry(
                 icon = Icons.AutoMirrored.Filled.MergeType,
                 title = "Fusionner des traces",
-                subtitle = "Réunir plusieurs parcours dans un parcours de destination",
+                subtitle = "Réunir plusieurs parcours en un seul, dans l'ordre chronologique",
                 onClick = { onOpenTool(Tool.MERGE) },
                 testTag = "open_merge_tool_button"
             )
@@ -195,23 +194,27 @@ private fun MergeTracksTool(
     val tracks by viewModel.allTracks.collectAsState()
 
     var selectedSourceIds by remember { mutableStateOf(emptySet<Long>()) }
-    var destinationTrackId by remember { mutableStateOf<Long?>(null) }
     var mergedName by remember { mutableStateOf("") }
     var isMerging by remember { mutableStateOf(false) }
 
     val selectedTracks = tracks.filter { it.id in selectedSourceIds }.sortedBy { it.startTime }
 
-    // La destination doit toujours faire partie de la sélection courante.
-    LaunchedEffect(selectedSourceIds) {
-        val current = destinationTrackId
-        if (current == null || !selectedSourceIds.contains(current)) {
-            destinationTrackId = selectedTracks.firstOrNull()?.id
-        }
-    }
+    /**
+     * Le parcours qui accueille les autres est **le plus ancien de la sélection**, et
+     * n'est plus demandé.
+     *
+     * C'était déjà celui que l'écran proposait par défaut, et le choix n'avait guère
+     * de sens à poser : les points sont de toute façon recopiés dans l'ordre
+     * chronologique, si bien que la destination ne change ni le tracé, ni les
+     * statistiques, ni le nom — seulement la ligne de la base qui survit et, avec
+     * elle, la catégorie du résultat. Partir du plus ancien donne la réponse
+     * attendue : la fusion se range là où commence le voyage.
+     */
+    val destinationTrack = selectedTracks.firstOrNull()
 
-    // Le nom proposé suit le parcours de destination tant que l'utilisateur n'a rien saisi.
-    LaunchedEffect(destinationTrackId) {
-        val destination = tracks.find { it.id == destinationTrackId }
+    // Le nom proposé est celui du parcours d'accueil.
+    LaunchedEffect(destinationTrack?.id) {
+        val destination = destinationTrack
         if (destination != null) {
             mergedName = destination.name
         }
@@ -280,63 +283,15 @@ private fun MergeTracksTool(
                 }
             }
 
-            // Étape 2 : dans lequel verser les autres
+            // Étape 2 : nom final
             ToolStepCard(
                 stepNumber = 2,
-                title = "Parcours de destination",
-                subtitle = "Les autres y seront ajoutés puis supprimés définitivement"
-            ) {
-                if (selectedTracks.size < 2) {
-                    Text(
-                        text = "Sélectionnez d'abord au moins deux parcours à l'étape 1.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    selectedTracks.forEach { track ->
-                        val isDestination = track.id == destinationTrackId
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (isDestination) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                    else Color.Transparent
-                                )
-                                .clickable { destinationTrackId = track.id }
-                                .padding(8.dp)
-                                .testTag("merge_destination_${track.id}"),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isDestination,
-                                onClick = { destinationTrackId = track.id }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = track.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isDestination) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isDestination) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = trackSubtitle(track),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Étape 3 : nom final
-            ToolStepCard(
-                stepNumber = 3,
                 title = "Nom du parcours fusionné",
-                subtitle = "Le parcours de destination conserve sa catégorie"
+                subtitle = if (destinationTrack != null) {
+                    "Le résultat rejoint la catégorie de « ${destinationTrack.name} », le plus ancien"
+                } else {
+                    "Sélectionnez d'abord au moins deux parcours"
+                }
             ) {
                 OutlinedTextField(
                     value = mergedName,
@@ -350,13 +305,13 @@ private fun MergeTracksTool(
             }
 
             val canMerge = selectedTracks.size >= 2 &&
-                    destinationTrackId != null &&
+                    destinationTrack != null &&
                     mergedName.isNotBlank() &&
                     !isMerging
 
             Button(
                 onClick = {
-                    val finalDestinationId = destinationTrackId ?: return@Button
+                    val finalDestinationId = destinationTrack?.id ?: return@Button
                     isMerging = true
                     viewModel.mergeTracks(
                         context = context,
@@ -367,7 +322,6 @@ private fun MergeTracksTool(
                             isMerging = false
                             Toast.makeText(context, "Parcours fusionnés avec succès !", Toast.LENGTH_LONG).show()
                             selectedSourceIds = emptySet()
-                            destinationTrackId = null
                             viewModel.selectTrack(mergedId)
                             onNavigateToDetails(mergedId)
                         },
