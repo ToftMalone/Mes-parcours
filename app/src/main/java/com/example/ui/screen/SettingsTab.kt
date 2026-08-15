@@ -1050,13 +1050,11 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.13-thierry",
+        version = "0.9.14-thierry",
         changes = listOf(
-            "Historique : L'onglet « Fusionnés » est de retour, à côté de « Enregistrés » et « Importés ». Un parcours fusionné y est rangé au lieu de se perdre parmi ceux dont il est issu, et il a sa propre couleur — orange par défaut, modifiable par appui long sur l'onglet",
-            "Fusion : Le choix du parcours de destination ne vous est plus demandé. Le plus ancien de la sélection accueille les autres — ce choix ne changeait ni le tracé, ni les statistiques, ni le nom du résultat",
-            "Export KML : Un parcours ne forme qu'une seule entrée dans le fichier, qu'il vienne d'une fusion ou d'un enregistrement interrompu par des pauses. Chaque morceau y reste une ligne distincte",
-            "Parcours importés : Chaque trajet garde SA couleur d'origine, celle que vous lui aviez donnée dans Google Earth",
-            "Les fusions faites avec les versions précédentes restent dans leur ancienne catégorie : rien ne permet de les reconnaître après coup. Seules les nouvelles fusions rejoignent l'onglet"
+            "Position : Sur un appareil sans localisation active, l'application affichait parfois un point bleu fictif tournant dans Paris, au lieu de dire que la localisation est désactivée. Ce mode de test ne peut plus s'activer dans une version publiée",
+            "Application allégée : Cinq bibliothèques inutilisées voyageaient dans chaque installation — vestiges d'une sauvegarde vers Google Drive abandonnée. Elles sont retirées",
+            "Nettoyage : Suppression de code devenu inutile — deux variantes d'export jamais appelées, trois requêtes de base sans usage, un réglage de destination de sauvegarde qui ne servait plus, et un fichier de données jamais chargé"
         )
     )
 )

@@ -28,8 +28,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     suspend fun getTrackById(trackId: Long): Track? = trackDao.getTrackById(trackId)
 
-    fun getPointsForTrackFlow(trackId: Long): Flow<List<TrackPoint>> = trackDao.getPointsForTrackFlow(trackId)
-
     suspend fun getPointsForTrack(trackId: Long): List<TrackPoint> = trackDao.getPointsForTrack(trackId)
 
     suspend fun resumeExistingTrack(trackId: Long): Boolean {
@@ -132,13 +130,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         _isPaused.value = false
         _livePoints.value = emptyList()
         _liveStats.value = LiveStats()
-    }
-
-    suspend fun insertPoints(points: List<TrackPoint>) {
-        if (points.isNotEmpty()) {
-            trackDao.insertTrackPoints(points)
-            points.firstOrNull()?.let { invalidatePointCaches(it.trackId) }
-        }
     }
 
     // ------------------------------------------------------------------
@@ -455,10 +446,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     fun getSelectedImportedTracksFlow(): Flow<List<Track>> {
         return trackDao.getSelectedImportedTracksFlow()
-    }
-
-    fun getSelectedImportedPointsFlow(): Flow<List<TrackPoint>> {
-        return trackDao.getSelectedImportedPointsFlow()
     }
 
     suspend fun updateTrack(track: Track) {

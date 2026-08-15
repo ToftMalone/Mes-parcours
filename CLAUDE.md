@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.9.11-thierry` (`versionCode` 11). Elle n'est écrite qu'une fois,
+- Version courante : `0.9.14-thierry` (`versionCode` 14). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
   - Jusqu'à la `1.0-thierry` **exclue** : une seule entrée, celle de la version
@@ -393,24 +393,42 @@ inverser, et l'assombrir la rendrait illisible.
   fichier ne sépare pas ses tronçons apparaît donc d'un seul tenant, sans que
   l'application puisse le deviner.
 
-## Poids mort identifié
+## Poids mort : traité
 
-Non corrigé pour l'instant, à traiter si l'occasion se présente :
+Le ménage a été fait. Ce qui a été retiré, et qui ne doit pas revenir par
+inadvertance :
 
-- Dépendances déclarées et jamais utilisées dans `app/build.gradle.kts` : `retrofit`,
-  `converter-moshi`, `moshi-kotlin` (+ son processeur KSP), `okhttp`,
-  `logging-interceptor`, `work-runtime-ktx`, `credentials`,
-  `credentials-play-services-auth`, `googleid` (vestiges d'une sauvegarde Drive retirée).
-- Code mort : `Exporter.exportToGPX` / `exportToKML` (variantes en mémoire),
-  `MediaStoreExporter.saveToLocalDownloads` (variante non-flux),
+- Dépendances déclarées et jamais appelées, vestiges d'une sauvegarde Drive
+  abandonnée : `retrofit`, `converter-moshi`, `moshi-kotlin` (+ son processeur KSP),
+  `okhttp`, `logging-interceptor`, `work-runtime-ktx`, `credentials`,
+  `credentials-play-services-auth`, `googleid`. Elles voyageaient dans chaque APK
+  installé sans qu'une ligne de code les touche.
+- Code mort : `Exporter.exportToGPX` / `exportToKML` (variantes en mémoire, que les
+  writers incrémentaux remplacent), `MediaStoreExporter.saveToLocalDownloads`,
   `TrackRepository.insertPoints`, `getPointsForTrackFlow`,
-  `getSelectedImportedPointsFlow`, `AutoBackupPreferences.isDestLocal` / `setDestLocal`,
-  colonne `Track.isMerged` (toujours écrite à `false`, jamais lue).
-- Asset jamais chargé : `app/src/main/assets/france_boundary.geojson`.
-- `MainScreen` contient une **seconde** simulation GPS, celle-ci *non* gardée par
-  `BuildConfig.DEBUG` : sur un appareil réel sans aucun fournisseur de position
-  actif, un point bleu fictif tourne dans Paris. Rien n'est écrit en base, mais
-  l'incohérence avec l'invariant 8 mérite d'être levée.
+  `getSelectedImportedPointsFlow` et leurs requêtes DAO,
+  `AutoBackupPreferences.isDestLocal` / `setDestLocal`.
+- Asset jamais chargé : `france_boundary.geojson`.
+- La simulation GPS de `MainScreen` n'était pas gardée par `BuildConfig.DEBUG`,
+  contrairement à celle de `TrackingService` : sur un appareil réel dont la détection
+  heuristique d'émulateur se déclenchait à tort, ou simplement sans fournisseur de
+  position actif, un point bleu fictif tournait dans Paris. Corrigé — l'invariant 8
+  vaut pour les deux.
+
+`Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
+« Fusionnés » de l'historique.
+
+### Reste à arbitrer
+
+- **`TrackRepository._livePoints` grandit sans borne pendant un enregistrement**, et
+  chaque point recopie toute la liste (`_livePoints.value + point`). Le coût est donc
+  quadratique sur la durée, et la liste finit par tenir plusieurs mégaoctets. Le
+  plafond existe déjà pour la reprise (`liveTailLimit`, 20 000 points) ; l'appliquer
+  ici bornerait le coût, au prix du début du tracé qui disparaîtrait de l'écran sur un
+  enregistrement de plus de cinq heures. À trancher avec l'auteur, l'effet étant
+  visible.
+- Les entrées de `libs.versions.toml` correspondant aux dépendances retirées sont
+  restées : inertes à la compilation, elles documentent ce qui a existé.
 
 ## Mise à jour de l'application
 

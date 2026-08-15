@@ -18,9 +18,6 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE isSelectedForMap = 1")
     fun getSelectedImportedTracksFlow(): Flow<List<Track>>
 
-    @Query("SELECT * FROM track_points WHERE trackId IN (SELECT id FROM tracks WHERE isSelectedForMap = 1) ORDER BY trackId ASC, id ASC")
-    fun getSelectedImportedPointsFlow(): Flow<List<TrackPoint>>
-
     @Query("SELECT * FROM tracks WHERE id = :trackId LIMIT 1")
     fun getTrackByIdFlow(trackId: Long): Flow<Track?>
 
@@ -29,9 +26,6 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks WHERE isRecording = 1 ORDER BY id DESC LIMIT 1")
     suspend fun getActiveRecordingTrack(): Track?
-
-    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id ASC")
-    fun getPointsForTrackFlow(trackId: Long): Flow<List<TrackPoint>>
 
     @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id ASC")
     suspend fun getPointsForTrack(trackId: Long): List<TrackPoint>

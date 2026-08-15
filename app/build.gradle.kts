@@ -30,8 +30,8 @@ android {
     applicationId = "com.toche.mesparcours"
     minSdk = 24
     targetSdk = 36
-    versionCode = 13
-    versionName = "0.9.13-thierry"
+    versionCode = 14
+    versionName = "0.9.14-thierry"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -82,8 +82,13 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
+// Les dépendances mises en commentaire ont été écartées sans être supprimées : les
+// remettre ne coûte alors qu'un décommentage.
+//
+// Retrofit, OkHttp, Moshi, WorkManager et les bibliothèques d'identifiants Google
+// ont en revanche été retirées pour de bon : vestiges d'une sauvegarde vers Drive
+// abandonnée, aucune ligne de code ne les appelait, et elles voyageaient malgré
+// tout dans chaque APK installé.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   // implementation(libs.accompanist.permissions)
@@ -107,19 +112,10 @@ dependencies {
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   // implementation(libs.coil.compose)
-  implementation(libs.converter.moshi)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
-  implementation(libs.moshi.kotlin)
-  implementation(libs.okhttp)
   implementation(libs.play.services.location)
-  implementation("androidx.work:work-runtime-ktx:2.9.1")
-  implementation("androidx.credentials:credentials:1.3.0")
-  implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-  implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
   implementation(libs.osmdroid.android)
-  implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -137,5 +133,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
 }

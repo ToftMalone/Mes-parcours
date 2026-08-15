@@ -44,27 +44,6 @@ object MediaStoreExporter {
         }
     }
 
-    fun saveToLocalDownloads(
-        context: Context,
-        fileName: String,
-        content: String,
-        mimeType: String
-    ): Boolean {
-        return try {
-            val output = openOutput(context, fileName, mimeType) ?: return false
-            output.use { stream ->
-                stream.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    writer.append(content)
-                }
-            }
-            Log.d(TAG, "Successfully saved $fileName")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save file $fileName locally", e)
-            false
-        }
-    }
-
     /**
      * Variante en flux : [write] produit le contenu au fur et à mesure dans le Writer.
      * Permet d'exporter une trace de plusieurs millions de points sans jamais

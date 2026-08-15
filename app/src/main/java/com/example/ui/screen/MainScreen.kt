@@ -66,6 +66,7 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.example.BuildConfig
 import com.example.data.model.TrackPoint
 import com.example.util.EnvironmentUtils
 
@@ -173,16 +174,19 @@ fun MainScreen(
                         return@LifecycleEventObserver
                     }
 
-                    // Check if running in emulator or cloud environment to bypass real GPS hardware and prevent AppOps errors
-                    val isEmulator = EnvironmentUtils.isEmulatorOrCloud(context)
-
-                    // Check if any actual GPS or Network providers are enabled.
-                    // If not, use simulated location mode to prevent E/AppOps errors and enable testing.
                     val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
                     val isGpsEnabled = try { lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) } catch (e: Exception) { false }
                     val isNetworkEnabled = try { lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { false }
-                    
-                    if (isEmulator || (!isGpsEnabled && !isNetworkEnabled)) {
+                    val hasNoProvider = !isGpsEnabled && !isNetworkEnabled
+
+                    // La simulation fabrique un point bleu qui tourne dans Paris. C'est
+                    // un outil de développement, et elle doit être gardée par
+                    // BuildConfig.DEBUG comme celle de TrackingService (invariant 8) :
+                    // la détection d'émulateur est heuristique — elle teste par exemple
+                    // si Build.PRODUCT contient « sdk » — et se déclenche donc parfois
+                    // sur un vrai appareil. En version publiée, l'utilisateur y verrait
+                    // sa position remplacée par une position inventée.
+                    if (BuildConfig.DEBUG && (EnvironmentUtils.isEmulatorOrCloud(context) || hasNoProvider)) {
                         viewModel.updateGpsStatus("Simulation GPS")
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
                             var simLat = 48.8566
@@ -209,6 +213,13 @@ fun MainScreen(
                                 kotlinx.coroutines.delay(2000L)
                             }
                         }
+                        return@LifecycleEventObserver
+                    }
+
+                    // Aucun fournisseur actif : on le signale, plutôt que d'afficher
+                    // une position que l'appareil n'a pas.
+                    if (hasNoProvider) {
+                        viewModel.updateGpsStatus("Localisation désactivée")
                         return@LifecycleEventObserver
                     }
 

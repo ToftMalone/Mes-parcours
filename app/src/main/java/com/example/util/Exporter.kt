@@ -168,29 +168,6 @@ object Exporter {
         }
     }
 
-    /**
-     * Variante en mémoire, pour les traces de taille courante et le partage.
-     * Préférer [GpxWriter] dès que la trace peut être volumineuse.
-     */
-    fun exportToGPX(track: Track, points: List<TrackPoint>): String {
-        val sb = StringBuilder()
-        val writer = GpxWriter(sb)
-        writer.start(track)
-        for (pt in points) writer.add(pt)
-        writer.finish()
-        return sb.toString()
-    }
-
-    /** Voir [exportToGPX]. */
-    fun exportToKML(track: Track, points: List<TrackPoint>): String {
-        val sb = StringBuilder()
-        val writer = KmlWriter(sb)
-        writer.start(track)
-        for (pt in points) writer.add(pt)
-        writer.finish()
-        return sb.toString()
-    }
-
     private fun escapeXml(str: String): String {
         return str.replace("&", "&amp;")
             .replace("<", "&lt;")
