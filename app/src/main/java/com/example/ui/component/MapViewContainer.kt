@@ -148,8 +148,16 @@ private const val VIEWPORT_MARGIN = 0.60
  */
 private const val RECENTER_SETTLE_MS = 600L
 
-/** Cadence de republication de la zone visible pendant le suivi automatique. */
-private const val AUTO_FOLLOW_VIEWPORT_POLL_MS = 500L
+/**
+ * Cadence de republication de la zone visible pendant le suivi automatique.
+ *
+ * Une seconde, et non deux fois par seconde comme auparavant : la carte suit des
+ * positions qui n'arrivent elles-mêmes qu'à 1 Hz, et chaque republication déclenche
+ * le circuit de rechargement des points. Doubler la cadence de la source ne pouvait
+ * rien apprendre de neuf — cela ne faisait que réveiller le processeur pour rien
+ * tant que l'écran reste allumé.
+ */
+private const val AUTO_FOLLOW_VIEWPORT_POLL_MS = 1000L
 
 /** Publie la zone visible actuelle (élargie de [VIEWPORT_MARGIN]) vers le ViewModel. */
 private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Unit) {

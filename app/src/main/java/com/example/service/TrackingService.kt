@@ -62,6 +62,21 @@ class TrackingService : Service() {
 
     private var timerJob: Job? = null
 
+    private val notificationManager: NotificationManager by lazy {
+        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
+
+    /**
+     * Dernier texte réellement affiché, pour ne pas republier deux fois le même.
+     *
+     * Volatile : la fonction est appelée depuis le minuteur et depuis le thread de
+     * traitement des points. Dans le pire des cas, deux fils la voient encore vide au
+     * même instant et publient chacun une fois — sans conséquence, l'affichage étant
+     * identique.
+     */
+    @Volatile
+    private var lastNotificationText: String? = null
+
     // Track state variables
     @Volatile
     private var trackId: Long = -1
@@ -217,6 +232,7 @@ class TrackingService : Service() {
             speedSumMps = 0.0
             isServiceStopping = false
             isPaused = false
+            lastNotificationText = null
 
             attachToOrRestoreActiveTrack(name, activityType, existingTrackId)
 
@@ -548,8 +564,15 @@ class TrackingService : Service() {
         }
 
         val notificationString = "Distance: $formattedKm | Temps: $formattedTime"
-        
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Le minuteur et l'arrivée d'un point GPS appellent tous deux cette fonction,
+        // chacun à environ une fois par seconde : la moitié des mises à jour
+        // réécrivait donc un texte identique, en traversant le système pour rien.
+        // Sur une sortie de quatre heures, cela faisait une quinzaine de milliers
+        // d'allers-retours inutiles.
+        if (notificationString == lastNotificationText) return
+        lastNotificationText = notificationString
+
         notificationManager.notify(NOTIFICATION_ID, buildNotification(notificationString))
     }
 
@@ -594,11 +617,18 @@ class TrackingService : Service() {
         }
     }
 
-    private fun buildNotification(contentText: String): Notification {
+    /**
+     * Gabarit de la notification, construit une seule fois.
+     *
+     * Rien n'y varie que le texte : le titre, l'icône, l'action « Arrêter » et surtout
+     * les deux PendingIntent sont identiques d'un bout à l'autre de l'enregistrement.
+     * Les refabriquer à chaque mise à jour — plusieurs milliers de fois par sortie —
+     * ne produisait que du travail.
+     */
+    private val notificationBuilder: NotificationCompat.Builder by lazy {
         val notificationIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -616,9 +646,8 @@ class TrackingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Mes parcours : Enregistrement actif")
-            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -632,8 +661,10 @@ class TrackingService : Service() {
                 stopPendingIntent
             )
             .setOnlyAlertOnce(true)
-            .build()
+    }
 
+    private fun buildNotification(contentText: String): Notification {
+        val notification = notificationBuilder.setContentText(contentText).build()
         notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR
         return notification
     }
