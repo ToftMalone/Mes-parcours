@@ -27,6 +27,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.SatelliteAlt
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Train
+import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
@@ -69,9 +78,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
-import com.example.ui.theme.AmberTertiary
-import com.example.ui.theme.EmeraldPrimary
-import com.example.ui.theme.IndigoSecondary
 import com.example.ui.theme.NightModePreferences
 import com.example.ui.theme.NightModeSource
 import com.example.util.AutoBackupPreferences
@@ -163,13 +169,13 @@ fun SettingsGroupHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 14.dp, bottom = 10.dp),
+            .padding(top = 16.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = EmeraldPrimary,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -218,27 +224,39 @@ private fun SettingsCardTitle(title: String, subtitle: String) {
     )
 }
 
-/** Pastille ronde portant l'emoji d'un réglage. */
+/**
+ * Pastille ronde portant l'icône d'un réglage.
+ *
+ * Une icône vectorielle et non un emoji : l'emoji ne se teinte pas avec le thème,
+ * change de dessin d'un fabricant à l'autre, et son style plein jurait avec les
+ * icônes de trait des en-têtes de groupe, juste au-dessus.
+ */
 @Composable
-private fun SettingsEmojiBadge(emoji: String, highlighted: Boolean) {
+private fun SettingsIconBadge(icon: ImageVector, highlighted: Boolean) {
     Box(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
             .background(
-                if (highlighted) EmeraldPrimary.copy(alpha = 0.2f)
+                if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(emoji, fontSize = 20.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (highlighted) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
 /** Une option exclusive d'une liste de choix. */
 private class SettingsChoice<T>(
     val value: T,
-    val emoji: String,
+    val icon: ImageVector,
     val title: String,
     val description: String,
     val testTag: String? = null
@@ -257,14 +275,14 @@ private fun <T> SettingsChoiceList(
 
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isSelected) EmeraldPrimary.copy(alpha = 0.15f) else Color.Transparent
+                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
             ),
             border = BorderStroke(
                 width = 1.dp,
-                color = if (isSelected) EmeraldPrimary
+                color = if (isSelected) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
@@ -275,7 +293,7 @@ private fun <T> SettingsChoiceList(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SettingsEmojiBadge(emoji = choice.emoji, highlighted = isSelected)
+                SettingsIconBadge(icon = choice.icon, highlighted = isSelected)
 
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -284,7 +302,7 @@ private fun <T> SettingsChoiceList(
                         text = choice.title,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = choice.description,
@@ -296,17 +314,17 @@ private fun <T> SettingsChoiceList(
                 RadioButton(
                     selected = isSelected,
                     onClick = select,
-                    colors = RadioButtonDefaults.colors(selectedColor = EmeraldPrimary)
+                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
                 )
             }
         }
     }
 }
 
-/** Réglage à bascule : emoji, libellé, description, interrupteur. */
+/** Réglage à bascule : icône, libellé, description, interrupteur. */
 @Composable
 private fun SettingsToggleRow(
-    emoji: String,
+    icon: ImageVector,
     title: String,
     description: String,
     checked: Boolean,
@@ -319,7 +337,7 @@ private fun SettingsToggleRow(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsEmojiBadge(emoji = emoji, highlighted = checked && enabled)
+        SettingsIconBadge(icon = icon, highlighted = checked && enabled)
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -346,7 +364,7 @@ private fun SettingsToggleRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = EmeraldPrimary
+                checkedTrackColor = MaterialTheme.colorScheme.primary
             ),
             modifier = switchTestTag?.let { Modifier.testTag(it) } ?: Modifier
         )
@@ -360,7 +378,7 @@ private fun SettingsHint(text: String, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-        modifier = modifier.padding(top = 10.dp)
+        modifier = modifier.padding(top = 12.dp)
     )
 }
 
@@ -384,14 +402,14 @@ private fun MapBackgroundCard() {
             choices = listOf(
                 SettingsChoice(
                     value = "mapnik",
-                    emoji = "🗺️",
+                    icon = Icons.Default.Map,
                     title = "Standard (Mapnik)",
                     description = "Carte classique OpenStreetMap",
                     testTag = "map_style_option_mapnik"
                 ),
                 SettingsChoice(
                     value = "usgs_sat",
-                    emoji = "🛰️",
+                    icon = Icons.Default.SatelliteAlt,
                     title = "Satellite hybride (Google)",
                     description = "Imagerie satellite haute définition enrichie des noms de rues",
                     testTag = "map_style_option_satellite"
@@ -422,21 +440,21 @@ private fun MapOrientationCard() {
             choices = listOf(
                 SettingsChoice(
                     value = "2d",
-                    emoji = "🧭",
+                    icon = Icons.Default.Explore,
                     title = "Vue 2D (nord en haut)",
                     description = "Carte fixe orientée vers le nord",
                     testTag = "map_mode_option_2d"
                 ),
                 SettingsChoice(
                     value = "3d",
-                    emoji = "🚘",
+                    icon = Icons.Default.Navigation,
                     title = "Vue 3D (sens d'avancement)",
                     description = "La carte pivote automatiquement selon votre direction",
                     testTag = "map_mode_option_3d"
                 ),
                 SettingsChoice(
                     value = "auto",
-                    emoji = "✨",
+                    icon = Icons.Default.AutoAwesome,
                     title = "Automatique",
                     description = "Vue 3D pendant un enregistrement, retour en 2D dès qu'il est arrêté",
                     testTag = "map_mode_option_auto"
@@ -481,14 +499,14 @@ fun NightModeSettingsCard() {
             choices = listOf(
                 SettingsChoice(
                     value = NightModeSource.SYSTEM,
-                    emoji = "📱",
+                    icon = Icons.Default.PhoneAndroid,
                     title = "Suivre le téléphone",
                     description = "L'application passe en sombre en même temps qu'Android",
                     testTag = "night_mode_option_system"
                 ),
                 SettingsChoice(
                     value = NightModeSource.SOLAR,
-                    emoji = "🌅",
+                    icon = Icons.Default.WbTwilight,
                     title = "Lever et coucher du soleil",
                     description = "Clair le jour, sombre la nuit, selon l'heure réelle du soleil là où vous êtes",
                     testTag = "night_mode_option_solar"
@@ -508,7 +526,7 @@ fun NightModeSettingsCard() {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingsToggleRow(
-                    emoji = "🚇",
+                    icon = Icons.Default.Train,
                     title = "Sombre dans les tunnels",
                     description = if (hasLightSensor) {
                         "Bascule en sombre le temps d'un tunnel ou d'un parking couvert, " +
@@ -559,7 +577,7 @@ fun ImportedTrackColorCard() {
 
     SettingsCard(modifier = Modifier.testTag("imported_track_color_card")) {
         SettingsToggleRow(
-            emoji = "🎨",
+            icon = Icons.Default.Palette,
             title = "Garder les couleurs des fichiers",
             description = "Chaque parcours importé reprend la couleur que portait son " +
                     "fichier, celle choisie dans Google Earth. Les fichiers qui n'en " +
@@ -605,14 +623,14 @@ fun TrackThicknessSettingsCard() {
             }
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = EmeraldPrimary.copy(alpha = 0.15f)
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
             ) {
                 Text(
                     text = current.label,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = EmeraldPrimary,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
             }
         }
@@ -624,13 +642,13 @@ fun TrackThicknessSettingsCard() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 drawLine(
-                    color = EmeraldPrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     start = Offset(24f, size.height / 2f),
                     end = Offset(size.width - 24f, size.height / 2f),
                     strokeWidth = current.strokeWidth,
@@ -689,7 +707,7 @@ fun AutoBackupSettingsCard() {
 
     SettingsCard(modifier = Modifier.testTag("auto_backup_settings_card")) {
         SettingsToggleRow(
-            emoji = "💾",
+            icon = Icons.Default.Save,
             title = "Sauvegarde automatique",
             description = "Exporte automatiquement chaque trajet terminé",
             checked = isEnabled,
@@ -712,7 +730,7 @@ fun AutoBackupSettingsCard() {
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Au moins un format doit rester coché, sinon la sauvegarde
                 // automatique serait activée sans rien produire.
@@ -747,7 +765,7 @@ fun AutoBackupSettingsCard() {
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -756,10 +774,10 @@ fun AutoBackupSettingsCard() {
                     Icon(
                         imageVector = Icons.Default.PinDrop,
                         contentDescription = null,
-                        tint = EmeraldPrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
                             text = "Stockage local",
@@ -835,8 +853,8 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                 width = 1.5.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        EmeraldPrimary.copy(alpha = 0.4f),
-                        IndigoSecondary.copy(alpha = 0.4f)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
                     )
                 ),
                 shape = RoundedCornerShape(24.dp)
@@ -884,7 +902,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Badge de version, cliquable pour ouvrir le journal des nouveautés.
             Surface(
@@ -908,7 +926,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                         fontFamily = FontFamily.Monospace
                     ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
             }
 
@@ -916,7 +934,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                 ReleaseNotesDialog(onDismiss = { showReleaseNotesDialog = false })
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = "Une application de suivi GPS et de cartographie moderne pour enregistrer, " +
@@ -932,12 +950,12 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
             // Dédicace à Thierry
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = AmberTertiary.copy(alpha = 0.12f)),
-                border = BorderStroke(width = 1.dp, color = AmberTertiary.copy(alpha = 0.35f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
+                border = BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -952,7 +970,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Application développée particulièrement pour mon père Thierry.",
                             style = MaterialTheme.typography.bodySmall.copy(
@@ -973,7 +991,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                     .padding(vertical = 8.dp)
                     .background(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(16.dp)
                     )
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
@@ -983,7 +1001,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                     Icon(
                         imageVector = Icons.Default.Code,
                         contentDescription = null,
-                        tint = IndigoSecondary,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1052,6 +1070,8 @@ private val RELEASES = listOf(
     Release(
         version = "0.9.14-thierry",
         changes = listOf(
+            "Apparence : Les icônes des réglages suivent désormais les couleurs de votre téléphone, au lieu de rester vertes quel que soit votre fond d'écran. Les emojis laissent place à de vraies icônes, identiques d'un appareil à l'autre",
+            "Apparence : Arrondis et espacements harmonisés dans les réglages et l'historique — trois rayons au lieu de six, et tous les écarts alignés sur une même grille",
             "Position : Sur un appareil sans localisation active, l'application affichait parfois un point bleu fictif tournant dans Paris, au lieu de dire que la localisation est désactivée. Ce mode de test ne peut plus s'activer dans une version publiée",
             "Application allégée : Cinq bibliothèques inutilisées voyageaient dans chaque installation — vestiges d'une sauvegarde vers Google Drive abandonnée. Elles sont retirées",
             "Nettoyage : Suppression de code devenu inutile — deux variantes d'export jamais appelées, trois requêtes de base sans usage, un réglage de destination de sauvegarde qui ne servait plus, et un fichier de données jamais chargé"
@@ -1067,7 +1087,7 @@ private fun ReleaseNotesDialog(onDismiss: () -> Unit) {
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = "Journal des nouveautés",
-                tint = EmeraldPrimary
+                tint = MaterialTheme.colorScheme.primary
             )
         },
         title = {
@@ -1087,9 +1107,9 @@ private fun ReleaseNotesDialog(onDismiss: () -> Unit) {
             ) {
                 RELEASES.forEachIndexed { index, release ->
                     if (index > 0) {
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     // Tant qu'une seule version est listée, signaler laquelle est
@@ -1098,17 +1118,17 @@ private fun ReleaseNotesDialog(onDismiss: () -> Unit) {
                         release = release,
                         showCurrentBadge = RELEASES.size > 1
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     release.changes.forEach { item ->
                         Row(
                             verticalAlignment = Alignment.Top,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            modifier = Modifier.padding(vertical = 4.dp)
                         ) {
                             Text(
                                 text = "• ",
                                 fontWeight = FontWeight.Bold,
-                                color = EmeraldPrimary,
+                                color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Text(
@@ -1129,7 +1149,7 @@ private fun ReleaseNotesDialog(onDismiss: () -> Unit) {
                 Text("Fermer", fontWeight = FontWeight.Bold)
             }
         },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier.testTag("release_notes_dialog")
     )
 }
@@ -1142,21 +1162,21 @@ private fun ReleaseHeader(release: Release, showCurrentBadge: Boolean) {
             text = "v${release.version}",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = EmeraldPrimary
+            color = MaterialTheme.colorScheme.primary
         )
 
         if (showCurrentBadge && release.version == BuildConfig.VERSION_NAME) {
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = EmeraldPrimary.copy(alpha = 0.15f)
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
             ) {
                 Text(
                     text = "actuelle",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = EmeraldPrimary,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
         }

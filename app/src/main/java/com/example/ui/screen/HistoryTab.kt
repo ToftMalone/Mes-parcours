@@ -186,7 +186,7 @@ fun HistoryTab(
                                     contentDescription = "Importer",
                                     modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text("Importer", style = MaterialTheme.typography.labelLarge)
                             }
                         }
@@ -616,7 +616,7 @@ fun TrackHistoryCard(
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier
             .fillMaxWidth()
             .border(
@@ -627,19 +627,19 @@ fun TrackHistoryCard(
                         MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(24.dp)
             )
             .clickable(onClick = onClick)
             .testTag("track_card_${track.id}")
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             // Header Row (Activity Type Icon + Name)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = trackColor.copy(alpha = 0.12f),
                     modifier = Modifier.size(44.dp)
                 ) {
@@ -652,7 +652,7 @@ fun TrackHistoryCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
                         text = track.name,
@@ -661,7 +661,7 @@ fun TrackHistoryCard(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = FormatUtils.formatDate(track.startTime),
                         style = MaterialTheme.typography.bodySmall,
@@ -672,10 +672,10 @@ fun TrackHistoryCard(
             }
 
             run {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (onResumeClick != null) {
@@ -686,7 +686,7 @@ fun TrackHistoryCard(
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer)
                                 .clickable(onClick = onResumeClick)
-                                .padding(horizontal = 6.dp)
+                                .padding(horizontal = 8.dp)
                                 .testTag("resume_track_card_button_${track.id}"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
@@ -722,7 +722,7 @@ fun TrackHistoryCard(
                                 .clip(CircleShape)
                                 .background(eyeBgColor)
                                 .clickable { onMapSelectionToggle(!isSelectedForMap) }
-                                .padding(horizontal = 6.dp)
+                                .padding(horizontal = 8.dp)
                                 .testTag("map_toggle_${track.id}"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
@@ -752,7 +752,7 @@ fun TrackHistoryCard(
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
                             .clickable(onClick = onDeleteClick)
-                            .padding(horizontal = 6.dp)
+                            .padding(horizontal = 8.dp)
                             .testTag("delete_track_button_${track.id}"),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
@@ -776,7 +776,7 @@ fun TrackHistoryCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             Spacer(
                 modifier = Modifier
                     .fillMaxWidth()
