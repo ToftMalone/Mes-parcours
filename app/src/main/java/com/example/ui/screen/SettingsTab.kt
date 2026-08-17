@@ -637,7 +637,13 @@ fun TrackThicknessSettingsCard() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Aperçu : un trait à l'épaisseur choisie
+        // Aperçu : un trait à l'épaisseur choisie.
+        //
+        // La couleur est lue ici, et non dans le Canvas : la fonction de dessin est un
+        // DrawScope, pas un contexte composable, et ne peut donc pas interroger le
+        // thème. La constante figée qu'elle utilisait auparavant, elle, passait
+        // n'importe où — c'est ce qui rendait l'erreur invisible.
+        val previewColor = MaterialTheme.colorScheme.primary
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -648,7 +654,7 @@ fun TrackThicknessSettingsCard() {
         ) {
             Canvas(modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 drawLine(
-                    color = MaterialTheme.colorScheme.primary,
+                    color = previewColor,
                     start = Offset(24f, size.height / 2f),
                     end = Offset(size.width - 24f, size.height / 2f),
                     strokeWidth = current.strokeWidth,
