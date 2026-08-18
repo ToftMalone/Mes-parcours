@@ -9,9 +9,9 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.9.15` (`versionCode` 15). Elle n'est écrite qu'une fois,
+- Version courante : `0.9.16` (`versionCode` 16). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
-  Le suffixe `-thierry` a été abandonné à partir de cette version.
+  Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
   - Jusqu'à la `1.0-thierry` **exclue** : une seule entrée, celle de la version
     courante, dont on remplace le contenu à chaque version. Les versions de

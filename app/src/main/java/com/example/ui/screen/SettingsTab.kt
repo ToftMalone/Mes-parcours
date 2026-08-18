@@ -1074,10 +1074,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.15",
+        version = "0.9.16",
         changes = listOf(
-            "Nouveau : Un parcours peut désormais être renommé, depuis l'icône crayon en haut de son écran de détail",
-            "Le nom de version perd son suffixe « -thierry »"
+            "Nouveau : Le bouton d'enregistrement propose désormais un choix entre démarrer une nouvelle trace et reprendre une trace existante de l'historique"
         )
     )
 )

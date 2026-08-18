@@ -23,6 +23,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,14 +35,20 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Height
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Pause
@@ -61,6 +68,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -70,6 +78,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -117,6 +126,12 @@ fun TrackingTab(
     val currentTrackId by viewModel.currentTrackId.collectAsState()
     val selectedImportedPoints by viewModel.selectedImportedPoints.collectAsState()
     val bypassZoomThreshold by viewModel.bypassZoomThreshold.collectAsState()
+    val allTracks by viewModel.allTracks.collectAsState()
+
+    // Bouton d'enregistrement : au premier appui, propose « nouvelle trace » ou
+    // « reprendre une trace existante » au lieu de démarrer directement.
+    var showStartOptions by remember { mutableStateOf(false) }
+    var showResumePicker by remember { mutableStateOf(false) }
 
     val sharedPrefs = remember { android.preference.PreferenceManager.getDefaultSharedPreferences(context) }
     var mapModeState by remember { mutableStateOf(sharedPrefs.getString("pref_map_mode", "2d") ?: "2d") }
@@ -341,12 +356,72 @@ fun TrackingTab(
                         modifier = Modifier.size(36.dp)
                     )
                 }
-            } else {
-                // Play FAB to start recording instantly without friction
+            } else if (showStartOptions) {
+                // Annuler : referme les options sans rien démarrer
+                FloatingActionButton(
+                    onClick = { showStartOptions = false },
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = CircleShape,
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), CircleShape)
+                        .testTag("cancel_start_options_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Annuler",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Reprendre une trace existante : seulement s'il y en a une dans l'historique
+                if (allTracks.isNotEmpty()) {
+                    FloatingActionButton(
+                        onClick = { showResumePicker = true },
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape,
+                        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                        modifier = Modifier
+                            .size(56.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
+                            .testTag("resume_existing_track_fab")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "Reprendre une trace existante",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Nouvelle trace
                 FloatingActionButton(
                     onClick = {
                         viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
+                        showStartOptions = false
                     },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = CircleShape,
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                    modifier = Modifier
+                        .size(72.dp)
+                        .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
+                        .testTag("start_new_track_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Nouvelle trace",
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            } else {
+                // Play FAB : révèle les deux options plutôt que de démarrer directement
+                FloatingActionButton(
+                    onClick = { showStartOptions = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = CircleShape,
@@ -366,6 +441,70 @@ fun TrackingTab(
         }
 
     }
+
+    if (showResumePicker) {
+        ResumeTrackPickerDialog(
+            tracks = allTracks,
+            onDismiss = { showResumePicker = false },
+            onTrackSelected = { track ->
+                viewModel.resumeTrack(context, track.id) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Reprise de la trace \"${track.name}\"",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                showResumePicker = false
+                showStartOptions = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun ResumeTrackPickerDialog(
+    tracks: List<Track>,
+    onDismiss: () -> Unit,
+    onTrackSelected: (Track) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reprendre une trace") },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 360.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(tracks, key = { it.id }) { track ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onTrackSelected(track) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                            .testTag("resume_picker_track_${track.id}")
+                    ) {
+                        Text(
+                            text = track.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = FormatUtils.formatDate(track.startTime),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Annuler")
+            }
+        }
+    )
 }
 
 @Composable
