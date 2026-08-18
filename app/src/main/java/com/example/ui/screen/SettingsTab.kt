@@ -1074,9 +1074,10 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.16",
+        version = "0.9.17",
         changes = listOf(
-            "Nouveau : Le bouton d'enregistrement propose désormais un choix entre démarrer une nouvelle trace et reprendre une trace existante de l'historique"
+            "Nouveau : Le bouton d'enregistrement propose un choix entre démarrer une nouvelle trace et reprendre une trace existante de l'historique — uniquement s'il existe déjà un parcours, sinon l'enregistrement démarre directement comme avant",
+            "L'APK de debug s'installe désormais à côté de la version release au lieu de l'écraser, et affiche « -debug » dans son numéro de version"
         )
     )
 )

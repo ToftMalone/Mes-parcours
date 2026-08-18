@@ -419,9 +419,17 @@ fun TrackingTab(
                     )
                 }
             } else {
-                // Play FAB : révèle les deux options plutôt que de démarrer directement
+                // Play FAB : révèle les deux options seulement s'il y a une trace à
+                // reprendre — sinon le choix n'existe pas vraiment, autant démarrer
+                // directement comme avant.
                 FloatingActionButton(
-                    onClick = { showStartOptions = true },
+                    onClick = {
+                        if (allTracks.isEmpty()) {
+                            viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
+                        } else {
+                            showStartOptions = true
+                        }
+                    },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = CircleShape,
