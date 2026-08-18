@@ -1,18 +1,8 @@
 package com.example.ui.screen
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.Alignment
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -320,36 +310,6 @@ fun MainScreen(
     var currentTab by remember { mutableStateOf("enregistrer") }
     var viewingDetailedTrackId by remember { mutableStateOf<Long?>(null) }
 
-    var showEasterEgg by remember { mutableStateOf(false) }
-
-    if (showEasterEgg) {
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(3000L)
-            showEasterEgg = false
-        }
-    }
-
-    LaunchedEffect(showEasterEgg) {
-        val activity = context.findActivity()
-        val window = activity?.window
-        if (window != null) {
-            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            if (showEasterEgg) {
-                insetsController.hide(
-                    androidx.core.view.WindowInsetsCompat.Type.statusBars() or
-                    androidx.core.view.WindowInsetsCompat.Type.navigationBars()
-                )
-                insetsController.systemBarsBehavior =
-                    androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else {
-                insetsController.show(
-                    androidx.core.view.WindowInsetsCompat.Type.statusBars() or
-                    androidx.core.view.WindowInsetsCompat.Type.navigationBars()
-                )
-            }
-        }
-    }
-
     // Redirect to home page (enregistrer tab) on system back press if currently on other tabs
     if (viewingDetailedTrackId == null && currentTab != "enregistrer") {
         BackHandler {
@@ -376,7 +336,6 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = {
-                if (!showEasterEgg) {
                     NavigationBar(
                         windowInsets = WindowInsets(0, 0, 0, 0),
                         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
@@ -449,7 +408,6 @@ fun MainScreen(
                     label = { Text("Paramètres") },
                     modifier = Modifier.testTag("tab_button_settings")
                 )
-              }
             }
         },
         modifier = modifier.fillMaxSize().testTag("main_screen")
@@ -512,8 +470,7 @@ fun MainScreen(
                     SettingsTab(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding),
-                        onEasterEggTriggered = { showEasterEgg = true }
+                            .padding(innerPadding)
                     )
                 }
             }
@@ -524,38 +481,6 @@ fun MainScreen(
         // n'y en a pas, et reste inerte tant qu'UpdateConfig n'est pas renseigné.
         UpdatePrompt()
 
-        AnimatedVisibility(
-            visible = showEasterEgg,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFFEF4444))
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { /* block all clicks */ }
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "Je t'aime sacré Pache 💓",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 32.sp
-                        ),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
         if (showBackgroundRationaleDialog) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showBackgroundRationaleDialog = false },
@@ -594,13 +519,4 @@ fun MainScreen(
             )
         }
     }
-}
-
-private fun android.content.Context.findActivity(): android.app.Activity? {
-    var context = this
-    while (context is android.content.ContextWrapper) {
-        if (context is android.app.Activity) return context
-        context = context.baseContext
-    }
-    return null
 }

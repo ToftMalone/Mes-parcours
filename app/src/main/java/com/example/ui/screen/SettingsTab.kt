@@ -93,8 +93,7 @@ import com.example.util.TrackStylePreferences
  */
 @Composable
 fun SettingsTab(
-    modifier: Modifier = Modifier,
-    onEasterEggTriggered: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
 
@@ -125,7 +124,7 @@ fun SettingsTab(
             AutoBackupSettingsCard()
 
             SettingsGroupHeader(title = "À propos", icon = Icons.Default.Info)
-            AboutCard(onEasterEggTriggered = onEasterEggTriggered)
+            AboutCard()
 
             // Évite que la dernière carte passe sous la barre de navigation flottante.
             Spacer(modifier = Modifier.height(80.dp))
@@ -846,8 +845,7 @@ private fun FormatCheckboxRow(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AboutCard(onEasterEggTriggered: () -> Unit) {
-    var heartClicks by remember { mutableStateOf(0) }
+private fun AboutCard() {
     var showReleaseNotesDialog by remember { mutableStateOf(false) }
 
     Card(
@@ -877,15 +875,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                 modifier = Modifier
                     .size(64.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                    .clickable {
-                        heartClicks++
-                        if (heartClicks >= 5) {
-                            onEasterEggTriggered()
-                            heartClicks = 0
-                        }
-                    }
-                    .testTag("heart_easter_egg_icon"),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -1029,7 +1019,7 @@ private fun AboutCard(onEasterEggTriggered: () -> Unit) {
                     Text(text = "✍️", fontSize = 20.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Fait par Toche",
+                        text = "Fait par ToftMalone",
                         fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
@@ -1074,7 +1064,7 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.17",
+        version = "0.9.16",
         changes = listOf(
             "Nouveau : Le bouton d'enregistrement propose un choix entre démarrer une nouvelle trace et reprendre une trace existante de l'historique — uniquement s'il existe déjà un parcours, sinon l'enregistrement démarre directement comme avant",
             "L'APK de debug s'installe désormais à côté de la version release au lieu de l'écraser, et affiche « -debug » dans son numéro de version"
