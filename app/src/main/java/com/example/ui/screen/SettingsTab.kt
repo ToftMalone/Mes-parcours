@@ -1074,14 +1074,10 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.9.14-thierry",
+        version = "0.9.15",
         changes = listOf(
-            "Batterie : La notification d'enregistrement n'est plus réécrite deux fois par seconde alors que son contenu n'avait pas changé, et la carte interroge sa position une fois par seconde au lieu de deux pendant le suivi",
-            "Apparence : Les icônes des réglages suivent désormais les couleurs de votre téléphone, au lieu de rester vertes quel que soit votre fond d'écran. Les emojis laissent place à de vraies icônes, identiques d'un appareil à l'autre",
-            "Apparence : Arrondis et espacements harmonisés dans les réglages et l'historique — trois rayons au lieu de six, et tous les écarts alignés sur une même grille",
-            "Position : Sur un appareil sans localisation active, l'application affichait parfois un point bleu fictif tournant dans Paris, au lieu de dire que la localisation est désactivée. Ce mode de test ne peut plus s'activer dans une version publiée",
-            "Application allégée : L'installation pèse 1,7 Mio de moins. Neuf bibliothèques inutilisées y voyageaient sans qu'aucune ligne de code ne les appelle — vestiges d'une sauvegarde vers Google Drive abandonnée",
-            "Nettoyage : Suppression de code devenu inutile — deux variantes d'export jamais appelées, trois requêtes de base sans usage, un réglage de destination de sauvegarde qui ne servait plus, et un fichier de données jamais chargé"
+            "Nouveau : Un parcours peut désormais être renommé, depuis l'icône crayon en haut de son écran de détail",
+            "Le nom de version perd son suffixe « -thierry »"
         )
     )
 )

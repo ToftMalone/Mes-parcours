@@ -327,6 +327,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         context.startService(intent)
     }
 
+    fun renameTrack(track: Track, newName: String) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty() || trimmed == track.name) return
+        viewModelScope.launch {
+            repository.updateTrack(track.copy(name = trimmed))
+        }
+    }
+
     fun deleteTrack(trackId: Long) {
         viewModelScope.launch {
             repository.deleteTrack(trackId)

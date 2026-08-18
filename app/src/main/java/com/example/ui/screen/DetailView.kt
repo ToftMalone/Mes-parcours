@@ -25,12 +25,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -39,15 +41,21 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,6 +97,9 @@ fun DetailView(
 
     val track by viewModel.selectedTrack.collectAsState()
     val points by viewModel.selectedTrackPoints.collectAsState()
+
+    var isRenaming by rememberSaveable { mutableStateOf(false) }
+    var renameText by rememberSaveable { mutableStateOf("") }
 
     val gpxLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("*/*")
@@ -144,10 +155,27 @@ fun DetailView(
                         modifier = Modifier.testTag("back_button")
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Retour",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                },
+                actions = {
+                    track?.let { current ->
+                        IconButton(
+                            onClick = {
+                                renameText = current.name
+                                isRenaming = true
+                            },
+                            modifier = Modifier.testTag("rename_track_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Renommer le parcours",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -472,6 +500,38 @@ fun DetailView(
                 }
             }
         }
+    }
+
+    if (isRenaming) {
+        val current = track
+        AlertDialog(
+            onDismissRequest = { isRenaming = false },
+            title = { Text("Renommer le parcours") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("rename_track_field")
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        current?.let { viewModel.renameTrack(it, renameText) }
+                        isRenaming = false
+                    },
+                    enabled = renameText.isNotBlank()
+                ) {
+                    Text("Renommer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isRenaming = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
     }
 }
 
