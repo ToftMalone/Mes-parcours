@@ -63,6 +63,12 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
+      // Un applicationId distinct de la release : les deux s'installent alors côte
+      // à côte sur le même appareil au lieu de s'écraser l'une l'autre, et le
+      // suffixe de version évite de confondre les deux dans l'écran « À propos ».
+      applicationIdSuffix = ".debug"
+      versionNameSuffix = "-debug"
+
       // Le trousseau de debug n'est pas versionné : sur un clone frais il est absent.
       // On ne l'impose donc que s'il est là, sinon AGP applique sa clé de debug par
       // défaut — sans quoi `assembleDebug` échouerait sur toute nouvelle machine.

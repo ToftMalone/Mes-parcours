@@ -87,15 +87,26 @@ Le poids s'accumule dans l'historique — une vingtaine de Mio par version, que 
 ne saura plus oublier sans réécriture. C'est le prix accepté du téléchargement
 direct depuis l'arborescence.
 
+**Le build type `debug` porte son propre `applicationId`** (suffixe `.debug`, donc
+`com.toche.mesparcours.debug`) **et son propre `versionName`** (suffixe `-debug`,
+donc par exemple `0.9.16-debug`). Deux conséquences voulues :
+
+- Un APK de debug s'installe **à côté** de la version release, jamais par-dessus :
+  Android les traite comme deux applications distinctes. Plus besoin de désinstaller
+  la release pour essayer un debug, ni l'inverse.
+- L'écran « À propos » d'un APK de debug affiche sans ambiguïté qu'il n'est pas la
+  version release, même une fois installé.
+
 **Attention à la clé de debug de l'APK produit en CI.** `debug.keystore` n'étant pas
 versionné, le runner n'en a pas et AGP en fabrique un neuf **à chaque exécution**.
 Deux APK de debug issus de deux exécutions ne portent donc pas la même signature, et
 aucun ne porte celle de la machine de l'auteur : les installer l'un par-dessus
 l'autre échoue avec « package signatures do not match », et il faut désinstaller —
-donc perdre les parcours enregistrés. Un APK de CI sert à essayer une version sur un
-téléphone, pas à mettre à jour une installation existante. Verser un `debug.keystore`
-fixe au dépôt lèverait la limite (une clé de debug n'est pas un secret), au prix de
-la règle actuelle qui le garde dehors.
+donc perdre les parcours enregistrés **du debug** (la release, application distincte,
+n'est jamais concernée). Un APK de CI sert à essayer une version, pas à mettre à jour
+une installation existante. Verser un `debug.keystore` fixe au dépôt lèverait la
+limite (une clé de debug n'est pas un secret), au prix de la règle actuelle qui le
+garde dehors.
 
 ## Carte du code
 
@@ -536,11 +547,14 @@ désinstallation, donc de la perte des parcours des utilisateurs.
 Le projet est passé aux **mises à jour sur place**, qui conservent les parcours de
 l'utilisateur. Trois points en découlent, et ils ne sont plus négociables :
 
-1. **`applicationId = "com.toche.mesparcours"` est définitif.** Le changer ferait
-   échouer toutes les mises à jour : Android installerait une seconde application à
-   côté, et la base de la première deviendrait inaccessible. (Il a successivement valu
-   `com.aistudio.mytracks.eaddfb`, hérité de l'échafaudage AI Studio, puis
-   `com.toche.sillage` — c'est terminé.)
+1. **`applicationId = "com.toche.mesparcours"` est définitif pour la release.** Le
+   changer ferait échouer toutes les mises à jour : Android installerait une seconde
+   application à côté, et la base de la première deviendrait inaccessible. (Il a
+   successivement valu `com.aistudio.mytracks.eaddfb`, hérité de l'échafaudage AI
+   Studio, puis `com.toche.sillage` — c'est terminé.) Le build type `debug`, lui,
+   porte volontairement un `applicationIdSuffix` différent : voir « Commandes »
+   plus haut pour la raison (installation côte à côte avec la release, jamais une
+   mise à jour l'une de l'autre).
 2. **La clé de signature est définitive.** Un APK signé par une autre clé est refusé
    avec « package signatures do not match » et impose une désinstallation. Les
    versions distribuées doivent donc toutes être signées avec la clé de `release`,
