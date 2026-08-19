@@ -9,15 +9,13 @@ name: Compiler un APK
 # secret KEYSTORE_BASE64 existe — inutile de revenir modifier ce fichier le jour où
 # le trousseau est créé, l'étape s'allume d'elle-même.
 #
-# Se lance à la main (onglet Actions → « Compiler un APK » → Run workflow), ou
-# automatiquement à chaque poussée sur main ou sur une branche de travail.
+# Se lance uniquement à la main (onglet Actions → « Compiler un APK » → Run
+# workflow) — pas à chaque poussée : chaque compilation verse un APK de plusieurs
+# dizaines de Mio dans l'historique git (voir CLAUDE.md), un poids qu'on ne veut
+# payer que lorsqu'un APK est vraiment demandé.
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - 'claude/**'
 
 jobs:
   compiler:

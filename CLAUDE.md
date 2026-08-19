@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.9.16` (`versionCode` 16). Elle n'est écrite qu'une fois,
+- Version courante : `0.10` (`versionCode` 17). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -57,8 +57,16 @@ rien ne permet de l'installer depuis là.
 Le détour, c'est `.github/workflows/debug-apk.yml` : le runner GitHub a le SDK, il
 compile, joint les APK à l'exécution et enchaîne les tests. C'est ce qui permet de
 vérifier une modification faite en session web — et d'en récupérer un APK
-installable — sans machine de développement sous la main. Se lance à la main depuis
-l'onglet Actions, ou à chaque poussée sur `main` ou sur une branche `claude/**`.
+installable — sans machine de développement sous la main.
+
+**Se lance uniquement à la main** (onglet Actions → « Compiler un APK » → Run
+workflow) — plus automatiquement à chaque poussée, à la demande de l'auteur : chaque
+compilation verse un APK dans l'historique git (poids détaillé plus bas), et il ne
+veut payer ce coût que lorsqu'un APK est réellement demandé, pas à chaque commit
+poussé en cours de route. En session Claude Code, ça veut dire pousser le code
+normalement, mais **ne déclencher ce workflow que si l'auteur le demande
+explicitement** (« compile », « fais-moi un APK »…) — jamais après une simple
+implémentation.
 
 Toujours un APK de debug ; **et un APK de release signé en plus dès que le secret
 `KEYSTORE_BASE64` existe.** L'étape s'allume d'elle-même le jour où le trousseau est
@@ -77,8 +85,9 @@ par les artefacts. Trois conséquences à connaître :
 - `app/build` reste ignoré par git ; c'est `git add --force` qui verse le seul
   fichier voulu. Percer le `.gitignore` ferait au contraire remonter toutes les
   compilations locales de l'auteur à chaque `git status`.
-- Le message de commit porte `[skip ci]`, sans quoi cette poussée relancerait le
-  workflow, qui repousserait, sans fin.
+- Le message de commit porte toujours `[skip ci]`, par habitude prudente — ce n'est
+  plus strictement nécessaire depuis que le workflow ne se déclenche plus tout seul
+  sur une poussée, mais ça ne coûte rien et protège si ce déclencheur revenait.
 - Ces APK sont **tracés** : après une compilation locale, `git status` les
   signalera modifiés. `git update-index --skip-worktree <chemin>` les fait taire
   sur une machine donnée.

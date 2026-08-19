@@ -111,7 +111,17 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         val existing = trackDao.getTrackById(trackId)
         if (existing != null) {
             val endTime = System.currentTimeMillis()
-            val finalName = com.example.util.FormatUtils.formatTrackName(existing.startTime, endTime)
+            // Ne finalise le nom généré à la création (avec l'heure de fin) que s'il
+            // n'a jamais été personnalisé. Sans ce garde-fou, reprendre puis arrêter
+            // une trace déjà nommée — par un arrêt précédent ou un renommage manuel —
+            // écrasait ce nom par un « Parcours du … à … » recalculé.
+            val stillPlaceholderName = existing.name ==
+                com.example.util.FormatUtils.formatTrackInProgressName(existing.startTime)
+            val finalName = if (stillPlaceholderName) {
+                com.example.util.FormatUtils.formatTrackName(existing.startTime, endTime)
+            } else {
+                existing.name
+            }
             val updated = existing.copy(
                 name = finalName,
                 endTime = endTime,
