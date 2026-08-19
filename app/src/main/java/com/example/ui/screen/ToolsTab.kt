@@ -19,14 +19,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,7 +35,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,12 +58,10 @@ import com.example.data.model.Track
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
-import kotlin.math.roundToLong
 
 /** Outils disponibles. Le menu s'étoffera au fil des versions. */
 private enum class Tool {
     MERGE,
-    EXPORT_RANGE,
     REMOVE_STATIONARY
 }
 
@@ -87,11 +81,6 @@ fun ToolsTab(
         Tool.MERGE -> MergeTracksTool(
             viewModel = viewModel,
             onNavigateToDetails = onNavigateToDetails,
-            onBack = { openTool = null },
-            modifier = modifier
-        )
-        Tool.EXPORT_RANGE -> ExportRangeTool(
-            viewModel = viewModel,
             onBack = { openTool = null },
             modifier = modifier
         )
@@ -138,14 +127,6 @@ private fun ToolsMenu(
                 subtitle = "Réunir plusieurs parcours en un seul, dans l'ordre chronologique",
                 onClick = { onOpenTool(Tool.MERGE) },
                 testTag = "open_merge_tool_button"
-            )
-
-            ToolMenuEntry(
-                icon = Icons.Filled.ContentCut,
-                title = "Exporter une plage",
-                subtitle = "N'exporter qu'une partie d'un parcours, entre deux horaires",
-                onClick = { onOpenTool(Tool.EXPORT_RANGE) },
-                testTag = "open_export_range_tool_button"
             )
 
             ToolMenuEntry(
@@ -553,179 +534,6 @@ private fun SingleTrackRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-private fun safeExportFileName(name: String): String = name
-    .replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-    .replace("\\s+".toRegex(), "_")
-
-/** Position temporelle correspondant à [fraction] (0f..1f) dans la durée de [track]. */
-private fun millisAtFraction(track: Track, fraction: Float): Long {
-    val span = track.endTime - track.startTime
-    return track.startTime + (span * fraction).roundToLong()
-}
-
-// ---------------------------------------------------------------------------
-// Exporter une plage
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun ExportRangeTool(
-    viewModel: TrackViewModel,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val tracks by viewModel.allTracks.collectAsState()
-    // Seul un parcours terminé a une plage de temps à découper.
-    val exportableTracks = tracks.filter { !it.isRecording && it.endTime > it.startTime }
-
-    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
-    val selectedTrack = exportableTracks.find { it.id == selectedTrackId }
-
-    var rangeFraction by remember { mutableStateOf(0f..1f) }
-
-    // Repart d'une plage complète à chaque changement de parcours sélectionné.
-    LaunchedEffect(selectedTrack?.id) {
-        rangeFraction = 0f..1f
-    }
-
-    if (exportableTracks.isEmpty()) {
-        ToolsEmptyState(
-            onBack = onBack,
-            modifier = modifier,
-            title = "Export indisponible",
-            message = "Il faut au moins un parcours terminé pour pouvoir en exporter une plage.",
-            screenTestTag = "export_range_tool",
-            backButtonTestTag = "export_range_tool_back_button"
-        )
-        return
-    }
-
-    val gpxLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("*/*")
-    ) { uri ->
-        val track = selectedTrack
-        if (uri != null && track != null) {
-            val range = millisAtFraction(track, rangeFraction.start)..millisAtFraction(track, rangeFraction.endInclusive)
-            viewModel.saveGPXToUri(
-                context, uri, track, range = range,
-                onSuccess = { Toast.makeText(context, "Fichier GPX enregistré !", Toast.LENGTH_SHORT).show() },
-                onError = { err -> Toast.makeText(context, "Erreur de sauvegarde : $err", Toast.LENGTH_SHORT).show() }
-            )
-        }
-    }
-    val kmlLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("*/*")
-    ) { uri ->
-        val track = selectedTrack
-        if (uri != null && track != null) {
-            val range = millisAtFraction(track, rangeFraction.start)..millisAtFraction(track, rangeFraction.endInclusive)
-            viewModel.saveKMLToUri(
-                context, uri, track, range = range,
-                onSuccess = { Toast.makeText(context, "Fichier KML enregistré !", Toast.LENGTH_SHORT).show() },
-                onError = { err -> Toast.makeText(context, "Erreur de sauvegarde : $err", Toast.LENGTH_SHORT).show() }
-            )
-        }
-    }
-
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .testTag("export_range_tool"),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.testTag("export_range_tool_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour aux outils",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
-                    Text(
-                        text = "Exporter une plage",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "N'exporter qu'une partie d'un parcours",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 1,
-                title = "Parcours",
-                subtitle = selectedTrack?.name ?: "Choisissez un parcours"
-            ) {
-                exportableTracks.sortedByDescending { it.startTime }.forEach { track ->
-                    SingleTrackRow(
-                        track = track,
-                        selected = track.id == selectedTrackId,
-                        onSelect = { selectedTrackId = track.id }
-                    )
-                }
-            }
-
-            if (selectedTrack != null) {
-                val startMillis = millisAtFraction(selectedTrack, rangeFraction.start)
-                val endMillis = millisAtFraction(selectedTrack, rangeFraction.endInclusive)
-                ToolStepCard(
-                    stepNumber = 2,
-                    title = "Plage à exporter",
-                    subtitle = "Du ${FormatUtils.formatDate(startMillis)} au ${FormatUtils.formatDate(endMillis)}"
-                ) {
-                    RangeSlider(
-                        value = rangeFraction,
-                        onValueChange = { rangeFraction = it },
-                        modifier = Modifier.fillMaxWidth().testTag("export_range_slider")
-                    )
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = { gpxLauncher.launch("${safeExportFileName(selectedTrack.name)}.gpx") },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .testTag("export_range_gpx_button")
-                    ) {
-                        Text("Enregistrer GPX", fontWeight = FontWeight.Black)
-                    }
-                    Button(
-                        onClick = { kmlLauncher.launch("${safeExportFileName(selectedTrack.name)}.kml") },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .testTag("export_range_kml_button")
-                    ) {
-                        Text("Enregistrer KML", fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

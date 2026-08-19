@@ -179,14 +179,10 @@ couleur**, une polyligne osmdroid n'en portant qu'une.
 ## Outils
 
 `ui/screen/ToolsTab.kt` centralise les opérations qui portent sur un ou plusieurs
-parcours déjà enregistrés — fusion, export, nettoyage. Chaque outil suit le même
-gabarit : une carte de sélection de parcours (`SingleTrackRow` pour un seul,
-`MergeTrackRow` pour plusieurs), un ou deux réglages, un bouton de confirmation.
+parcours déjà enregistrés — fusion, nettoyage. Chaque outil suit le même gabarit :
+une carte de sélection de parcours (`SingleTrackRow` pour un seul, `MergeTrackRow`
+pour plusieurs), un ou deux réglages, un bouton de confirmation.
 
-- **Exporter une plage** restreint un export GPX/KML à une plage de temps choisie
-  par un `RangeSlider`, plutôt que la trace entière. Le filtre s'applique en flux,
-  pendant que `forEachPoint` relit les points page par page — aucune trace, même
-  très dense, n'est chargée entièrement en mémoire pour ça (invariant 4).
 - **Supprimer les points immobiles** écarte tout point à moins d'une distance
   choisie (par défaut 1 m) du dernier point conservé, sauf les marqueurs de rupture
   de tronçon (`TrackPoint.isDiscontinuous`), toujours gardés pour ne pas recoller

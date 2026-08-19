@@ -424,19 +424,18 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         KML(".kml")
     }
 
-    /** [range] restreint l'export à une plage de temps (millisecondes) ; null = trace entière. */
-    private suspend fun writeTrack(track: Track, out: Appendable, format: ExportFormat, range: LongRange? = null) {
+    private suspend fun writeTrack(track: Track, out: Appendable, format: ExportFormat) {
         when (format) {
             ExportFormat.GPX -> {
                 val writer = Exporter.GpxWriter(out)
                 writer.start(track)
-                repository.forEachPoint(track.id) { if (range == null || it.timestamp in range) writer.add(it) }
+                repository.forEachPoint(track.id) { writer.add(it) }
                 writer.finish()
             }
             ExportFormat.KML -> {
                 val writer = Exporter.KmlWriter(out)
                 writer.start(track)
-                repository.forEachPoint(track.id) { if (range == null || it.timestamp in range) writer.add(it) }
+                repository.forEachPoint(track.id) { writer.add(it) }
                 writer.finish()
             }
         }
@@ -451,7 +450,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         uri: android.net.Uri,
         track: Track,
         format: ExportFormat,
-        range: LongRange? = null,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -462,7 +460,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     ?: throw java.io.IOException("Impossible d'ouvrir le fichier de destination")
                 stream.use { outputStream ->
                     outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
-                        writeTrack(track, writer, format, range)
+                        writeTrack(track, writer, format)
                     }
                 }
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
@@ -512,19 +510,17 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         context: Context,
         uri: android.net.Uri,
         track: Track,
-        range: LongRange? = null,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
-    ) = exportToUri(context, uri, track, ExportFormat.GPX, range, onSuccess, onError)
+    ) = exportToUri(context, uri, track, ExportFormat.GPX, onSuccess, onError)
 
     fun saveKMLToUri(
         context: Context,
         uri: android.net.Uri,
         track: Track,
-        range: LongRange? = null,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
-    ) = exportToUri(context, uri, track, ExportFormat.KML, range, onSuccess, onError)
+    ) = exportToUri(context, uri, track, ExportFormat.KML, onSuccess, onError)
 
     private fun ensureUriExtension(context: Context, uri: android.net.Uri, expectedExtension: String): android.net.Uri {
         try {

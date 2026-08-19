@@ -1067,7 +1067,6 @@ private val RELEASES = listOf(
         version = "0.10",
         changes = listOf(
             "Correction : Reprendre puis arrêter une trace déjà nommée (renommée à la main, ou déjà arrêtée une première fois) ne remplace plus son nom par un « Parcours du … » recalculé",
-            "Nouvel outil : Exporter une plage précise d'un parcours en GPX ou KML, plutôt que la trace entière",
             "Nouvel outil : Supprimer les points immobiles d'un parcours (à moins d'une distance choisie les uns des autres) dans une copie, en gardant l'original intact"
         )
     )
