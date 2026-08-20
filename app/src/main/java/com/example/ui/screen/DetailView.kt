@@ -206,6 +206,11 @@ fun DetailView(
 
         val scrollState = rememberScrollState()
 
+        // Utilisé à la fois pour la couleur de la carte (rouge tant que l'enregistrement
+        // continue, sans quoi ce Détail affiche la trace en cours dans sa couleur par
+        // défaut, comme si elle était déjà terminée) et pour le bouton « Reprendre ».
+        val isCurrentRecording = currentTrack.isRecording || (isTracking && activeTrackId == currentTrack.id)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -243,6 +248,7 @@ fun DetailView(
                         isImported = currentTrack.isImported,
                         isMerged = currentTrack.isMerged,
                         sourceColor = currentTrack.sourceColor,
+                        isCurrentTracking = isCurrentRecording,
                         onViewportChanged = { viewModel.updateMapViewport(it) }
                     )
                 } else {
@@ -395,7 +401,6 @@ fun DetailView(
             }
 
             // 2.5 Reprendre la trace CTA Button
-            val isCurrentRecording = currentTrack.isRecording || (isTracking && activeTrackId == currentTrack.id)
             if (!isCurrentRecording) {
                 Button(
                     onClick = {

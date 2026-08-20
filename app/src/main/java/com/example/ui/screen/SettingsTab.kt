@@ -1164,11 +1164,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11",
+        version = "0.11.1",
         changes = listOf(
-            "Le réglage d'épaisseur du trait accepte désormais une valeur précise en dp, avec virgule, au lieu d'un choix parmi six paliers fixes",
-            "Correction : En mode suivi automatique (position en focus), les tracés affichés en superposition pouvaient cesser de se charger au fil du déplacement — typiquement en voiture — jusqu'à un glissement ou un zoom manuel sur la carte",
-            "Nouveau : Ignorer une mise à jour disponible ne la fait plus disparaître — un badge sur l'onglet Paramètres et un bouton permettent de la retrouver sans redémarrer l'application"
+            "Correction : l'écran Détails d'un parcours affichait la trace en cours d'enregistrement dans sa couleur habituelle au lieu du rouge, comme si elle était déjà terminée"
         )
     )
 )
