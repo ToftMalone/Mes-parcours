@@ -410,6 +410,26 @@ inverser, et l'assombrir la rendrait illisible.
   existe) et lisser par interpolation sur l'arc le plus court, ce qui règle du même
   coup le passage par le nord.
 
+### À vérifier sur le terrain, correctif déjà en place
+
+- **Republication de la zone visible pendant le suivi automatique : cause précisée.**
+  Symptôme rapporté : en voiture, mode focus actif, les tracés affichés en
+  superposition cessent de se charger au fil du déplacement, jusqu'à ce qu'un
+  glissement ou un zoom manuel remette tout à jour d'un coup. Le sondage périodique
+  (`AUTO_FOLLOW_VIEWPORT_POLL_MS`) republiait bien une zone toutes les secondes, mais
+  centrée sur ce que rapportait `map.boundingBox` — or `animateTo()`, appelé à chaque
+  nouvelle position, peut être rejeté par osmdroid sans erreur si l'animation
+  précédente tourne encore. Pendant un trajet en voiture, ces appels ignorés
+  s'accumulent : la caméra prend du retard sur la position réelle, silencieusement,
+  et la zone republiée n'est plus celle qu'il faut charger — jusqu'à ce qu'un geste
+  manuel recale tout via `onScroll`/`onZoom`. `reportAutoFollowViewport` reconstruit
+  désormais la zone autour de la position GPS elle-même (via `rememberUpdatedState`,
+  pour rester à jour dans une boucle de longue durée), plutôt qu'autour d'un centre de
+  caméra qui peut avoir décroché. Correctif non vérifié sur le terrain — à confirmer
+  par un trajet en voiture avec le mode focus actif. Ne s'applique qu'au suivi GPS en
+  direct ; le même sondage, pour un parcours affiché sans suivi GPS (`points.last()`),
+  continue de se fier à `map.boundingBox`.
+
 ### En attente d'arbitrage
 
 - `VIEWPORT_MARGIN` est passé de 0,35 à 0,60 à la demande de l'auteur. À évaluer.
@@ -417,10 +437,6 @@ inverser, et l'assombrir la rendrait illisible.
   sert aussi à `coversMostOfTrack`, donc l'affichage se rabat plus tôt sur la seule
   silhouette. Si le tracé paraît plus grossier, mesurer cette couverture sur la zone
   réellement visible plutôt que sur la zone élargie.
-- Le correctif de republication de la zone visible pendant le suivi automatique
-  n'agit que sur les traces de plus de 60 000 points ; en deçà, tout est chargé d'un
-  coup. Reste à savoir si le symptôme rapporté concerne bien ce cas, et si « les
-  traits » désignent le tracé ou le fond de carte.
 - **Deuxième levier disponible** pour le même sujet : ne plus réinterroger la base
   quand la zone visible reste incluse dans ce qui est déjà chargé. Gratuit en
   performance. Subtilité : ne pas sauter le rechargement lors d'un zoom avant, sous

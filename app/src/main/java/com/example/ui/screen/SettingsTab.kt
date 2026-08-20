@@ -1105,7 +1105,8 @@ private val RELEASES = listOf(
     Release(
         version = "0.11",
         changes = listOf(
-            "Le réglage d'épaisseur du trait accepte désormais une valeur précise en dp, avec virgule, au lieu d'un choix parmi six paliers fixes"
+            "Le réglage d'épaisseur du trait accepte désormais une valeur précise en dp, avec virgule, au lieu d'un choix parmi six paliers fixes",
+            "Correction : En mode suivi automatique (position en focus), les tracés affichés en superposition pouvaient cesser de se charger au fil du déplacement — typiquement en voiture — jusqu'à un glissement ou un zoom manuel sur la carte"
         )
     )
 )

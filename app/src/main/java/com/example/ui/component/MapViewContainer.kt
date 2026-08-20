@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -182,6 +183,55 @@ private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Uni
         MapViewport(
             minLat = (box.latSouth - latMargin).coerceAtLeast(-90.0),
             maxLat = (box.latNorth + latMargin).coerceAtMost(90.0),
+            minLon = minLon,
+            maxLon = maxLon,
+            zoom = map.zoomLevelDouble
+        )
+    )
+}
+
+/**
+ * Variante de [reportViewport] pour le sondage périodique du suivi automatique :
+ * centre la zone publiée sur la position GPS connue plutôt que sur le centre
+ * rapporté par la carte. Seule l'étendue (largeur/hauteur en degrés) vient encore
+ * de `map.boundingBox` — elle ne dépend que du zoom, jamais d'une animation.
+ *
+ * `animateTo()` est appelé à chaque nouvelle position pendant le suivi (une fois par
+ * seconde environ), mais osmdroid rejette silencieusement tout appel lancé pendant
+ * qu'une précédente animation tourne encore — sans erreur, sans y revenir. Un trajet
+ * en voiture peut ainsi accumuler des appels ignorés : la caméra prend du retard sur
+ * la position réelle sans que rien ne le signale, et le centre que rapporterait
+ * `map.boundingBox` ne serait alors plus celui qu'il faut réellement charger.
+ * Reconstruire la zone autour de la position GPS elle-même — toujours exacte,
+ * puisqu'elle ne dépend d'aucune animation — élimine ce risque.
+ */
+private fun reportAutoFollowViewport(
+    map: MapView,
+    userLat: Double,
+    userLon: Double,
+    onViewportChanged: (MapViewport) -> Unit
+) {
+    val box = map.boundingBox ?: return
+
+    val latSpan = box.latNorth - box.latSouth
+    val lonSpan = box.lonEast - box.lonWest
+    if (latSpan <= 0.0) return
+
+    val halfLat = latSpan * (0.5 + VIEWPORT_MARGIN)
+    var minLon = userLon - lonSpan * (0.5 + VIEWPORT_MARGIN)
+    var maxLon = userLon + lonSpan * (0.5 + VIEWPORT_MARGIN)
+
+    // Vue à cheval sur l'antiméridien ou dégénérée : on n'essaie pas de filtrer
+    // en longitude, la sélection se fera sur la latitude seule.
+    if (lonSpan <= 0.0 || minLon < -180.0 || maxLon > 180.0) {
+        minLon = -180.0
+        maxLon = 180.0
+    }
+
+    onViewportChanged(
+        MapViewport(
+            minLat = (userLat - halfLat).coerceAtLeast(-90.0),
+            maxLat = (userLat + halfLat).coerceAtMost(90.0),
             minLon = minLon,
             maxLon = maxLon,
             zoom = map.zoomLevelDouble
@@ -774,12 +824,30 @@ fun MapViewContainer(
      * serait annulé avant la fin de l'animation et ne publierait jamais rien.
      * `MapViewport` étant une data class dans un StateFlow, une zone inchangée
      * n'entraîne aucun rechargement.
+     *
+     * Se fier au centre rapporté par la carte ne suffit pas : `animateTo()`, appelé à
+     * chaque nouvelle position, peut être rejeté par osmdroid si l'animation
+     * précédente tourne encore — sans erreur, sans y revenir. Pendant un trajet en
+     * voiture, ces appels ignorés s'accumulent et la caméra prend du retard sur la
+     * position réelle, silencieusement : le sondage se répète bien, mais republie une
+     * zone qui n'a jamais fini de rejoindre l'endroit à charger — jusqu'à ce qu'un
+     * geste manuel (glissement, zoom) recale tout d'un coup via `onScroll`/`onZoom`.
+     * `reportAutoFollowViewport` reconstruit donc la zone autour de la position GPS
+     * elle-même, lue via `rememberUpdatedState` pour rester à jour dans cette boucle
+     * de longue durée — jamais autour d'un centre de caméra qui peut avoir décroché.
      */
+    val latestUserLocation by rememberUpdatedState(currentUserLocation)
+    val latestIsCurrentTracking by rememberUpdatedState(isCurrentTracking)
     LaunchedEffect(isAutoFollowActive) {
         if (!isAutoFollowActive) return@LaunchedEffect
         while (true) {
             kotlinx.coroutines.delay(AUTO_FOLLOW_VIEWPORT_POLL_MS)
-            reportViewport(mapView, onViewportChanged)
+            val loc = latestUserLocation
+            if (latestIsCurrentTracking && loc != null) {
+                reportAutoFollowViewport(mapView, loc.latitude, loc.longitude, onViewportChanged)
+            } else {
+                reportViewport(mapView, onViewportChanged)
+            }
         }
     }
 
