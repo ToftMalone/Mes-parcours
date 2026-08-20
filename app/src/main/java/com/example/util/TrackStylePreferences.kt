@@ -9,7 +9,7 @@ import android.preference.PreferenceManager
  */
 object TrackStylePreferences {
 
-    private const val KEY_THICKNESS_LEVEL = "pref_track_thickness_level"
+    private const val KEY_THICKNESS_DP = "pref_track_thickness_dp"
     private const val KEY_COLOR_RECORDED = "pref_track_color_recorded"
     private const val KEY_COLOR_IMPORTED = "pref_track_color_imported"
     private const val KEY_COLOR_MERGED = "pref_track_color_merged"
@@ -24,20 +24,13 @@ object TrackStylePreferences {
     /** Orange, pour distinguer d'emblée les parcours fusionnés des deux autres. */
     const val DEFAULT_COLOR_MERGED = 0xFFFF9800.toInt()
 
-    /** Niveau d'épaisseur : un libellé et la largeur du trait en pixels. */
-    data class ThicknessLevel(val label: String, val strokeWidth: Float)
+    /** Épaisseur par défaut, en dp — comparable à l'ancien niveau « Normal ». */
+    const val DEFAULT_THICKNESS_DP = 4f
 
-    val THICKNESS_LEVELS = listOf(
-        ThicknessLevel("Très fin", 4f),
-        ThicknessLevel("Fin", 8f),
-        ThicknessLevel("Normal", 12f),
-        ThicknessLevel("Épais", 16f),
-        ThicknessLevel("Très épais", 22f),
-        ThicknessLevel("Maximal", 28f)
-    )
-
-    /** "Normal" : correspond à l'épaisseur utilisée jusqu'ici. */
-    const val DEFAULT_THICKNESS_LEVEL = 2
+    /** Bornes du réglage : en dessous, le trait devient difficile à voir sur la
+     *  carte ; au-delà, il masque le fond de carte plus qu'il ne montre le tracé. */
+    const val MIN_THICKNESS_DP = 0.5f
+    const val MAX_THICKNESS_DP = 15f
 
     /** Palette proposée pour les deux catégories. */
     val COLOR_PALETTE = listOf(
@@ -55,20 +48,24 @@ object TrackStylePreferences {
 
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
-    fun getThicknessLevel(context: Context): Int {
-        val stored = prefs(context).getInt(KEY_THICKNESS_LEVEL, DEFAULT_THICKNESS_LEVEL)
-        return stored.coerceIn(0, THICKNESS_LEVELS.lastIndex)
+    /** Épaisseur choisie par l'utilisateur, en dp — indépendante de la densité d'écran. */
+    fun getThicknessDp(context: Context): Float {
+        val stored = prefs(context).getFloat(KEY_THICKNESS_DP, DEFAULT_THICKNESS_DP)
+        return stored.coerceIn(MIN_THICKNESS_DP, MAX_THICKNESS_DP)
     }
 
-    fun setThicknessLevel(context: Context, level: Int) {
+    fun setThicknessDp(context: Context, dp: Float) {
         prefs(context).edit()
-            .putInt(KEY_THICKNESS_LEVEL, level.coerceIn(0, THICKNESS_LEVELS.lastIndex))
+            .putFloat(KEY_THICKNESS_DP, dp.coerceIn(MIN_THICKNESS_DP, MAX_THICKNESS_DP))
             .apply()
     }
 
-    /** Largeur du trait correspondant au niveau enregistré. */
+    /**
+     * Largeur du trait en pixels, celle qu'attend `Paint.strokeWidth` — convertie
+     * depuis la valeur en dp choisie par l'utilisateur via la densité de l'écran.
+     */
     fun getStrokeWidth(context: Context): Float =
-        THICKNESS_LEVELS[getThicknessLevel(context)].strokeWidth
+        getThicknessDp(context) * context.resources.displayMetrics.density
 
     fun getRecordedColor(context: Context): Int =
         prefs(context).getInt(KEY_COLOR_RECORDED, DEFAULT_COLOR_RECORDED)

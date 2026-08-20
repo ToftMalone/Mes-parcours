@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
@@ -71,9 +73,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -591,16 +595,30 @@ fun ImportedTrackColorCard() {
     }
 }
 
+/** "3,5" plutôt que "3.5" : une virgule quel que soit le réglage régional de l'appareil. */
+private fun formatThicknessDp(value: Float): String =
+    String.format(java.util.Locale.US, "%.1f", value).replace('.', ',')
+
 /**
  * Réglage de l'épaisseur du trait des tracés, avec aperçu en direct.
- * Le curseur est cranté sur les niveaux définis dans [TrackStylePreferences].
+ *
+ * Curseur continu et champ de saisie se répondent l'un l'autre : le premier pour un
+ * réglage rapide, le second pour une valeur précise (en dp, avec virgule). Aucun des
+ * deux n'est cranté sur des paliers prédéfinis.
  */
 @Composable
 fun TrackThicknessSettingsCard() {
     val context = LocalContext.current
-    val levels = TrackStylePreferences.THICKNESS_LEVELS
-    var level by remember { mutableStateOf(TrackStylePreferences.getThicknessLevel(context)) }
-    val current = levels[level.coerceIn(0, levels.lastIndex)]
+    val density = LocalDensity.current
+
+    var thicknessDp by remember { mutableStateOf(TrackStylePreferences.getThicknessDp(context)) }
+    var textValue by remember { mutableStateOf(formatThicknessDp(thicknessDp)) }
+
+    fun applyThickness(dp: Float) {
+        val clamped = dp.coerceIn(TrackStylePreferences.MIN_THICKNESS_DP, TrackStylePreferences.MAX_THICKNESS_DP)
+        thicknessDp = clamped
+        TrackStylePreferences.setThicknessDp(context, clamped)
+    }
 
     SettingsCard(modifier = Modifier.testTag("track_thickness_card")) {
         Row(
@@ -625,7 +643,7 @@ fun TrackThicknessSettingsCard() {
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
             ) {
                 Text(
-                    text = current.label,
+                    text = "${formatThicknessDp(thicknessDp)} dp",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -642,7 +660,12 @@ fun TrackThicknessSettingsCard() {
         // DrawScope, pas un contexte composable, et ne peut donc pas interroger le
         // thème. La constante figée qu'elle utilisait auparavant, elle, passait
         // n'importe où — c'est ce qui rendait l'erreur invisible.
+        //
+        // La conversion dp → pixels utilise la densité de l'écran, exactement comme
+        // TrackStylePreferences.getStrokeWidth : l'aperçu montre donc la même
+        // épaisseur que celle qui sera dessinée sur la carte.
         val previewColor = MaterialTheme.colorScheme.primary
+        val previewStrokeWidthPx = with(density) { thicknessDp.dp.toPx() }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -656,7 +679,7 @@ fun TrackThicknessSettingsCard() {
                     color = previewColor,
                     start = Offset(24f, size.height / 2f),
                     end = Offset(size.width - 24f, size.height / 2f),
-                    strokeWidth = current.strokeWidth,
+                    strokeWidth = previewStrokeWidthPx,
                     cap = StrokeCap.Round
                 )
             }
@@ -665,11 +688,12 @@ fun TrackThicknessSettingsCard() {
         Spacer(modifier = Modifier.height(8.dp))
 
         Slider(
-            value = level.toFloat(),
-            onValueChange = { level = it.toInt().coerceIn(0, levels.lastIndex) },
-            onValueChangeFinished = { TrackStylePreferences.setThicknessLevel(context, level) },
-            valueRange = 0f..levels.lastIndex.toFloat(),
-            steps = (levels.size - 2).coerceAtLeast(0),
+            value = thicknessDp,
+            onValueChange = {
+                applyThickness(it)
+                textValue = formatThicknessDp(it)
+            },
+            valueRange = TrackStylePreferences.MIN_THICKNESS_DP..TrackStylePreferences.MAX_THICKNESS_DP,
             modifier = Modifier.fillMaxWidth().testTag("track_thickness_slider")
         )
 
@@ -678,16 +702,31 @@ fun TrackThicknessSettingsCard() {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = levels.first().label,
+                text = "${formatThicknessDp(TrackStylePreferences.MIN_THICKNESS_DP)} dp",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = levels.last().label,
+                text = "${formatThicknessDp(TrackStylePreferences.MAX_THICKNESS_DP)} dp",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = textValue,
+            onValueChange = { input ->
+                textValue = input
+                input.replace(',', '.').toFloatOrNull()?.let { applyThickness(it) }
+            },
+            label = { Text("Valeur précise (dp)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().testTag("track_thickness_field")
+        )
 
         // La couleur se règle depuis l'historique, par appui long sur une catégorie.
         // Le geste étant indevinable, mieux vaut le rappeler là où on cherche à
@@ -1064,10 +1103,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.10",
+        version = "0.11",
         changes = listOf(
-            "Correction : Reprendre puis arrêter une trace déjà nommée (renommée à la main, ou déjà arrêtée une première fois) ne remplace plus son nom par un « Parcours du … » recalculé",
-            "Nouvel outil : Supprimer les points immobiles d'un parcours (à moins d'une distance choisie les uns des autres) dans une copie, en gardant l'original intact"
+            "Le réglage d'épaisseur du trait accepte désormais une valeur précise en dp, avec virgule, au lieu d'un choix parmi six paliers fixes"
         )
     )
 )
