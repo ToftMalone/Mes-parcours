@@ -60,22 +60,42 @@ private sealed interface UpdateState {
  * entièrement inerte si [UpdateConfig] n'est pas renseigné : aucune requête n'est
  * alors émise. Un échec de recherche est silencieux — ne pas joindre le serveur ne
  * concerne pas l'utilisateur.
+ *
+ * @param reopenTrigger Incrémenté par l'appelant (le bouton des réglages) pour
+ * rouvrir le bandeau sur la mise à jour déjà détectée, sans relancer une recherche
+ * réseau ni redémarrer l'application.
+ * @param onUpdateAvailable Prévient l'appelant dès qu'une mise à jour est détectée,
+ * pour qu'il puisse afficher un badge persistant même une fois le bandeau ignoré.
  */
 @Composable
-fun UpdatePrompt() {
+fun UpdatePrompt(
+    reopenTrigger: Int = 0,
+    onUpdateAvailable: (AvailableUpdate) -> Unit = {}
+) {
     if (!UpdateConfig.isConfigured) return
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<UpdateState>(UpdateState.Idle) }
     var downloadJob by remember { mutableStateOf<Job?>(null) }
+    // Conservée même une fois le bandeau ignoré (state redevenu Idle), pour pouvoir
+    // le rouvrir sur la même mise à jour sans reconsulter le réseau.
+    var knownUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
 
     LaunchedEffect(Unit) {
         val update = UpdateChecker.fetchLatest() ?: return@LaunchedEffect
         if (update.isNewerThan(BuildConfig.VERSION_CODE)) {
             // Les APK d'une version précédente ne servent plus à rien.
             UpdateDownloader.clearDownloads(context)
+            knownUpdate = update
             state = UpdateState.Available(update)
+            onUpdateAvailable(update)
+        }
+    }
+
+    LaunchedEffect(reopenTrigger) {
+        if (reopenTrigger > 0) {
+            knownUpdate?.let { state = UpdateState.Available(it) }
         }
     }
 

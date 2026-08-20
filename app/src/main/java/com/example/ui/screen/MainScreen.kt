@@ -20,6 +20,8 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -67,6 +69,12 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
     val isTracking by viewModel.isTracking.collectAsState()
+
+    // Mise à jour détectée par UpdatePrompt : conservée ici pour afficher un badge
+    // persistant dans les réglages une fois le bandeau ignoré, et pour pouvoir le
+    // rouvrir depuis là sans redémarrer l'application.
+    var availableUpdate by remember { mutableStateOf<com.example.util.update.AvailableUpdate?>(null) }
+    var updateReopenTrigger by remember { mutableStateOf(0) }
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -400,10 +408,23 @@ fun MainScreen(
                     selected = currentTab == "parametres",
                     onClick = { currentTab = "parametres" },
                     icon = {
-                        Icon(
-                            imageVector = if (currentTab == "parametres") Icons.Filled.Settings else Icons.Outlined.Settings,
-                            contentDescription = "Paramètres"
-                        )
+                        BadgedBox(
+                            badge = {
+                                // Signale une mise à jour ignorée, sans redire ce que le
+                                // bandeau a déjà proposé : juste de quoi le retrouver.
+                                if (availableUpdate != null) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.testTag("settings_update_badge")
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (currentTab == "parametres") Icons.Filled.Settings else Icons.Outlined.Settings,
+                                contentDescription = "Paramètres"
+                            )
+                        }
                     },
                     label = { Text("Paramètres") },
                     modifier = Modifier.testTag("tab_button_settings")
@@ -470,7 +491,9 @@ fun MainScreen(
                     SettingsTab(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .padding(innerPadding),
+                        hasAvailableUpdate = availableUpdate != null,
+                        onShowUpdate = { updateReopenTrigger++ }
                     )
                 }
             }
@@ -479,7 +502,10 @@ fun MainScreen(
 
         // Recherche d'une nouvelle version au démarrage. Ne montre rien tant qu'il
         // n'y en a pas, et reste inerte tant qu'UpdateConfig n'est pas renseigné.
-        UpdatePrompt()
+        UpdatePrompt(
+            reopenTrigger = updateReopenTrigger,
+            onUpdateAvailable = { availableUpdate = it }
+        )
 
         if (showBackgroundRationaleDialog) {
             androidx.compose.material3.AlertDialog(

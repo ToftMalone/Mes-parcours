@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SatelliteAlt
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material.icons.filled.Code
@@ -97,7 +98,9 @@ import com.example.util.TrackStylePreferences
  */
 @Composable
 fun SettingsTab(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasAvailableUpdate: Boolean = false,
+    onShowUpdate: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -112,6 +115,11 @@ fun SettingsTab(
             SettingsScreenHeader()
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (hasAvailableUpdate) {
+                UpdateAvailableCard(onShowUpdate = onShowUpdate)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             SettingsGroupHeader(title = "Carte", icon = Icons.Default.Map)
             MapBackgroundCard()
@@ -152,6 +160,59 @@ private fun SettingsScreenHeader() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * Rappel qu'une mise à jour a été détectée puis ignorée (bandeau de [UpdatePrompt]
+ * fermé sans télécharger ni installer). [onShowUpdate] rouvre ce même bandeau, sans
+ * redemander au réseau ni redémarrer l'application.
+ */
+@Composable
+private fun UpdateAvailableCard(onShowUpdate: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        ),
+        modifier = Modifier.fillMaxWidth().testTag("update_available_card")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.SystemUpdate,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Mise à jour disponible",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = "Vous l'avez ignorée — revoir les détails",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            TextButton(
+                onClick = onShowUpdate,
+                modifier = Modifier.testTag("show_update_button")
+            ) {
+                Text(
+                    text = "Voir",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
     }
 }
 
@@ -1106,7 +1167,8 @@ private val RELEASES = listOf(
         version = "0.11",
         changes = listOf(
             "Le réglage d'épaisseur du trait accepte désormais une valeur précise en dp, avec virgule, au lieu d'un choix parmi six paliers fixes",
-            "Correction : En mode suivi automatique (position en focus), les tracés affichés en superposition pouvaient cesser de se charger au fil du déplacement — typiquement en voiture — jusqu'à un glissement ou un zoom manuel sur la carte"
+            "Correction : En mode suivi automatique (position en focus), les tracés affichés en superposition pouvaient cesser de se charger au fil du déplacement — typiquement en voiture — jusqu'à un glissement ou un zoom manuel sur la carte",
+            "Nouveau : Ignorer une mise à jour disponible ne la fait plus disparaître — un badge sur l'onglet Paramètres et un bouton permettent de la retrouver sans redémarrer l'application"
         )
     )
 )

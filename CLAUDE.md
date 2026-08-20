@@ -519,6 +519,14 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
 - L'installation silencieuse est impossible pour une application ordinaire : le
   système affiche toujours son écran de confirmation.
 
+Ignorer le bandeau (« Plus tard ») ne fait pas disparaître la mise à jour : un badge
+rouge sur l'onglet « Paramètres » et une carte en tête de cet écran restent, avec un
+bouton qui rouvre le même bandeau. `MainScreen` conserve la mise à jour détectée
+(`onUpdateAvailable`, appelé une fois par `UpdatePrompt`) et un compteur
+`updateReopenTrigger` incrémenté par ce bouton ; `UpdatePrompt` le lit pour rouvrir
+son dialogue sur la mise à jour déjà connue, sans reconsulter le réseau ni redémarrer
+l'application.
+
 ## Publier une version
 
 `.github/workflows/release.yml` fait tout : tests, compilation signée, `update.json`,
