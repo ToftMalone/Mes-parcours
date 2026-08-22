@@ -23,8 +23,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -213,22 +213,37 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         repository.updateGpsAccuracy(accuracy)
     }
 
-    /** Tracés à superposer sur la carte, chacun avec de quoi choisir sa couleur. */
+    /**
+     * Tracés à superposer sur la carte, chacun avec de quoi choisir sa couleur.
+     *
+     * **`conflate()` et non `flatMapLatest`.** `flatMapLatest` annule la lecture en
+     * cours dès qu'une nouvelle zone arrive. Hors suivi automatique, les zones
+     * n'arrivent qu'aux gestes de l'utilisateur et cela ne se voyait pas ; mais en
+     * mode focus, la zone est republiée à chaque seconde, et toute lecture plus
+     * longue qu'une seconde était donc annulée avant d'avoir rien produit. Elle
+     * repartait de zéro au tour suivant pour être annulée de nouveau : les tracés
+     * cessaient purement et simplement de se charger tant que le mode restait actif.
+     * C'est ce qui expliquait qu'un geste manuel — qui coupe le suivi, donc les
+     * republications — fasse tout réapparaître d'un coup.
+     *
+     * `conflate()` ne coupe jamais une lecture commencée : les zones qui arrivent
+     * pendant qu'elle travaille s'écrasent les unes les autres, et c'est la plus
+     * récente qui est traitée une fois la précédente terminée. Le résultat arrive
+     * peut-être avec un tour de retard, mais il arrive.
+     */
     val selectedImportedPoints: StateFlow<List<MapTrack>> = combine(
         repository.getSelectedImportedTracksFlow(),
         _mapViewport.debounce(VIEWPORT_DEBOUNCE_MS)
     ) { tracks, viewport -> tracks to viewport }
-    .flatMapLatest { (tracks, viewport) ->
-        flow {
-            val allPoints = tracks.map { track ->
-                MapTrack(
-                    isImported = track.isImported,
-                    isMerged = track.isMerged,
-                    sourceColor = track.sourceColor,
-                    points = repository.getDisplayPoints(track.id, viewport)
-                )
-            }
-            emit(allPoints)
+    .conflate()
+    .map { (tracks, viewport) ->
+        tracks.map { track ->
+            MapTrack(
+                isImported = track.isImported,
+                isMerged = track.isMerged,
+                sourceColor = track.sourceColor,
+                points = repository.getDisplayPoints(track.id, viewport)
+            )
         }
     }.flowOn(Dispatchers.IO)
     .stateIn(
@@ -264,16 +279,16 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     // Points destinés à l'affichage uniquement : sous-échantillonnés hors de la zone
     // visible pour les traces très denses. Ne jamais s'en servir pour exporter —
     // l'export relit la totalité des points en base (voir exportToUri).
+    //
+    // `conflate()` pour la même raison que selectedImportedPoints : une lecture
+    // commencée doit pouvoir aller à son terme, même si la zone bouge entre-temps.
     val selectedTrackPoints: StateFlow<List<TrackPoint>> = combine(
         _selectedTrackId,
         _mapViewport.debounce(VIEWPORT_DEBOUNCE_MS)
     ) { id, viewport -> id to viewport }
-    .flatMapLatest { (id, viewport) ->
-        if (id != null) {
-            flow { emit(repository.getDisplayPoints(id, viewport)) }
-        } else {
-            flowOf(emptyList())
-        }
+    .conflate()
+    .map { (id, viewport) ->
+        if (id != null) repository.getDisplayPoints(id, viewport) else emptyList()
     }.flowOn(Dispatchers.IO)
     .stateIn(
         scope = viewModelScope,

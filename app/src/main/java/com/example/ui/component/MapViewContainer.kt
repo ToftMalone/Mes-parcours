@@ -155,6 +155,24 @@ private const val RECENTER_SETTLE_MS = 600L
  */
 private const val AUTO_FOLLOW_VIEWPORT_POLL_MS = 1000L
 
+/**
+ * Distance parcourue, en fraction de la largeur de l'écran, au-delà de laquelle le
+ * suivi automatique republie la zone visible.
+ *
+ * La zone publiée déborde l'écran de [VIEWPORT_MARGIN] de chaque côté : tant que l'on
+ * s'est moins déplacé que cela, l'écran reste couvert par des points déjà chargés et
+ * republier ne peut rien apprendre de neuf. La moitié de cette marge laisse de quoi
+ * recharger avant d'en atteindre le bord.
+ *
+ * Sans ce filtre, la zone repartait à chaque seconde et relançait tout le circuit de
+ * lecture — y compris, pour les traces sous `fullLoadLimit`, une relecture complète de
+ * leurs points qui ne dépend pourtant pas de la zone. En voiture, cela revenait à
+ * redemander plusieurs centaines de milliers de lignes par seconde pour un résultat
+ * identique. À vitesse d'automobile, on republie désormais toutes les dizaines de
+ * secondes au lieu de chaque seconde.
+ */
+private const val AUTO_FOLLOW_RELOAD_FRACTION = VIEWPORT_MARGIN / 2.0
+
 /** Publie la zone visible actuelle (élargie de [VIEWPORT_MARGIN]) vers le ViewModel. */
 private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Unit) {
     val box = map.boundingBox ?: return
@@ -835,14 +853,49 @@ fun MapViewContainer(
     val latestIsCurrentTracking by rememberUpdatedState(isCurrentTracking)
     LaunchedEffect(isAutoFollowActive) {
         if (!isAutoFollowActive) return@LaunchedEffect
+
+        // Repère du dernier envoi. Tant que la vue reste bien à l'intérieur de ce qui
+        // a déjà été demandé, republier ne ferait que relancer une lecture identique.
+        var publishedLat = Double.NaN
+        var publishedLon = Double.NaN
+        var publishedZoom = Double.NaN
+
         while (true) {
             kotlinx.coroutines.delay(AUTO_FOLLOW_VIEWPORT_POLL_MS)
+
+            val box = mapView.boundingBox ?: continue
+            val latSpan = box.latNorth - box.latSouth
+            val lonSpan = box.lonEast - box.lonWest
+            if (latSpan <= 0.0) continue
+
             val loc = latestUserLocation
-            if (latestIsCurrentTracking && loc != null) {
-                reportAutoFollowViewport(mapView, loc.latitude, loc.longitude, onViewportChanged)
+            val followingGps = latestIsCurrentTracking && loc != null
+            // Le centre du suivi GPS est la position elle-même, jamais celle que
+            // rapporte la caméra : `animateTo` peut avoir pris du retard (voir
+            // reportAutoFollowViewport).
+            val centerLat = if (followingGps) loc!!.latitude else (box.latNorth + box.latSouth) / 2.0
+            val centerLon = if (followingGps) loc!!.longitude else (box.lonEast + box.lonWest) / 2.0
+            val zoom = mapView.zoomLevelDouble
+
+            // Un changement de zoom change le niveau de détail attendu : on republie
+            // toujours. Sauter ce cas laisserait un zoom avant sur la silhouette
+            // grossière, exactement le gain de détail qu'il venait chercher.
+            val zoomChanged = publishedZoom.isNaN() || zoom != publishedZoom
+            val movedFar = publishedLat.isNaN() ||
+                    kotlin.math.abs(centerLat - publishedLat) > latSpan * AUTO_FOLLOW_RELOAD_FRACTION ||
+                    kotlin.math.abs(centerLon - publishedLon) > lonSpan * AUTO_FOLLOW_RELOAD_FRACTION
+
+            if (!zoomChanged && !movedFar) continue
+
+            if (followingGps) {
+                reportAutoFollowViewport(mapView, centerLat, centerLon, onViewportChanged)
             } else {
                 reportViewport(mapView, onViewportChanged)
             }
+
+            publishedLat = centerLat
+            publishedLon = centerLon
+            publishedZoom = zoom
         }
     }
 

@@ -1199,17 +1199,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.2",
+        version = "0.11.3",
         changes = listOf(
-            "Correction : le bandeau de mise à jour écarté revenait, et une recherche réseau était relancée, à chaque aller-retour vers un parcours",
-            "Correction : après une éviction de l'application par le système, l'enregistrement s'arrêtait en silence au lieu de reprendre",
-            "Correction : arrêter un enregistrement dont l'application avait été fermée entre-temps laissait un parcours « en cours » impossible à refermer",
-            "Correction : le chronomètre prenait du retard sur les longues sorties et se figeait à la perte du signal GPS",
-            "Correction : les fichiers GPX horodatés avec un décalage horaire — le cas le plus courant — perdaient toute leur chronologie à l'import",
-            "Correction : un fichier KML dont la taille n'était pas connue s'importait daté dans le futur",
-            "Correction : la suite d'un parcours consulté pendant son propre enregistrement n'apparaissait plus sur la carte",
-            "Correction : le champ d'épaisseur du trait gardait à l'écran une valeur refusée ou hors bornes",
-            "Les fichiers importés ne peuvent plus déclarer d'entités XML, et l'APK d'une mise à jour est vérifié par son empreinte avant installation"
+            "Correction : en mode focus, les tracés affichés en superposition cessaient de se charger au fil du déplacement — typiquement en voiture — jusqu'à ce qu'un geste sur la carte remette tout d'un coup. La cause était ailleurs que là où la 0.11 l'avait cherchée"
         )
     )
 )

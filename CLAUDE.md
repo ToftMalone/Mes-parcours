@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.2` (`versionCode` 20). Elle n'est écrite qu'une fois,
+- Version courante : `0.11.3` (`versionCode` 21). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -454,25 +454,42 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   existe) et lisser par interpolation sur l'arc le plus court, ce qui règle du même
   coup le passage par le nord.
 
-### À vérifier sur le terrain, correctif déjà en place
+### Chargement des tracés pendant le suivi automatique : résolu en 0.11.3
 
-- **Republication de la zone visible pendant le suivi automatique : cause précisée.**
-  Symptôme rapporté : en voiture, mode focus actif, les tracés affichés en
-  superposition cessent de se charger au fil du déplacement, jusqu'à ce qu'un
-  glissement ou un zoom manuel remette tout à jour d'un coup. Le sondage périodique
-  (`AUTO_FOLLOW_VIEWPORT_POLL_MS`) republiait bien une zone toutes les secondes, mais
-  centrée sur ce que rapportait `map.boundingBox` — or `animateTo()`, appelé à chaque
-  nouvelle position, peut être rejeté par osmdroid sans erreur si l'animation
-  précédente tourne encore. Pendant un trajet en voiture, ces appels ignorés
-  s'accumulent : la caméra prend du retard sur la position réelle, silencieusement,
-  et la zone republiée n'est plus celle qu'il faut charger — jusqu'à ce qu'un geste
-  manuel recale tout via `onScroll`/`onZoom`. `reportAutoFollowViewport` reconstruit
-  désormais la zone autour de la position GPS elle-même (via `rememberUpdatedState`,
-  pour rester à jour dans une boucle de longue durée), plutôt qu'autour d'un centre de
-  caméra qui peut avoir décroché. Correctif non vérifié sur le terrain — à confirmer
-  par un trajet en voiture avec le mode focus actif. Ne s'applique qu'au suivi GPS en
-  direct ; le même sondage, pour un parcours affiché sans suivi GPS (`points.last()`),
-  continue de se fier à `map.boundingBox`.
+Symptôme : en voiture, mode focus actif, les tracés affichés en superposition cessent
+de se charger au fil du déplacement, jusqu'à ce qu'un glissement ou un zoom manuel
+remette tout à jour d'un coup.
+
+**La 0.11 s'était trompée de cause.** Elle avait supposé que la caméra prenait du
+retard sur la position (`animateTo` rejeté en cours d'animation) et que la zone
+republiée n'était donc pas la bonne ; `reportAutoFollowViewport` reconstruit depuis
+la position GPS plutôt que depuis `map.boundingBox`. C'est juste en soi, et c'est
+gardé — mais ce n'était pas ce qui cassait l'affichage.
+
+Les deux vraies causes, trouvées en 0.11.3 :
+
+1. **`flatMapLatest` annulait la lecture en cours.** `selectedImportedPoints` et
+   `selectedTrackPoints` relancent une lecture à chaque nouvelle zone, et
+   `flatMapLatest` annule la précédente. Hors suivi, les zones n'arrivent qu'aux
+   gestes de l'utilisateur : sans conséquence. En mode focus, elles arrivaient toutes
+   les secondes (`AUTO_FOLLOW_VIEWPORT_POLL_MS`), si bien que toute lecture dépassant
+   la seconde était annulée avant d'avoir rien produit, repartait de zéro, et se
+   faisait annuler de nouveau — indéfiniment. D'où le symptôme exact : un geste manuel
+   coupe le suivi (`setOnTouchListener` → `onAutoFollowChanged(false)`), donc les
+   republications, donc la lecture aboutit enfin et tout apparaît d'un coup.
+   Corrigé par `conflate()` : une lecture commencée va toujours à son terme, les zones
+   arrivées entre-temps s'écrasent, et la plus récente est traitée ensuite.
+2. **La zone était republiée à chaque seconde pour rien.** Le sondage envoyait la
+   position à chaque tour, alors que la zone publiée déborde l'écran de
+   `VIEWPORT_MARGIN` : tant qu'on s'est déplacé de moins que cette marge, l'écran est
+   déjà couvert. Pire, `getDisplayPoints` relit intégralement les traces de moins de
+   `fullLoadLimit` points — une relecture qui ne dépend même pas de la zone. Le
+   sondage ne republie désormais qu'au-delà de `AUTO_FOLLOW_RELOAD_FRACTION` de la
+   largeur d'écran parcourue, ou sur changement de zoom (à conserver : sans ce
+   second cas, un zoom avant resterait sur la silhouette grossière).
+
+Ces deux points étaient l'un des « leviers » laissés en arbitrage plus bas ; ils n'y
+figurent donc plus.
 
 ### En attente d'arbitrage
 
@@ -481,10 +498,6 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   sert aussi à `coversMostOfTrack`, donc l'affichage se rabat plus tôt sur la seule
   silhouette. Si le tracé paraît plus grossier, mesurer cette couverture sur la zone
   réellement visible plutôt que sur la zone élargie.
-- **Deuxième levier disponible** pour le même sujet : ne plus réinterroger la base
-  quand la zone visible reste incluse dans ce qui est déjà chargé. Gratuit en
-  performance. Subtilité : ne pas sauter le rechargement lors d'un zoom avant, sous
-  peine de perdre le gain de détail attendu.
 - `Importer` cumule le dénivelé **sans seuil**, alors que l'enregistrement et la
   reprise passent par `ElevationAccumulator`. À harmoniser, mais cela changerait les
   statistiques des futurs imports.
