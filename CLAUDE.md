@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.8` (`versionCode` 26). Elle n'est écrite qu'une fois,
+- Version courante : `0.11.9` (`versionCode` 27). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -444,6 +444,30 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   `MediaStoreExporter` emprunte alors le stockage public sans que
   `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
 - Le tracé en diagonale (voir ci-dessous) reste non corrigé, à la demande de l'auteur.
+
+### Le mode focus zoomait tout seul : corrigé en 0.11.9
+
+Rapporté ainsi : « quand je mets le mode focus parfois ça zoom ou dézoom tout seul ».
+
+**La cause** : le `LaunchedEffect(recenterTrigger, isAutoFollowActive)` de
+`MapViewContainer` qui recentre la caméra et réinitialise le zoom à
+`pref_default_zoom` avait pour garde `recenterTrigger > 0 || isAutoFollowActive`.
+`recenterTrigger` ne fait qu'augmenter (jamais remis à zéro) : dès le premier appui
+sur le bouton de recentrage dans une session, `recenterTrigger > 0` reste vrai pour
+toujours. Or `LaunchedEffect` réexécute tout son corps à **chaque changement** de
+l'une ou l'autre de ses clés — y compris quand `isAutoFollowActive` passe de `true`
+à `false`. Un simple toucher de l'écran pour désengager le mode focus (l'invariant
+existant : tout toucher appelle `onAutoFollowChanged(false)`) déclenchait donc, lui
+aussi, ce recentrage-rezoom — juste après, voire pendant, le geste manuel de
+l'utilisateur. La carte semblait alors annuler son propre zoom ou son propre
+recentrage tout seule.
+
+**Le correctif** : la garde ne porte plus que sur la valeur actuelle de
+`isAutoFollowActive`. `recenterTrigger` reste dans les clés (pour forcer une
+nouvelle exécution quand on retape sur le bouton alors que le mode focus est déjà
+actif, cas où sa valeur seule ne changerait pas), mais ne fait plus partie de la
+condition d'exécution. Le recentrage-rezoom ne se déclenche donc plus que lorsque le
+mode focus est effectivement actif — jamais au moment où il vient de s'éteindre.
 
 ### Le mode 3D pivotait sans arrêt : corrigé en 0.11.6
 

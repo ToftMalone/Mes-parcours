@@ -822,9 +822,17 @@ fun MapViewContainer(
         }
     }
 
-    // Handle center cameras when recenter trigger changes explicitly or auto-follow is activated
+    // Handle center cameras when recenter trigger changes explicitly or auto-follow is activated.
+    // `recenterTrigger` reste dans les clés pour forcer une nouvelle exécution quand
+    // l'utilisateur retape sur le bouton de recentrage alors que le mode focus est déjà
+    // actif (sa valeur seule ne change alors pas) ; mais la garde ne doit porter que sur
+    // l'état actuel de isAutoFollowActive. Avec `recenterTrigger > 0` dans la garde, cet
+    // effet continuait de recentrer et de réinitialiser le zoom même quand isAutoFollowActive
+    // venait de repasser à false (un simple toucher pour désengager le mode focus) : la
+    // carte revenait alors en arrière juste après le geste manuel de l'utilisateur, donnant
+    // l'impression qu'elle zoomait ou dézoomait toute seule.
     LaunchedEffect(recenterTrigger, isAutoFollowActive) {
-        if (recenterTrigger > 0 || isAutoFollowActive) {
+        if (isAutoFollowActive) {
             val prefs = PreferenceManager.getDefaultSharedPreferences(context)
             val zoomLevelToSet = prefs.getFloat("pref_default_zoom", 16.5f).toDouble()
             mapView.controller.setZoom(zoomLevelToSet)

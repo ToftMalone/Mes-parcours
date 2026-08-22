@@ -1199,9 +1199,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.8",
+        version = "0.11.9",
         changes = listOf(
-            "Nouveau : les boutons d'enregistrement (démarrer, mettre en pause, arrêter) surgissent désormais avec un léger effet de zoom au lieu de sauter d'un jeu de boutons à l'autre, et le bouton pause/reprendre anime son icône et sa couleur"
+            "Correction : en mode focus, la carte pouvait sembler zoomer ou dézoomer toute seule juste après avoir touché l'écran pour la désengager"
         )
     )
 )
