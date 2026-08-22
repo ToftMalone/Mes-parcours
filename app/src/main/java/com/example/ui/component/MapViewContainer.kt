@@ -176,6 +176,23 @@ private const val AUTO_FOLLOW_RELOAD_FRACTION = VIEWPORT_MARGIN / 2.0
 /** Intervalle minimal entre deux mémorisations de la position de carte. */
 private const val MAP_STATE_PERSIST_MS = 1000L
 
+/**
+ * Déplacement minimal entre deux relevés pour en tirer un cap.
+ *
+ * À 1 Hz, un mètre et demi correspond à environ 5 km/h : en dessous, l'écart entre
+ * deux positions vient surtout de l'imprécision du GPS, et la direction qu'on en
+ * déduirait tournerait au hasard.
+ */
+private const val BEARING_MIN_DISTANCE_METERS = 1.5
+
+/**
+ * Part du nouveau cap reprise à chaque mise à jour.
+ *
+ * Assez bas pour absorber le tremblement d'un relevé à l'autre, assez haut pour
+ * qu'un virage soit suivi en quelques secondes plutôt qu'accompli d'un bloc.
+ */
+private const val BEARING_SMOOTHING = 0.35f
+
 /** Publie la zone visible actuelle (élargie de [VIEWPORT_MARGIN]) vers le ViewModel. */
 private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Unit) {
     val box = map.boundingBox ?: return
@@ -436,7 +453,7 @@ fun MapViewContainer(
                 } else {
                     val calcBearing = computeCurrentBearing(points, currentUserLocation, state.currentUserLocation)
                     if (calcBearing != null) {
-                        state.lastKnownBearing = calcBearing
+                        state.lastKnownBearing = smoothedBearing(state.lastKnownBearing, calcBearing)
                     }
                     val activeBearing = state.lastKnownBearing ?: 0f
                     val targetOrientation = -activeBearing
@@ -1285,24 +1302,43 @@ private fun rebuildMapOverlays(map: MapView, state: MapState, isZoomedOut: Boole
     map.invalidate()
 }
 
-private fun computeCurrentBearing(
+/**
+ * Cap à afficher, ou null s'il n'y a rien de neuf à en dire — l'appelant garde alors
+ * le dernier cap connu.
+ *
+ * **Une position connue fait autorité, et elle seule.** Le repli sur les points
+ * enregistrés ne vaut que faute de position GPS : s'en servir parce que la position
+ * n'a pas changé depuis le passage précédent était un piège. Pendant une pause
+ * d'enregistrement, `points` ne bouge plus et garde éternellement le cap qu'on avait
+ * en s'arrêtant ; la carte basculait donc entre le cap réel et ce cap fossilisé,
+ * plusieurs fois par seconde et sur une centaine de degrés. Le défaut est d'autant
+ * plus visible que l'affichage est réévalué souvent, ce qui est le cas depuis que la
+ * zone visible est échantillonnée à intervalle régulier.
+ *
+ * Renvoyer null quand la position n'a pas assez bougé est donc la bonne réponse :
+ * mieux vaut conserver le cap précédent qu'en inventer un autre.
+ */
+internal fun computeCurrentBearing(
     points: List<TrackPoint>,
     currentLocation: TrackPoint?,
     previousLocation: TrackPoint?
 ): Float? {
-    if (currentLocation != null && previousLocation != null && currentLocation != previousLocation) {
+    if (currentLocation != null) {
+        if (previousLocation == null || currentLocation == previousLocation) return null
         val dist = calculateDistanceMeters(
             previousLocation.latitude, previousLocation.longitude,
             currentLocation.latitude, currentLocation.longitude
         )
-        if (dist >= 1.5) {
-            return calculateBearing(
-                previousLocation.latitude, previousLocation.longitude,
-                currentLocation.latitude, currentLocation.longitude
-            )
-        }
+        // Sous ce seuil, l'écart entre deux relevés tient davantage au bruit du GPS
+        // qu'à un déplacement réel : le cap qu'on en tirerait serait aléatoire.
+        if (dist < BEARING_MIN_DISTANCE_METERS) return null
+        return calculateBearing(
+            previousLocation.latitude, previousLocation.longitude,
+            currentLocation.latitude, currentLocation.longitude
+        )
     }
 
+    // Aucune position connue : on s'oriente sur la fin du tracé affiché.
     if (points.size >= 2) {
         val last = points.last()
         for (i in points.size - 2 downTo 0.coerceAtLeast(points.size - 10)) {
@@ -1311,7 +1347,7 @@ private fun computeCurrentBearing(
                 prev.latitude, prev.longitude,
                 last.latitude, last.longitude
             )
-            if (dist >= 1.5) {
+            if (dist >= BEARING_MIN_DISTANCE_METERS) {
                 return calculateBearing(
                     prev.latitude, prev.longitude,
                     last.latitude, last.longitude
@@ -1320,6 +1356,22 @@ private fun computeCurrentBearing(
         }
     }
     return null
+}
+
+/**
+ * Rapproche le cap affiché de [target], en suivant l'arc le plus court.
+ *
+ * Deux raisons de ne pas poser directement la valeur. D'abord le passage par le nord :
+ * interpoler de 350° à 10° en ligne droite ferait faire à la carte un tour complet
+ * pour un virage de vingt degrés. Ensuite le confort : le cap issu de deux positions
+ * consécutives tressaute, et l'appliquer tel quel donnait une carte qui sursaute à
+ * chaque relevé au lieu de tourner.
+ */
+internal fun smoothedBearing(previous: Float?, target: Float): Float {
+    if (previous == null) return target
+    // Écart ramené dans [-180°, 180°] : c'est ce qui choisit le sens de rotation.
+    val delta = ((target - previous + 540f) % 360f) - 180f
+    return ((previous + delta * BEARING_SMOOTHING) % 360f + 360f) % 360f
 }
 
 private fun calculateDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
