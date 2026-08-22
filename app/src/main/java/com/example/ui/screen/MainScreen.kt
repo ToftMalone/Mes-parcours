@@ -1,6 +1,13 @@
 package com.example.ui.screen
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
@@ -331,175 +338,198 @@ fun MainScreen(
     val detailId = viewingDetailedTrackId
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (detailId != null) {
-            DetailView(
-                trackId = detailId,
-                viewModel = viewModel,
-                onBackClick = { viewingDetailedTrackId = null },
-                onResumeTrack = {
-                    viewingDetailedTrackId = null
-                    currentTab = "enregistrer"
-                },
-                modifier = modifier
-            )
-        } else {
-            Scaffold(
-                bottomBar = {
-                        NavigationBar(
-                            windowInsets = WindowInsets(0, 0, 0, 0),
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                            tonalElevation = 8.dp,
-                            modifier = Modifier
-                                .navigationBarsPadding()
-                                .padding(horizontal = 24.dp, vertical = 8.dp)
-                                .height(72.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .border(
-                                    width = 1.dp,
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .testTag("bottom_nav_bar")
-                        ) {
-                    NavigationBarItem(
-                        selected = currentTab == "enregistrer",
-                        onClick = { currentTab = "enregistrer" },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentTab == "enregistrer") Icons.Filled.PlayArrow else Icons.Outlined.PlayArrow,
-                                contentDescription = "Enregistrer"
-                            )
-                        },
-                        label = { Text("Enregistrer") },
-                        modifier = Modifier.testTag("tab_button_tracking")
-                    )
-
-                    NavigationBarItem(
-                        selected = currentTab == "historique",
-                        onClick = { currentTab = "historique" },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentTab == "historique") Icons.Filled.History else Icons.Outlined.History,
-                                contentDescription = "Historique"
-                            )
-                        },
-                        label = { Text("Historique") },
-                        modifier = Modifier.testTag("tab_button_history")
-                    )
-
-                    NavigationBarItem(
-                        selected = currentTab == "outils",
-                        onClick = { currentTab = "outils" },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentTab == "outils") Icons.Filled.Build else Icons.Outlined.Build,
-                                contentDescription = "Outils"
-                            )
-                        },
-                        label = { Text("Outils") },
-                        modifier = Modifier.testTag("tab_button_tools")
-                    )
-
-                    NavigationBarItem(
-                        selected = currentTab == "parametres",
-                        onClick = { currentTab = "parametres" },
-                        icon = {
-                            BadgedBox(
-                                badge = {
-                                    // Signale une mise à jour ignorée, sans redire ce que le
-                                    // bandeau a déjà proposé : juste de quoi le retrouver.
-                                    if (availableUpdate != null) {
-                                        Badge(
-                                            containerColor = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.testTag("settings_update_badge")
-                                        )
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = if (currentTab == "parametres") Icons.Filled.Settings else Icons.Outlined.Settings,
-                                    contentDescription = "Paramètres"
-                                )
-                            }
-                        },
-                        label = { Text("Paramètres") },
-                        modifier = Modifier.testTag("tab_button_settings")
-                    )
+        // Glissement + fondu entre les onglets et la vue de détail, plutôt qu'une
+        // bascule sèche : c'était le seul endroit de toute l'application sans la
+        // moindre transition. Le sens du glissement suit la navigation — la vue de
+        // détail entre par la droite comme un écran qu'on empile, en sort par la
+        // droite comme on le dépile — pour rester lisible en un coup d'œil plutôt que
+        // décoratif.
+        AnimatedContent(
+            targetState = detailId,
+            transitionSpec = {
+                if (targetState != null && initialState == null) {
+                    (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(220)) { -it / 5 } + fadeOut(tween(220)))
+                } else if (targetState == null && initialState != null) {
+                    (slideInHorizontally(tween(220)) { -it / 5 } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
+                } else {
+                    fadeIn(tween(150)) togetherWith fadeOut(tween(150))
                 }
             },
-            modifier = modifier.fillMaxSize().testTag("main_screen")
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                when (currentTab) {
-                    "enregistrer" -> {
-                        TrackingTab(
-                            viewModel = viewModel,
-                            hasLocationPermission = hasLocationPermission,
-                            onRequestPermission = {
-                                val permissionsToRequest = mutableListOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
+            label = "detail_transition",
+            modifier = Modifier.fillMaxSize()
+        ) { id ->
+            if (id != null) {
+                DetailView(
+                    trackId = id,
+                    viewModel = viewModel,
+                    onBackClick = { viewingDetailedTrackId = null },
+                    onResumeTrack = {
+                        viewingDetailedTrackId = null
+                        currentTab = "enregistrer"
+                    },
+                    modifier = modifier
+                )
+            } else {
+                Scaffold(
+                    bottomBar = {
+                            NavigationBar(
+                                windowInsets = WindowInsets(0, 0, 0, 0),
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                tonalElevation = 8.dp,
+                                modifier = Modifier
+                                    .navigationBarsPadding()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                                    .height(72.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                                Color.Transparent
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(24.dp)
+                                    )
+                                    .testTag("bottom_nav_bar")
+                            ) {
+                        NavigationBarItem(
+                            selected = currentTab == "enregistrer",
+                            onClick = { currentTab = "enregistrer" },
+                            icon = {
+                                Icon(
+                                    imageVector = if (currentTab == "enregistrer") Icons.Filled.PlayArrow else Icons.Outlined.PlayArrow,
+                                    contentDescription = "Enregistrer"
                                 )
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                            },
+                            label = { Text("Enregistrer") },
+                            modifier = Modifier.testTag("tab_button_tracking")
+                        )
+
+                        NavigationBarItem(
+                            selected = currentTab == "historique",
+                            onClick = { currentTab = "historique" },
+                            icon = {
+                                Icon(
+                                    imageVector = if (currentTab == "historique") Icons.Filled.History else Icons.Outlined.History,
+                                    contentDescription = "Historique"
+                                )
+                            },
+                            label = { Text("Historique") },
+                            modifier = Modifier.testTag("tab_button_history")
+                        )
+
+                        NavigationBarItem(
+                            selected = currentTab == "outils",
+                            onClick = { currentTab = "outils" },
+                            icon = {
+                                Icon(
+                                    imageVector = if (currentTab == "outils") Icons.Filled.Build else Icons.Outlined.Build,
+                                    contentDescription = "Outils"
+                                )
+                            },
+                            label = { Text("Outils") },
+                            modifier = Modifier.testTag("tab_button_tools")
+                        )
+
+                        NavigationBarItem(
+                            selected = currentTab == "parametres",
+                            onClick = { currentTab = "parametres" },
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        // Signale une mise à jour ignorée, sans redire ce que le
+                                        // bandeau a déjà proposé : juste de quoi le retrouver.
+                                        if (availableUpdate != null) {
+                                            Badge(
+                                                containerColor = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.testTag("settings_update_badge")
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (currentTab == "parametres") Icons.Filled.Settings else Icons.Outlined.Settings,
+                                        contentDescription = "Paramètres"
+                                    )
                                 }
-                                if (!hasLocationPermission) {
-                                    launcher.launch(permissionsToRequest.toTypedArray())
-                                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundPermission) {
-                                    showBackgroundRationaleDialog = true
+                            },
+                            label = { Text("Paramètres") },
+                            modifier = Modifier.testTag("tab_button_settings")
+                        )
+                    }
+                },
+                modifier = modifier.fillMaxSize().testTag("main_screen")
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    when (currentTab) {
+                        "enregistrer" -> {
+                            TrackingTab(
+                                viewModel = viewModel,
+                                hasLocationPermission = hasLocationPermission,
+                                onRequestPermission = {
+                                    val permissionsToRequest = mutableListOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                    if (!hasLocationPermission) {
+                                        launcher.launch(permissionsToRequest.toTypedArray())
+                                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundPermission) {
+                                        showBackgroundRationaleDialog = true
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                                onNavigateToDetails = { id ->
+                                    viewingDetailedTrackId = id
                                 }
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                            onNavigateToDetails = { id ->
-                                viewingDetailedTrackId = id
-                            }
-                        )
-                    }
-                    "historique" -> {
-                        HistoryTab(
-                            viewModel = viewModel,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding),
-                            onNavigateToDetails = { id ->
-                                viewingDetailedTrackId = id
-                            },
-                            onResumeTrack = {
-                                viewingDetailedTrackId = null
-                                currentTab = "enregistrer"
-                            }
-                        )
-                    }
-                    "outils" -> {
-                        ToolsTab(
-                            viewModel = viewModel,
-                            onNavigateToDetails = { id ->
-                                viewingDetailedTrackId = id
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding)
-                        )
-                    }
-                    "parametres" -> {
-                        SettingsTab(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding),
-                            hasAvailableUpdate = availableUpdate != null,
-                            onShowUpdate = { updateReopenTrigger++ }
-                        )
+                            )
+                        }
+                        "historique" -> {
+                            HistoryTab(
+                                viewModel = viewModel,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(innerPadding),
+                                onNavigateToDetails = { id ->
+                                    viewingDetailedTrackId = id
+                                },
+                                onResumeTrack = {
+                                    viewingDetailedTrackId = null
+                                    currentTab = "enregistrer"
+                                }
+                            )
+                        }
+                        "outils" -> {
+                            ToolsTab(
+                                viewModel = viewModel,
+                                onNavigateToDetails = { id ->
+                                    viewingDetailedTrackId = id
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(innerPadding)
+                            )
+                        }
+                        "parametres" -> {
+                            SettingsTab(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(innerPadding),
+                                hasAvailableUpdate = availableUpdate != null,
+                                onShowUpdate = { updateReopenTrigger++ }
+                            )
+                        }
                     }
                 }
             }
-        }
+            }
         }
 
         // Recherche d'une nouvelle version au démarrage. Ne montre rien tant qu'il

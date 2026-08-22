@@ -1,5 +1,9 @@
 package com.example.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,7 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,11 +48,13 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -301,28 +308,30 @@ fun HistoryTab(
                         }
                     }
                 } else {
-                    items(recordedTracks, key = { it.id }) { track ->
-                        TrackHistoryCard(
-                            track = track,
-                            trackColor = Color(recordedColor),
-                            onClick = { onNavigateToDetails(track.id) },
-                            onDeleteClick = { trackToDelete = track },
-                            onResumeClick = {
-                                if (isTracking) {
-                                    Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
-                                } else {
-                                    viewModel.resumeTrack(context, track.id) {
-                                        Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
-                                        onResumeTrack(track.id)
+                    itemsIndexed(recordedTracks, key = { _, it -> it.id }) { index, track ->
+                        StaggeredHistoryCard(index) {
+                            TrackHistoryCard(
+                                track = track,
+                                trackColor = Color(recordedColor),
+                                onClick = { onNavigateToDetails(track.id) },
+                                onDeleteClick = { trackToDelete = track },
+                                onResumeClick = {
+                                    if (isTracking) {
+                                        Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        viewModel.resumeTrack(context, track.id) {
+                                            Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
+                                            onResumeTrack(track.id)
+                                        }
                                     }
+                                },
+                                showMapSelection = true,
+                                isSelectedForMap = track.isSelectedForMap,
+                                onMapSelectionToggle = { isChecked ->
+                                    viewModel.toggleTrackSelectionForMap(track)
                                 }
-                            },
-                            showMapSelection = true,
-                            isSelectedForMap = track.isSelectedForMap,
-                            onMapSelectionToggle = { isChecked ->
-                                viewModel.toggleTrackSelectionForMap(track)
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -378,34 +387,36 @@ fun HistoryTab(
                         }
                     }
                 } else {
-                    items(importedTracks, key = { it.id }) { track ->
-                        TrackHistoryCard(
-                            track = track,
-                            trackColor = Color(
-                                TrackStylePreferences.resolveImportedColor(
-                                    fromFile = importedColorFromFile,
-                                    sourceColor = track.sourceColor,
-                                    fallback = importedColor
-                                )
-                            ),
-                            onClick = { onNavigateToDetails(track.id) },
-                            onDeleteClick = { trackToDelete = track },
-                            onResumeClick = {
-                                if (isTracking) {
-                                    Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
-                                } else {
-                                    viewModel.resumeTrack(context, track.id) {
-                                        Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
-                                        onResumeTrack(track.id)
+                    itemsIndexed(importedTracks, key = { _, it -> it.id }) { index, track ->
+                        StaggeredHistoryCard(index) {
+                            TrackHistoryCard(
+                                track = track,
+                                trackColor = Color(
+                                    TrackStylePreferences.resolveImportedColor(
+                                        fromFile = importedColorFromFile,
+                                        sourceColor = track.sourceColor,
+                                        fallback = importedColor
+                                    )
+                                ),
+                                onClick = { onNavigateToDetails(track.id) },
+                                onDeleteClick = { trackToDelete = track },
+                                onResumeClick = {
+                                    if (isTracking) {
+                                        Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        viewModel.resumeTrack(context, track.id) {
+                                            Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
+                                            onResumeTrack(track.id)
+                                        }
                                     }
+                                },
+                                showMapSelection = true,
+                                isSelectedForMap = track.isSelectedForMap,
+                                onMapSelectionToggle = { isChecked ->
+                                    viewModel.toggleTrackSelectionForMap(track)
                                 }
-                            },
-                            showMapSelection = true,
-                            isSelectedForMap = track.isSelectedForMap,
-                            onMapSelectionToggle = { isChecked ->
-                                viewModel.toggleTrackSelectionForMap(track)
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -416,37 +427,39 @@ fun HistoryTab(
                         MergedEmptyState()
                     }
                 } else {
-                    items(mergedTracks, key = { it.id }) { track ->
-                        TrackHistoryCard(
-                            track = track,
-                            // Un parcours fusionné à partir de fichiers garde les
-                            // couleurs de ceux-ci quand le réglage le demande ; sinon
-                            // il prend la couleur de sa propre catégorie.
-                            trackColor = Color(
-                                TrackStylePreferences.resolveImportedColor(
-                                    fromFile = importedColorFromFile,
-                                    sourceColor = track.sourceColor,
-                                    fallback = mergedColor
-                                )
-                            ),
-                            onClick = { onNavigateToDetails(track.id) },
-                            onDeleteClick = { trackToDelete = track },
-                            onResumeClick = {
-                                if (isTracking) {
-                                    Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
-                                } else {
-                                    viewModel.resumeTrack(context, track.id) {
-                                        Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
-                                        onResumeTrack(track.id)
+                    itemsIndexed(mergedTracks, key = { _, it -> it.id }) { index, track ->
+                        StaggeredHistoryCard(index) {
+                            TrackHistoryCard(
+                                track = track,
+                                // Un parcours fusionné à partir de fichiers garde les
+                                // couleurs de ceux-ci quand le réglage le demande ; sinon
+                                // il prend la couleur de sa propre catégorie.
+                                trackColor = Color(
+                                    TrackStylePreferences.resolveImportedColor(
+                                        fromFile = importedColorFromFile,
+                                        sourceColor = track.sourceColor,
+                                        fallback = mergedColor
+                                    )
+                                ),
+                                onClick = { onNavigateToDetails(track.id) },
+                                onDeleteClick = { trackToDelete = track },
+                                onResumeClick = {
+                                    if (isTracking) {
+                                        Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        viewModel.resumeTrack(context, track.id) {
+                                            Toast.makeText(context, "Reprise de la trace \"${track.name}\"", Toast.LENGTH_SHORT).show()
+                                            onResumeTrack(track.id)
+                                        }
                                     }
+                                },
+                                showMapSelection = true,
+                                isSelectedForMap = track.isSelectedForMap,
+                                onMapSelectionToggle = { isChecked ->
+                                    viewModel.toggleTrackSelectionForMap(track)
                                 }
-                            },
-                            showMapSelection = true,
-                            isSelectedForMap = track.isSelectedForMap,
-                            onMapSelectionToggle = { isChecked ->
-                                viewModel.toggleTrackSelectionForMap(track)
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -582,6 +595,33 @@ fun HistoryTab(
         )
     }
 
+}
+
+/**
+ * Fait apparaître une carte de l'historique en fondu-glissé, avec un léger décalage
+ * selon [index], et anime aussi son emplacement dans la liste ([LazyItemScope.animateItem]) —
+ * utile lors d'une suppression ou d'un changement d'onglet, où les cartes restantes
+ * glissent à leur nouvelle place plutôt que de sauter.
+ *
+ * Le décalage entre cartes est plafonné : au-delà d'une douzaine, attendre son tour
+ * prendrait plus de temps que l'utilisateur n'en met à faire défiler jusque-là. C'est
+ * une garniture, pas un ralentissement — une appli consultée parfois d'une main en
+ * plein trajet ne doit pas faire patienter pour lire ses statistiques.
+ */
+@Composable
+private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(minOf(index, 12) * 18L)
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 6 },
+        modifier = Modifier.animateItem()
+    ) {
+        content()
+    }
 }
 
 @Composable

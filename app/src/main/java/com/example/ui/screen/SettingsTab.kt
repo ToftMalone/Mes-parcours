@@ -1199,10 +1199,10 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.6",
+        version = "0.11.7",
         changes = listOf(
-            "Correction : en vue orientée, la carte pivotait sur elle-même d'une centaine de degrés plusieurs fois par seconde. Elle se fiait au tracé enregistré quand la position n'avait pas bougé — or pendant une pause ce tracé est figé et garde le cap qu'on avait en s'arrêtant",
-            "L'orientation de la carte est désormais lissée et tourne toujours du côté le plus court : plus de tour complet pour un simple virage"
+            "Nouveau : ouvrir ou fermer le détail d'un parcours se fait désormais par un glissement, au lieu d'un changement d'écran sec",
+            "Nouveau : les cartes de l'historique apparaissent en douceur, et glissent à leur nouvelle place plutôt que de sauter"
         )
     )
 )
