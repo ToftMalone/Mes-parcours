@@ -24,14 +24,33 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 
-/** Délai d'accalmie avant de recharger les points après un déplacement de carte. */
-private const val VIEWPORT_DEBOUNCE_MS = 250L
+/**
+ * Cadence maximale de rechargement des points quand la carte bouge.
+ *
+ * **`sample` et non `debounce`, et c'est tout le sujet.** `debounce` n'émet qu'après
+ * un silence — ici 250 ms sans nouvelle zone. Or osmdroid notifie `onScroll` à chaque
+ * image de ses animations : `MapController.onAnimationUpdate` appelle `setMapCenter`
+ * une soixantaine de fois par seconde, et chaque appel descend dans `MapView.scrollTo`
+ * qui prévient les écouteurs. En suivi automatique, `animateTo` est relancé à chaque
+ * position GPS pour une animation d'une seconde : les animations s'enchaînent sans
+ * interruption, le silence n'arrive donc jamais, et `debounce` n'émettait tout
+ * simplement plus rien. Les tracés restaient figés sur la silhouette grossière
+ * calculée au moment où le mode avait été activé — de longues lignes droites entre
+ * des points très espacés — jusqu'à ce qu'un geste coupe le suivi, arrête les
+ * animations, laisse enfin passer le silence et recharge tout d'un coup.
+ *
+ * `sample` renverse la logique : il émet la zone la plus récente à intervalle
+ * régulier tant qu'il en arrive, et laisse passer la dernière une fois le flux tari.
+ * Un flux continu ne peut donc plus l'affamer, et une carte qui s'arrête est quand
+ * même servie.
+ */
+private const val VIEWPORT_SAMPLE_MS = 500L
 
 @OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 class TrackViewModel(private val repository: TrackRepository, private val appContext: Context) : ViewModel() {
@@ -233,7 +252,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      */
     val selectedImportedPoints: StateFlow<List<MapTrack>> = combine(
         repository.getSelectedImportedTracksFlow(),
-        _mapViewport.debounce(VIEWPORT_DEBOUNCE_MS)
+        _mapViewport.sample(VIEWPORT_SAMPLE_MS)
     ) { tracks, viewport -> tracks to viewport }
     .conflate()
     .map { (tracks, viewport) ->
@@ -284,7 +303,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     // commencée doit pouvoir aller à son terme, même si la zone bouge entre-temps.
     val selectedTrackPoints: StateFlow<List<TrackPoint>> = combine(
         _selectedTrackId,
-        _mapViewport.debounce(VIEWPORT_DEBOUNCE_MS)
+        _mapViewport.sample(VIEWPORT_SAMPLE_MS)
     ) { id, viewport -> id to viewport }
     .conflate()
     .map { (id, viewport) ->

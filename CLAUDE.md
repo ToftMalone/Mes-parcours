@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.4` (`versionCode` 22). Elle n'est écrite qu'une fois,
+- Version courante : `0.11.5` (`versionCode` 23). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -454,7 +454,54 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   existe) et lisser par interpolation sur l'arc le plus court, ce qui règle du même
   coup le passage par le nord.
 
-### Chargement des tracés pendant le suivi automatique : résolu en 0.11.3
+### Chargement des tracés pendant le suivi automatique : la cause, trouvée en 0.11.5
+
+**Symptôme exact, tel que rapporté** : en voiture, mode focus actif, les points déjà
+à l'écran au moment de l'activation restent corrects, mais tout ce que l'on découvre
+en avançant s'affiche en **grandes lignes droites** — la silhouette sous-échantillonnée
+au lieu du détail. Toucher la carte, zoomer ou dézoomer remet tout d'aplomb.
+
+**La cause.** `onScroll` republie la zone visible, et le ViewModel la filtrait avec
+`debounce`, qui n'émet qu'après un silence. Or osmdroid notifie `onScroll` **à chaque
+image de ses animations** : `MapController.onAnimationUpdate` appelle `setMapCenter`
+une soixantaine de fois par seconde, ce qui descend dans `MapView.scrollTo`, qui
+prévient les écouteurs — le commentaire d'osmdroid le dit lui-même. En suivi
+automatique, `animateTo` est relancé à chaque position GPS pour une animation d'une
+seconde : les animations s'enchaînent sans interruption, le silence n'arrive jamais,
+et `debounce` n'émet plus rien du tout. Aucun rechargement n'était déclenché tant que
+le mode restait actif. Un geste coupe le suivi (`setOnTouchListener` →
+`onAutoFollowChanged(false)`), les animations cessent, le silence passe, tout se
+recharge d'un coup.
+
+`sample` remplace `debounce` : il émet la zone la plus récente à intervalle régulier
+tant qu'il en arrive, et laisse passer la dernière une fois le flux tari. Un flux
+continu ne peut plus l'affamer. **Ne jamais remettre `debounce` sur ce flux** : la
+source peut être continue par construction.
+
+Corollaire traité en même temps : `onScroll` faisait aussi mémoriser la position de
+carte à chaque image, soit quatre écritures de préférences par image et plus de deux
+cents accès disque par seconde. Borné à une fois par seconde (`MAP_STATE_PERSIST_MS`).
+
+**Trois versions ont visé à côté avant celle-ci**, et il vaut la peine de savoir
+pourquoi pour ne pas y revenir :
+
+- **0.11** supposait que la caméra prenait du retard sur la position et que la zone
+  publiée n'était donc pas la bonne (`reportAutoFollowViewport`). Juste en soi, gardé,
+  sans effet sur ce défaut.
+- **0.11.3** a remplacé `flatMapLatest` par `conflate` (une lecture commencée n'est
+  plus annulée) et espacé les republications du sondage. Deux améliorations réelles,
+  mais qui portaient sur la boucle de sondage alors que le déluge venait de
+  `onScroll`. Essayé sur le terrain : aucun changement.
+- **0.11.4** a mis en cache les points des traces sous `fullLoadLimit`
+  (`fullPointsCache`), qui étaient relues intégralement à chaque republication. Gain
+  réel de performance, mais ne pouvait pas débloquer un rechargement qui n'était
+  jamais déclenché.
+
+Ces trois versions restent utiles, aucune n'est à défaire. La leçon est ailleurs :
+le défaut n'était pas dans le circuit de chargement, mais dans le filtre placé à son
+entrée. Ce qui suit décrit les deux premières tentatives, conservées pour mémoire.
+
+### Ce que les 0.11.3 et 0.11.4 avaient corrigé au passage
 
 Symptôme : en voiture, mode focus actif, les tracés affichés en superposition cessent
 de se charger au fil du déplacement, jusqu'à ce qu'un glissement ou un zoom manuel

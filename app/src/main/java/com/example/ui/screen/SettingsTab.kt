@@ -1199,9 +1199,10 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.4",
+        version = "0.11.5",
         changes = listOf(
-            "Suite du correctif précédent : les parcours affichés en superposition étaient relus entièrement en base à chaque déplacement de la carte, alors que leur contenu ne dépend pas du cadrage. Ils sont désormais gardés en mémoire, ce qui supprime l'attente avant qu'ils réapparaissent"
+            "Correction, la vraie cette fois : en mode focus, les tracés restaient figés sur leur silhouette — de longues lignes droites — et ne se rafraîchissaient qu'en touchant la carte. Le rechargement attendait une pause dans les mouvements de la carte, pause que l'animation du suivi ne laissait jamais venir",
+            "La position de la carte n'est plus mémorisée soixante fois par seconde pendant que le suivi anime l'affichage"
         )
     )
 )

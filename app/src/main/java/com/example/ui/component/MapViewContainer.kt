@@ -173,6 +173,9 @@ private const val AUTO_FOLLOW_VIEWPORT_POLL_MS = 1000L
  */
 private const val AUTO_FOLLOW_RELOAD_FRACTION = VIEWPORT_MARGIN / 2.0
 
+/** Intervalle minimal entre deux mémorisations de la position de carte. */
+private const val MAP_STATE_PERSIST_MS = 1000L
+
 /** Publie la zone visible actuelle (élargie de [VIEWPORT_MARGIN]) vers le ViewModel. */
 private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Unit) {
     val box = map.boundingBox ?: return
@@ -975,9 +978,29 @@ fun rememberMapViewWithLifecycle(
         map.addMapListener(object : org.osmdroid.events.MapListener {
             private var lastZoomedOut = defaultZoom < ZOOM_THRESHOLD
 
-            override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+            /**
+             * Dernière mémorisation de la position de carte, sur horloge monotone.
+             *
+             * osmdroid notifie ces deux rappels à chaque image de ses animations —
+             * `MapController.onAnimationUpdate` déplace la carte une soixantaine de
+             * fois par seconde. Y enregistrer la position à chaque fois revenait à
+             * demander quatre écritures de préférences par image, soit plus de deux
+             * cents accès disque par seconde tant que le suivi automatique animait la
+             * carte. Une fois par seconde suffit largement : cette valeur ne sert qu'à
+             * retrouver le même cadrage au prochain lancement.
+             */
+            private var lastPersistedAt = 0L
+
+            private fun persistMapStateThrottled() {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastPersistedAt < MAP_STATE_PERSIST_MS) return
+                lastPersistedAt = now
                 val centerPt = map.mapCenter
                 onMapStateChanged(centerPt.latitude, centerPt.longitude, map.zoomLevelDouble)
+            }
+
+            override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+                persistMapStateThrottled()
                 reportViewport(map, onViewportChanged)
                 return false
             }
@@ -986,8 +1009,7 @@ fun rememberMapViewWithLifecycle(
                 val zoomedOut = zoom < ZOOM_THRESHOLD
                 val mapState = map.tag as? MapState ?: return false
 
-                val centerPt = map.mapCenter
-                onMapStateChanged(centerPt.latitude, centerPt.longitude, zoom)
+                persistMapStateThrottled()
                 reportViewport(map, onViewportChanged)
 
                 if (zoomedOut != lastZoomedOut) {
