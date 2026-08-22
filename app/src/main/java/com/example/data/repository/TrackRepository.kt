@@ -174,9 +174,28 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     private val pointMetaCache = java.util.concurrent.ConcurrentHashMap<Long, TrackPointMeta>()
     private val skeletonCache = java.util.concurrent.ConcurrentHashMap<Long, List<TrackPoint>>()
 
+    /**
+     * Points complets des traces sous [fullLoadLimit], gardés d'un appel à l'autre.
+     *
+     * Ces traces-là sont renvoyées en entier quelle que soit la zone visible : le
+     * résultat ne dépend pas du tout du cadrage, et le relire était donc du travail
+     * intégralement perdu. En suivi automatique, où la zone se republie au fil du
+     * déplacement, cela revenait à redemander à SQLite jusqu'à soixante mille lignes
+     * par trace affichée et à en reconstruire autant d'objets — de quoi occuper
+     * plusieurs secondes avant que le moindre point nouveau n'apparaisse.
+     *
+     * Le cache ne coûte pas de mémoire supplémentaire, au contraire : ces listes
+     * étaient déjà retenues par le flux d'affichage, et l'on en fabriquait une copie
+     * neuve à chaque tour pendant que la précédente vivait encore. Renvoyer la même
+     * instance rend en prime la comparaison de la carte immédiate, là où elle
+     * repassait sur chaque point pour conclure que rien n'avait changé.
+     */
+    private val fullPointsCache = java.util.concurrent.ConcurrentHashMap<Long, List<TrackPoint>>()
+
     fun invalidatePointCaches(trackId: Long) {
         pointMetaCache.remove(trackId)
         skeletonCache.remove(trackId)
+        fullPointsCache.remove(trackId)
     }
 
     /**
@@ -203,7 +222,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         if (meta.pointCount == 0 || minId == null) return emptyList()
 
         if (meta.pointCount <= fullLoadLimit) {
-            return trackDao.getPointsForTrack(trackId)
+            // Indépendant de [viewport] : d'où la mise en cache, voir [fullPointsCache].
+            return (if (isLive) null else fullPointsCache[trackId])
+                ?: trackDao.getPointsForTrack(trackId)
+                    .also { if (!isLive) fullPointsCache[trackId] = it }
         }
 
         val globalStride = ceilDiv(meta.pointCount.toLong(), skeletonBudget.toLong())

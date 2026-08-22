@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.3` (`versionCode` 21). Elle n'est écrite qu'une fois,
+- Version courante : `0.11.4` (`versionCode` 22). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -490,6 +490,25 @@ Les deux vraies causes, trouvées en 0.11.3 :
 
 Ces deux points étaient l'un des « leviers » laissés en arbitrage plus bas ; ils n'y
 figurent donc plus.
+
+**Troisième cause, trouvée en 0.11.4 après un essai sur le terrain** qui rapportait
+« du mieux, mais ça bugue encore ». La branche `pointCount <= fullLoadLimit` de
+`getDisplayPoints` était la seule à ne rien mettre en cache : une trace de moins de
+60 000 points était relue intégralement en base à chaque republication de la zone,
+alors que son résultat ne dépend pas du cadrage. En suivi automatique, cela revenait
+à redemander des dizaines de milliers de lignes par trace affichée, et à reconstruire
+autant d'objets, pour un résultat identique au précédent. `fullPointsCache` corrige
+cela ; renvoyer la même instance rend en prime immédiate la comparaison de
+`MapViewContainer`, qui repassait sur chaque point pour conclure que rien n'avait
+changé. Toute écriture sur les points d'une trace passe déjà par
+`invalidatePointCaches`, le cache ne peut donc pas rester périmé.
+
+Ce qui reste possible si le défaut persiste : les traces **au-dessus** de
+`fullLoadLimit` refont à chaque republication un `countPointsInBounds` puis un
+`getDetailPointsInBounds`, ces deux-là dépendant réellement de la zone ; et
+`MapViewContainer` invalide ses polylignes en bloc, si bien qu'une seule trace dense
+qui bouge fait reconstruire celles de toutes les autres sur le thread principal. Un
+cache de polylignes par trace serait la marche suivante.
 
 ### En attente d'arbitrage
 
