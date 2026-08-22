@@ -9,7 +9,32 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 
-@Database(entities = [Track::class, TrackPoint::class], version = 7, exportSchema = false)
+/**
+ * Version du schéma de la base.
+ *
+ * Déclarée à part plutôt qu'écrite en dur dans l'annotation : `MigrationChainTest` la
+ * compare à la chaîne de migrations, et une annotation ne se relit pas toujours à
+ * l'exécution. L'incrémenter sans ajouter la migration correspondante fait échouer ce
+ * test — c'est précisément ce qu'on lui demande.
+ */
+internal const val DATABASE_VERSION = 7
+
+/**
+ * `exportSchema = true` : Room écrit le schéma de chaque version dans
+ * `app/schemas/`, ces fichiers étant versionnés avec le code.
+ *
+ * Ce n'est pas de la documentation. C'est ce qui permet à `AppDatabaseMigrationTest`
+ * d'ouvrir une base d'ancienne version, d'y appliquer les migrations déclarées et de
+ * vérifier que le résultat correspond au schéma attendu. Sans ces fichiers, aucun
+ * test ne peut le faire, et l'invariant nº 2 de CLAUDE.md — « toute nouvelle version
+ * de schéma vient avec sa migration » — ne repose que sur la vigilance humaine, alors
+ * que l'oublier efface tous les parcours des utilisateurs sans un mot.
+ */
+@Database(
+    entities = [Track::class, TrackPoint::class],
+    version = DATABASE_VERSION,
+    exportSchema = true
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract val trackDao: TrackDao
 
@@ -65,6 +90,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Toutes les migrations déclarées, dans l'ordre.
+         *
+         * Exposée pour que le test de migration applique exactement la même liste que
+         * l'application : la recopier dans le test laisserait passer une migration
+         * ajoutée ici et oubliée là.
+         */
+        @androidx.annotation.VisibleForTesting
+        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 // Re-vérification sous le verrou : sans elle, deux appels simultanés
@@ -77,8 +112,15 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "my_tracks_db"
                 )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(*MIGRATIONS)
+                    // Uniquement à la descente de version : une base plus récente que
+                    // le code ne peut arriver qu'en réinstallant une version antérieure,
+                    // et Room ne saurait pas la relire. La variante générale, elle,
+                    // effaçait aussi les parcours à la moindre migration oubliée en
+                    // montée de version — le cas exact contre lequel il faut se
+                    // protéger. Mieux vaut alors un plantage franc, qui se voit et se
+                    // corrige, qu'un historique effacé en silence.
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                     .also { INSTANCE = it }
             }

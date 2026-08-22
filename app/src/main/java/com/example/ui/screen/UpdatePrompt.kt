@@ -1,6 +1,5 @@
 package com.example.ui.screen
 
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -64,12 +63,17 @@ private sealed interface UpdateState {
  * @param reopenTrigger Incrémenté par l'appelant (le bouton des réglages) pour
  * rouvrir le bandeau sur la mise à jour déjà détectée, sans relancer une recherche
  * réseau ni redémarrer l'application.
+ * @param isVisible Suspend l'affichage sans sortir de la composition, le temps qu'un
+ * autre écran occupe la place. Sortir vraiment de la composition effacerait la mise à
+ * jour déjà trouvée, et le prochain retour relancerait une requête réseau tout en
+ * rouvrant un bandeau que l'utilisateur avait écarté.
  * @param onUpdateAvailable Prévient l'appelant dès qu'une mise à jour est détectée,
  * pour qu'il puisse afficher un badge persistant même une fois le bandeau ignoré.
  */
 @Composable
 fun UpdatePrompt(
     reopenTrigger: Int = 0,
+    isVisible: Boolean = true,
     onUpdateAvailable: (AvailableUpdate) -> Unit = {}
 ) {
     if (!UpdateConfig.isConfigured) return
@@ -118,6 +122,9 @@ fun UpdatePrompt(
             }
         }
     }
+
+    // L'état reste vivant, seul l'affichage est suspendu.
+    if (!isVisible) return
 
     when (val current = state) {
         UpdateState.Idle -> Unit
@@ -292,11 +299,4 @@ private fun UpdateDialog(
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.testTag(testTag)
     )
-}
-
-/** Pour les écrans qui veulent proposer une recherche manuelle. */
-suspend fun findUpdate(context: Context): AvailableUpdate? {
-    if (!UpdateConfig.isConfigured) return null
-    val update = UpdateChecker.fetchLatest() ?: return null
-    return if (update.isNewerThan(BuildConfig.VERSION_CODE)) update else null
 }

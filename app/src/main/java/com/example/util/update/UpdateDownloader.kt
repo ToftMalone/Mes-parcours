@@ -13,7 +13,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
+
+/** Empreinte en hexadécimal minuscule, la forme qu'emploie `sha256sum`. */
+private fun ByteArray.toHexString(): String =
+    joinToString("") { "%02x".format(it) }
 
 /**
  * Téléchargement de l'APK d'une nouvelle version, puis passage de relais à
@@ -69,6 +74,10 @@ object UpdateDownloader {
             val total = connection.contentLength.toLong()
             var downloaded = 0L
 
+            // Empreinte calculée pendant l'écriture : relire le fichier ensuite
+            // doublerait les entrées-sorties pour rien.
+            val digest = MessageDigest.getInstance("SHA-256")
+
             partial.delete()
             connection.inputStream.use { input ->
                 partial.outputStream().use { output ->
@@ -81,6 +90,7 @@ object UpdateDownloader {
                         val read = input.read(buffer)
                         if (read < 0) break
                         output.write(buffer, 0, read)
+                        digest.update(buffer, 0, read)
                         downloaded += read
                         if (total > 0) onProgress((downloaded.toFloat() / total).coerceIn(0f, 1f))
                     }
@@ -89,7 +99,20 @@ object UpdateDownloader {
             }
 
             // Taille annoncée non respectée : le fichier est incomplet.
+            //
+            // Ce contrôle ne suffit pas à lui seul : `contentLength` vaut -1 quand le
+            // serveur répond en découpage par blocs, et l'on ne saurait alors pas
+            // qu'un téléchargement s'est arrêté en route. C'est l'empreinte qui
+            // tranche vraiment, quand la publication en annonce une.
             if (total > 0 && partial.length() != total) {
+                partial.delete()
+                return@withContext null
+            }
+
+            val expected = update.sha256
+            if (expected != null && expected != digest.digest().toHexString()) {
+                // Fichier corrompu, tronqué, ou servi par autre chose que la
+                // publication attendue : on ne le présente pas à l'installateur.
                 partial.delete()
                 return@withContext null
             }

@@ -142,28 +142,41 @@ interface TrackDao {
     @Query("SELECT * FROM track_points WHERE trackId = :trackId AND id > :afterId ORDER BY id ASC LIMIT :limit")
     suspend fun getPointsPage(trackId: Long, afterId: Long, limit: Int): List<TrackPoint>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // ------------------------------------------------------------------
+    // Insertions : ABORT, et surtout pas REPLACE.
+    //
+    // Toutes les insertions passent un id à 0, donc laissent SQLite l'attribuer : un
+    // conflit de clé primaire ne peut pas se produire aujourd'hui. Mais REPLACE
+    // signifie DELETE puis INSERT, et track_points est lié à tracks par une clé
+    // étrangère ON DELETE CASCADE : le jour où un Track serait réinséré avec un id
+    // existant, la suppression implicite emporterait tous ses points. Un parcours de
+    // plusieurs millions de points disparaîtrait sans le moindre message.
+    //
+    // ABORT fait échouer l'insertion à la place. Le piège ne peut plus se refermer.
+    // ------------------------------------------------------------------
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTrack(track: Track): Long
 
     @Update
     suspend fun updateTrack(track: Track)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTrackPoint(point: TrackPoint): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTrackPoints(points: List<TrackPoint>)
 
     // Variantes bloquantes, utilisées par l'import en flux : le parsing SAX est
     // synchrone et ne peut pas appeler de fonction suspend. À n'appeler que
     // depuis un thread d'arrière-plan.
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     fun insertTrackBlocking(track: Track): Long
 
     @Update
     fun updateTrackBlocking(track: Track)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     fun insertTrackPointsBlocking(points: List<TrackPoint>)
 
     @Query("DELETE FROM tracks WHERE id = :trackId")

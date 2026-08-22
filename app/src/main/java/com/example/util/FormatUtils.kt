@@ -2,7 +2,6 @@ package com.example.util
 
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.math.roundToInt
 
 object FormatUtils {
 
@@ -45,16 +44,6 @@ object FormatUtils {
         } else {
             String.format(Locale.getDefault(), "%02d:%02d", m, s)
         }
-    }
-
-    fun formatPace(paceMinPerKm: Double): String {
-        if (paceMinPerKm <= 0.0 || paceMinPerKm.isInfinite() || paceMinPerKm.isNaN()) {
-            return "--'--"
-        }
-        val displayedPace = if (isMetric) paceMinPerKm else paceMinPerKm * 1.609344
-        val mins = displayedPace.toInt()
-        val secs = ((displayedPace - mins) * 60).roundToInt()
-        return String.format(Locale.getDefault(), "%d'%02d\"", mins, secs)
     }
 
     /**

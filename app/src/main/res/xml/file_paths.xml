@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <!--
-       Uniquement le sous-dossier dédié aux fichiers à partager, et non tout le
-       cache : celui-ci contient aussi le cache de tuiles et d'autres données
-       internes qui n'ont pas à être exposées via le ContentProvider.
+       Le sous-dossier « exports/ » a disparu avec la fonction de partage, retirée de
+       l'interface sans que son code ni ce chemin ne le soient. Ne rien exposer qui ne
+       serve : chaque chemin déclaré ici est lisible par l'application à qui l'on passe
+       une URI, et un chemin sans usage est une surface offerte pour rien.
+
+       Si le partage revient un jour, c'est ici qu'il faudra rouvrir un sous-dossier
+       dédié — jamais tout le cache, qui contient aussi les tuiles de carte.
     -->
-    <cache-path name="shared_files" path="exports/" />
 
     <!--
        APK des mises à jour téléchargées. Nécessaire pour les présenter à

@@ -13,7 +13,6 @@ import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import android.preference.PreferenceManager
 import com.example.BuildConfig
 import com.example.MainActivity
 import com.example.data.model.LiveStats
@@ -36,9 +35,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 class TrackingService : Service() {
 
@@ -81,7 +78,36 @@ class TrackingService : Service() {
     @Volatile
     private var trackId: Long = -1
     private var startTimeMs: Long = 0
-    private var elapsedSeconds: Long = 0
+
+    /**
+     * Durée déjà acquise avant le segment de chronométrage en cours : ce qu'ont compté
+     * les périodes précédentes, plus ce qu'apportait une trace reprise.
+     */
+    @Volatile
+    private var elapsedBaseSeconds: Long = 0
+
+    /** Repère monotone du début du segment en cours, ou 0 si le chronomètre est arrêté. */
+    @Volatile
+    private var segmentStartedAtRealtime: Long = 0
+
+    /**
+     * Durée totale de l'enregistrement, en secondes.
+     *
+     * Déduite d'une horloge monotone plutôt qu'incrémentée par une boucle
+     * `delay(1000)` : `delay` ne promet pas la ponctualité, et le retard de chaque
+     * tour s'ajoutait au précédent. Sur une sortie de plusieurs heures, la durée
+     * affichée finissait sensiblement en dessous du temps réellement écoulé.
+     *
+     * `elapsedRealtime` et non `currentTimeMillis` : l'heure système peut sauter — mise
+     * à l'heure réseau, changement manuel — et la durée ferait alors un bond.
+     */
+    private val elapsedSeconds: Long
+        get() = if (segmentStartedAtRealtime == 0L) {
+            elapsedBaseSeconds
+        } else {
+            elapsedBaseSeconds +
+                    (android.os.SystemClock.elapsedRealtime() - segmentStartedAtRealtime) / 1000L
+        }
 
     /**
      * Dernière position retenue du tronçon en cours, ou null si le tronçon vient de
@@ -140,7 +166,18 @@ class TrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        // Redémarrage par le système après une éviction mémoire : START_STICKY relance
+        // le service avec une intention nulle. Sans ce cas, aucune branche ne
+        // s'appliquait — ni notification de premier plan, ni GPS, ni minuteur. Le
+        // service repartait vide et l'enregistrement s'arrêtait en silence, sans que
+        // rien ne le signale à l'utilisateur, qui croyait sa sortie toujours en cours.
+        if (intent?.action == null) {
+            startForegroundServiceNotification()
+            resumeAfterSystemRestart()
+            return START_STICKY
+        }
+
+        when (intent.action) {
             ACTION_START -> {
                 val name = intent.getStringExtra(EXTRA_TRACK_NAME) ?: "Parcours sans titre"
                 val activityType = intent.getStringExtra(EXTRA_ACTIVITY_TYPE) ?: "Randonnée"
@@ -178,7 +215,10 @@ class TrackingService : Service() {
                 updated
             } else null
         } else {
-            repository.checkForAndRestoreActiveTrack()
+            // markPaused = false : le service reprend l'enregistrement à l'instant même.
+            // Le laisser à vrai faisait afficher « en pause » à l'écran pendant que les
+            // positions s'enregistraient — le service et le dépôt se contredisaient.
+            repository.checkForAndRestoreActiveTrack(markPaused = false)
         }
 
         if (activeTrack != null) {
@@ -190,7 +230,8 @@ class TrackingService : Service() {
             val points = resume.points
             val stats = resume.stats
 
-            elapsedSeconds = stats.durationSec
+            elapsedBaseSeconds = stats.durationSec
+            segmentStartedAtRealtime = 0L
             totalDistanceMeters = stats.distanceMeters
             maxSpeedMps = stats.maxSpeedMps
             // Les totaux de dénivelé reprennent où ils étaient, mais sans référence
@@ -206,7 +247,8 @@ class TrackingService : Service() {
         } else {
             trackId = repository.createNewTrack(name, activityType)
             startTimeMs = System.currentTimeMillis()
-            elapsedSeconds = 0
+            elapsedBaseSeconds = 0
+            segmentStartedAtRealtime = 0L
             totalDistanceMeters = 0.0
             maxSpeedMps = 0.0
             elevation.reset()
@@ -217,41 +259,62 @@ class TrackingService : Service() {
     }
 
     private fun startTracking(name: String, activityType: String, existingTrackId: Long = -1L) {
-        // Start Foreground Location Request after a very small delay to allow the System Server's
-        // ActivityManager and AppOps services to fully bind and propagate our foreground-location process priority.
-        serviceScope.launch {
-            kotlinx.coroutines.delay(200L)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                requestLocationUpdates()
-            }
-        }
+        isServiceStopping = false
+        isPaused = false
+        lastNotificationText = null
 
-        serviceScope.launch {
-            // Reset track stats
+        // Toute la préparation passe par pointScope, le thread unique qui traite aussi
+        // les points GPS. Elle se faisait auparavant sur serviceScope alors que les
+        // positions arrivaient déjà — le GPS était armé après 200 ms, la reprise d'une
+        // trace pouvant en prendre bien plus. Deux threads écrivaient donc les mêmes
+        // champs : une distance tout juste ajoutée se faisait écraser par la valeur
+        // restaurée, et le lisseur d'altitude — un ArrayDeque, qui n'est pas prévu pour
+        // ça — subissait un reset() d'un côté pendant un add() de l'autre.
+        pointScope.launch {
             totalSpeedPoints = 0
             speedSumMps = 0.0
-            isServiceStopping = false
-            isPaused = false
-            lastNotificationText = null
 
             attachToOrRestoreActiveTrack(name, activityType, existingTrackId)
 
-            startTimer()
+            // Le GPS n'est armé qu'une fois la préparation finie : aucun point ne peut
+            // donc être traité avant que les accumulateurs soient dans leur état de
+            // départ. Le court délai laisse au système le temps de propager la priorité
+            // de premier plan du processus avant la demande de positions.
+            delay(200L)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                requestLocationUpdates()
+            }
 
-            // Update Foreground Notification with initial track content
+            startTimer()
             updateStatsNotification()
         }
     }
 
     private fun startTimer() {
         timerJob?.cancel()
+        if (segmentStartedAtRealtime == 0L) {
+            segmentStartedAtRealtime = android.os.SystemClock.elapsedRealtime()
+        }
         timerJob = serviceScope.launch {
             while (true) {
                 delay(1000L)
-                elapsedSeconds++
+                // Le minuteur publie lui-même la durée. La laisser à la charge des
+                // points GPS figeait le chronomètre affiché dès la perte du signal,
+                // alors que le temps, lui, continuait de passer.
+                val stats = repository.liveStats.value
+                val seconds = elapsedSeconds
+                if (stats.durationSec != seconds) {
+                    repository.updateLiveStats(stats.copy(durationSec = seconds))
+                }
                 updateStatsNotification()
             }
         }
+    }
+
+    /** Fige la durée acquise : le chronomètre repartira de cette valeur. */
+    private fun freezeElapsed() {
+        elapsedBaseSeconds = elapsedSeconds
+        segmentStartedAtRealtime = 0L
     }
 
     private fun pauseTracking() {
@@ -260,7 +323,26 @@ class TrackingService : Service() {
         lastLocation = null
         repository.setRecordingPaused(true)
         timerJob?.cancel()
+        freezeElapsed()
         updateStatsNotification()
+    }
+
+    /**
+     * Reprise après un redémarrage décidé par le système, sans intention d'origine.
+     *
+     * On ne reprend que s'il reste vraiment un enregistrement ouvert en base. Appeler
+     * [resumeTracking] à l'aveugle créerait sinon un parcours vide : faute de trace
+     * active à retrouver, [attachToOrRestoreActiveTrack] en ouvre une nouvelle.
+     */
+    private fun resumeAfterSystemRestart() {
+        serviceScope.launch {
+            if (repository.getActiveRecordingTrack() == null) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+            resumeTracking()
+        }
     }
 
     private fun resumeTracking() {
@@ -268,7 +350,9 @@ class TrackingService : Service() {
         repository.setRecordingPaused(false)
         // Nouveau tronçon, sans raccordement avec ce qui précède.
         lastLocation = null
-        serviceScope.launch {
+        // Sur pointScope, pour la même raison qu'au démarrage : la restauration touche
+        // aux accumulateurs que le traitement des points fait vivre.
+        pointScope.launch {
             if (trackId <= 0) {
                 attachToOrRestoreActiveTrack("Parcours sans titre", "Randonnée")
             }
@@ -522,16 +606,6 @@ class TrackingService : Service() {
 
             // Calculate live statistics
             val avgSpeed = if (totalSpeedPoints > 0) speedSumMps / totalSpeedPoints else 0.0
-            
-            // Pace (min/km)
-            val paceMinPerKm = if (avgSpeed > 0.1) {
-                // speed is m/s
-                // 1 km takes 1000 / avgSpeed seconds
-                // / 60 = minutes
-                (1000.0 / avgSpeed) / 60.0
-            } else {
-                0.0
-            }
 
             val stats = LiveStats(
                 durationSec = elapsedSeconds,
@@ -540,8 +614,7 @@ class TrackingService : Service() {
                 avgSpeedMps = avgSpeed,
                 maxSpeedMps = maxSpeedMps,
                 elevationGain = elevation.gainMeters,
-                elevationLoss = elevation.lossMeters,
-                paceMinPerKm = paceMinPerKm
+                elevationLoss = elevation.lossMeters
             )
 
             repository.updateLiveStats(stats)
@@ -580,11 +653,26 @@ class TrackingService : Service() {
         timerJob?.cancel()
         isServiceStopping = true
         removeLocationUpdatesSafely()
+        freezeElapsed()
 
         serviceScope.launch {
-            if (trackId != -1L) {
-                val stats = repository.liveStats.value
-                val finishedTrackId = trackId
+            // trackId vaut -1 quand ce service vient tout juste d'être créé pour
+            // recevoir cet arrêt : le précédent avait été tué avec le processus, et
+            // l'interface lui adresse malgré tout ACTION_STOP. Sans ce rattrapage, la
+            // trace restait marquée « en cours » en base pour toujours et revenait à
+            // chaque lancement comme un enregistrement fantôme, impossible à refermer.
+            val finishedTrackId = if (trackId != -1L) {
+                trackId
+            } else {
+                repository.getActiveRecordingTrack()?.id ?: -1L
+            }
+
+            if (finishedTrackId != -1L) {
+                val live = repository.liveStats.value
+                // Le chronomètre de ce service ne vaut que s'il a lui-même mené
+                // l'enregistrement. Sinon, les statistiques restaurées depuis la base
+                // au lancement de l'application sont les seules qui aient un sens.
+                val stats = if (trackId != -1L) live.copy(durationSec = elapsedSeconds) else live
                 repository.finishTracking(finishedTrackId, stats)
                 com.example.util.AutoBackupManager.performAutoBackup(applicationContext, finishedTrackId)
             }

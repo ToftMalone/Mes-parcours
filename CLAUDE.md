@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.1` (`versionCode` 19). Elle n'est écrite qu'une fois,
+- Version courante : `0.11.2` (`versionCode` 20). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -206,13 +206,25 @@ pourquoi. À relire avant d'y toucher.
    instances = deux jeux de `StateFlow` et de suivis d'invalidation Room : le
    service alimente l'une pendant que l'écran observe l'autre, et l'interface cesse
    silencieusement de se mettre à jour.
-2. **Toutes les migrations Room sont obligatoires.** La base est construite avec
-   `fallbackToDestructiveMigration()` : retirer l'une des migrations déclarées —
-   `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6` (`Track.sourceColor`),
-   `MIGRATION_6_7` (`TrackPoint.segmentColor`) — effacerait tous les parcours des
-   utilisateurs existants. Toute nouvelle version de schéma doit venir avec la sienne.
-   **Vital** depuis le passage aux mises à jour sur place : plus rien ne rattrape un
-   oubli, voir « Identité de l'application ».
+2. **Toutes les migrations Room sont obligatoires.** Retirer l'une des migrations
+   déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
+   (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`) — rendrait la
+   base illisible pour tout utilisateur venant d'une version antérieure. Toute
+   nouvelle version de schéma doit venir avec la sienne.
+   Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
+   la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec
+   `fallbackToDestructiveMigrationOnDowngrade()` — une migration oubliée fait
+   désormais échouer l'ouverture au lieu d'effacer l'historique sans un mot ; et
+   `MigrationChainTest` vérifie que les migrations déclarées forment bien une chaîne
+   continue de la plus ancienne version rattrapable jusqu'à `DATABASE_VERSION`.
+   La version du schéma est une constante à part (`DATABASE_VERSION`) et non un
+   nombre écrit dans l'annotation : c'est ce qui la rend lisible par le test.
+   `exportSchema = true` fait écrire par Room le schéma de chaque version dans
+   `app/schemas/` (chemin fixé par `room.schemaLocation` dans `app/build.gradle.kts`,
+   sans quoi la compilation échoue). Ces fichiers **sont à verser au dépôt** : ils
+   apparaissent après la première compilation et sont ce dont aurait besoin un futur
+   test de migration réel, qui ouvre une base d'ancienne version et y applique les
+   migrations.
    Sur `track_points`, préférer une colonne **nullable et sans valeur par défaut** :
    SQLite se contente alors de modifier le schéma, là où une valeur par défaut
    réécrirait toutes les lignes — plusieurs millions sur une trace importée.
@@ -232,6 +244,11 @@ pourquoi. À relire avant d'y toucher.
    `KmlWriter` ne gardent jamais plus d'un lot en mémoire — une trace de plusieurs
    millions de points doit passer. Le KML est parsé en SAX, pas en `XmlPullParser`
    (qui reconstruirait tout le bloc `<coordinates>` en mémoire).
+   **L'analyseur SAX est durci** (`newSaxParser`) : un fichier importé vient de
+   l'extérieur et ne doit pas pouvoir déclarer d'entités XML. Sans cela, quelques
+   kilo-octets d'entités imbriquées suffisent à saturer la mémoire. Les drapeaux sont
+   posés au mieux — une implémentation qui n'en connaîtrait pas un ne doit pas
+   empêcher tout import.
 5. **La fusion se fait dans SQLite** (`INSERT … SELECT`), aucun point ne transite
    par la mémoire. Le `ORDER BY id` de `copyPointsInto` est indispensable : sans
    lui, le planificateur peut recopier dans l'ordre des latitudes.
@@ -374,12 +391,16 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 72 tests unitaires : `SolarTimesTest` (9), `KmlColorTest` (8), `UpdateManifestTest`
-  (7), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7),
+- 103 tests unitaires : `Iso8601Test` (16), `UpdateManifestTest` (11),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `TrackSegmentsTest` (7),
+  `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `TunnelDetectorTest` (6), `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest`
-  (6), `MergeTracksTest` (4), `RemoveStationaryPointsTest` (2), plus trois tests
-  d'échafaudage hérités (`ExampleUnitTest`, `ExampleRobolectricTest`,
-  `GreetingScreenshotTest` avec Roborazzi).
+  (6), `MergeTracksTest` (5), `MigrationChainTest` (3), `RemoveStationaryPointsTest`
+  (2), plus trois tests d'échafaudage hérités (`ExampleUnitTest`,
+  `ExampleRobolectricTest`, `GreetingScreenshotTest` avec Roborazzi).
+  Ce décompte s'était mis à mentir : il annonçait 72 tests pour 11 suites alors que le
+  dépôt en portait 80 pour 15, `KmlExportTest` n'y ayant jamais été ajouté. À tenir à
+  jour en même temps que les tests eux-mêmes.
 - Sous git depuis le premier commit de l'état `0.9.8-thierry`, branche `main`.
 
 ## Où en est le projet
@@ -399,6 +420,29 @@ inverser, et l'assombrir la rendrait illisible.
 ### En attente d'une action de l'auteur
 
 - Rien ne bloque plus la chaîne de publication.
+
+### Audit du 0.11.2
+
+Une relecture complète du code a produit une liste de trente-deux points, dont
+vingt-deux ont été traités dans cette version (voir le journal des nouveautés et
+« Poids mort »). Les dix restants ont été écartés par l'auteur, sciemment :
+
+- **La vue satellite passe par les serveurs de tuiles de Google** (`mt0-3.google.com`,
+  `MapViewContainer`). La préférence porte encore le nom `usgs_sat`, hérité d'une
+  imagerie publique qui n'est plus celle utilisée. Deux conséquences : c'est un usage
+  hors conditions d'utilisation, coupable d'être coupé sans préavis, et la zone
+  consultée part chez Google — ce que la promesse « rien ne quitte l'appareil » ne
+  laisse pas attendre.
+- Le cache de tuiles osmdroid est dans `externalCacheDir` : lisible par une autre
+  application sur Android 9 et antérieur.
+- Le filtre anti-dérive `dist > 1.0` écarte les intervalles de moins d'un mètre : à
+  1 Hz, la marche lente (moins de 3,6 km/h) est structurellement sous-comptée.
+- `FLAG_KEEP_SCREEN_ON` est posé sans condition dans `MainActivity` : l'écran ne
+  s'éteint jamais tant que l'application est ouverte, même hors enregistrement.
+- L'export vers Téléchargements est inopérant sur Android 9 et antérieur :
+  `MediaStoreExporter` emprunte alors le stockage public sans que
+  `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
+- Le tracé en diagonale (voir ci-dessous) reste non corrigé, à la demande de l'auteur.
 
 ### À vérifier sur le terrain, rien n'a été modifié
 
@@ -466,6 +510,22 @@ inadvertance :
   `TrackRepository.insertPoints`, `getPointsForTrackFlow`,
   `getSelectedImportedPointsFlow` et leurs requêtes DAO,
   `AutoBackupPreferences.isDestLocal` / `setDestLocal`.
+- Deuxième passe, `0.11.2`, après un audit de tout le code source :
+  - **Le partage d'un parcours en entier.** `shareGPX` / `shareKML` n'avaient plus
+    aucun appelant — le bouton avait disparu de l'interface, pas le code : avec eux
+    sont partis `shareTrack`, `shareCachedFile`, `safeFileName`, le dossier
+    `cacheDir/exports` et son entrée `<cache-path>` dans `file_paths.xml`. Ce dernier
+    point n'est pas cosmétique : tout chemin déclaré là est exposable via le
+    `FileProvider`, et un chemin sans usage est une surface offerte pour rien.
+  - Trois composables jamais appelés de `TrackingTab` : `SportRadarBackground`,
+    `StatColumn`, `GpsStatusSquare` (environ 270 lignes).
+  - `UpdatePrompt.findUpdate`, écrite pour une recherche manuelle qui n'a jamais existé.
+  - **L'allure** : `LiveStats.paceMinPerKm` était calculée en trois endroits et
+    `FormatUtils.formatPace` n'était appelée nulle part. Aucun écran ne l'affichait.
+  - `TrackRepository.getPointsForTrack` et `setLivePoints`, sans appelant.
+  - 55 imports inutilisés, surtout dans `TrackingTab` et `HistoryTab`.
+  - `OsmConfig.init` était appelé deux fois, dans `TrackApplication` puis dans
+    `MainActivity` ; le second appel ne faisait rien (garde `isInitialized`).
 - Asset jamais chargé : `france_boundary.geojson`.
 - La simulation GPS de `MainScreen` n'était pas gardée par `BuildConfig.DEBUG`,
   contrairement à celle de `TrackingService` : sur un appareil réel dont la détection
@@ -516,6 +576,14 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
   l'utilisateur.
 - `util/update/UpdateDownloader` télécharge dans un `.part` renommé à la fin, pour ne
   jamais présenter un APK tronqué à l'installateur, et vérifie la taille annoncée.
+- **`sha256` : l'empreinte de l'APK, vérifiée pendant l'écriture.** Le contrôle de
+  taille ne suffisait pas : `contentLength` vaut -1 quand le serveur répond en
+  découpage par blocs, et un téléchargement interrompu passait alors inaperçu. Le
+  champ est **facultatif** — les publications antérieures à son introduction n'en
+  portent pas et doivent rester installables — et une empreinte présente mais
+  malformée est ignorée plutôt que retenue, sinon la comparaison échouerait toujours
+  et la mise à jour deviendrait ininstallable. `release.yml` la calcule au moment de
+  la publication.
 - L'installation silencieuse est impossible pour une application ordinaire : le
   système affiche toujours son écran de confirmation.
 

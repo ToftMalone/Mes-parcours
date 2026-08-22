@@ -43,7 +43,17 @@ data class AvailableUpdate(
     val versionCode: Int,
     val versionName: String,
     val apkUrl: String,
-    val notes: List<String>
+    val notes: List<String>,
+    /**
+     * Empreinte SHA-256 de l'APK, en hexadécimal minuscule, ou null si la publication
+     * n'en annonce pas — les versions publiées avant l'ajout de ce champ.
+     *
+     * Quand elle est présente, le téléchargement n'est présenté à l'installateur que
+     * s'il correspond. Android refuserait de toute façon un APK signé par une autre
+     * clé, mais cette vérification-ci écarte plus tôt le cas bien plus banal du
+     * fichier tronqué ou corrompu en route.
+     */
+    val sha256: String? = null
 )
 
 /**
@@ -88,12 +98,22 @@ object UpdateManifest {
                 }
             }
 
-            AvailableUpdate(versionCode, versionName, apkUrl, notes)
+            // Empreinte facultative : les publications antérieures à son introduction
+            // n'en portent pas, et doivent rester installables. Une empreinte présente
+            // mais malformée est en revanche ignorée plutôt que retenue telle quelle —
+            // la comparer échouerait toujours, rendant la mise à jour ininstallable.
+            val sha256 = root.optString("sha256").lowercase().takeIf { it.isValidSha256() }
+
+            AvailableUpdate(versionCode, versionName, apkUrl, notes, sha256)
         } catch (e: Exception) {
             null
         }
     }
 }
+
+/** Une empreinte SHA-256 fait 64 caractères hexadécimaux, et rien d'autre. */
+private fun String.isValidSha256(): Boolean =
+    length == 64 && all { it in '0'..'9' || it in 'a'..'f' }
 
 /**
  * Une mise à jour n'est proposée que si elle porte un numéro de version strictement

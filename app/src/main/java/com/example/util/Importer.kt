@@ -16,9 +16,6 @@ import javax.xml.parsers.SAXParserFactory
 /** Nombre de points écrits en base par lot. Borne l'empreinte mémoire de l'import. */
 private const val BATCH_SIZE = 1000
 
-/** Taille moyenne en octets d'un triplet "lon,lat,alt " dans un bloc <coordinates> KML. */
-private const val KML_BYTES_PER_POINT = 25
-
 /** Longueur maximale retenue pour le nom lu dans le fichier. */
 private const val MAX_NAME_LENGTH = 512
 
@@ -70,9 +67,10 @@ object Importer {
         val sourceColor: Int? = null
     )
 
-    private data class FileMeta(
-        val name: String,
-        val size: Long
+    /** Ce que la première lecture d'un KML relève : les styles, et le nombre de points. */
+    private data class KmlPrescan(
+        val styles: KmlStyleTable,
+        val pointCount: Long
     )
 
     /**
@@ -87,9 +85,9 @@ object Importer {
         trackId: Long,
         onBatch: (List<TrackPoint>) -> Unit
     ): ImportSummary? {
-        val fileMeta = getFileMeta(context, uri)
-        val extension = fileMeta.name.substringAfterLast('.', "").lowercase()
-        val defaultName = fileMeta.name.substringBeforeLast('.')
+        val fileName = getFileName(context, uri)
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        val defaultName = fileName.substringBeforeLast('.')
         val isKml = extension == "kml" || isKMLContent(context, uri)
 
         val sink = PointSink(trackId, onBatch)
@@ -102,17 +100,19 @@ object Importer {
         // style est déclaré après lui resterait sans couleur, et ses points sont déjà
         // écrits en base quand on l'apprend : impossible de revenir dessus.
         //
-        // Cette passe ne retient que les styles, jamais les coordonnées : quelques
-        // dizaines d'entrées, quelle que soit la taille du fichier.
-        val styleTable = if (isKml) {
-            context.contentResolver.openInputStream(uri)?.use { scanKmlStyles(it) } ?: KmlStyleTable()
+        // Cette passe compte aussi les points, sans en garder aucun : c'est ce qui
+        // permet de dater le tracé exactement (voir parseKML). Son empreinte mémoire
+        // reste de quelques dizaines d'entrées, quelle que soit la taille du fichier.
+        val prescan = if (isKml) {
+            context.contentResolver.openInputStream(uri)?.use { prescanKml(it) }
+                ?: KmlPrescan(KmlStyleTable(), 0L)
         } else {
-            KmlStyleTable()
+            KmlPrescan(KmlStyleTable(), 0L)
         }
 
         val meta = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             if (isKml) {
-                parseKML(inputStream, defaultName, fileMeta.size, sink, styleTable)
+                parseKML(inputStream, defaultName, prescan, sink)
             } else {
                 parseGPX(inputStream, defaultName, sink)
             }
@@ -232,41 +232,79 @@ object Importer {
     private fun parseKML(
         inputStream: InputStream,
         defaultName: String,
-        fileSize: Long,
-        sink: PointSink,
-        styleTable: KmlStyleTable
+        prescan: KmlPrescan,
+        sink: PointSink
     ): TrackMeta {
         // Le KML ne porte pas d'horodatage : on garde la convention historique d'un
         // point par seconde, calée pour que la trace se termine à l'instant présent.
-        val estimatedPoints = (fileSize / KML_BYTES_PER_POINT).coerceAtLeast(1L)
-        val handler = KmlHandler(
-            sink,
-            defaultName,
-            System.currentTimeMillis() - estimatedPoints * 1000L,
-            styleTable
-        )
+        //
+        // Le nombre de points vient du comptage exact fait à la première lecture, et
+        // non plus d'une estimation tirée de la taille du fichier. Cette estimation se
+        // trompait lourdement dès que le fournisseur ne savait pas annoncer la taille
+        // — le cas de Google Drive et de plusieurs gestionnaires de fichiers, qui
+        // renvoient alors zéro. Le calcul retombait sur un seul point, et un fichier
+        // de 100 000 points se datait de « maintenant » à « maintenant + 27 heures » :
+        // le parcours importé se rangeait dans le futur, donc en tête de l'historique.
+        val startClock = System.currentTimeMillis() - prescan.pointCount * 1000L
+        val handler = KmlHandler(sink, defaultName, startClock, prescan.styles)
 
         newSaxParser().parse(inputStream, handler)
 
         return TrackMeta(handler.trackName, "Randonnée", handler.firstLineColor)
     }
 
-    /** Première lecture : on ne relève que les styles, jamais les coordonnées. */
-    private fun scanKmlStyles(inputStream: InputStream): KmlStyleTable {
+    /**
+     * Première lecture : relève les styles et compte les points, sans en garder aucun.
+     *
+     * Le comptage traverse bien les blocs `<coordinates>`, mais ne retient qu'un
+     * entier : l'empreinte mémoire ne dépend pas de la taille du fichier.
+     */
+    private fun prescanKml(inputStream: InputStream): KmlPrescan {
         val handler = KmlStyleHandler()
         newSaxParser().parse(inputStream, handler)
-        return handler.table
+        return KmlPrescan(handler.table, handler.pointCount)
     }
 
+    /**
+     * Analyseur SAX durci : un fichier importé vient de l'extérieur, il ne doit pas
+     * pouvoir déclarer d'entités XML.
+     *
+     * Sans ces réglages, un `<!DOCTYPE>` contenant des entités imbriquées — l'attaque
+     * dite « billion laughs » — fait gonfler la mémoire jusqu'au plantage depuis un
+     * fichier de quelques kilo-octets ; et une entité externe pourrait faire lire un
+     * fichier local ou émettre une requête réseau à l'insu de l'utilisateur.
+     *
+     * Le GPX, lui, passe par [Xml.newPullParser] : kXML2 ignore par défaut la
+     * déclaration de type de document, il n'y a donc rien à désactiver de ce côté.
+     */
     private fun newSaxParser() = SAXParserFactory.newInstance()
-        .apply { isNamespaceAware = false }
+        .apply {
+            isNamespaceAware = false
+            trySetFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            trySetFeature("http://xml.org/sax/features/external-general-entities", false)
+            trySetFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        }
         .newSAXParser()
+
+    /**
+     * Pose un drapeau de sécurité s'il est reconnu.
+     *
+     * Toutes les implémentations ne connaissent pas tous les drapeaux, et refuser
+     * d'importer parce que l'une manque serait pire que de s'en passer : le premier
+     * de la liste suffit à lui seul à écarter le cas dangereux.
+     */
+    private fun SAXParserFactory.trySetFeature(name: String, value: Boolean) {
+        try {
+            setFeature(name, value)
+        } catch (e: Exception) {
+            // Drapeau inconnu de cette implémentation : on poursuit sans.
+        }
+    }
 
     // ------------------------------------------------------------- Divers
 
-    private fun getFileMeta(context: Context, uri: Uri): FileMeta {
+    private fun getFileName(context: Context, uri: Uri): String {
         var name = "Parcours Importe"
-        var size = 0L
         try {
             context.contentResolver.query(uri, null, null, null, null)?.use {
                 if (it.moveToFirst()) {
@@ -275,24 +313,12 @@ object Importer {
                         val n = it.getString(nameIndex)
                         if (!n.isNullOrEmpty()) name = n
                     }
-                    val sizeIndex = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                    if (sizeIndex != -1 && !it.isNull(sizeIndex)) {
-                        size = it.getLong(sizeIndex)
-                    }
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        if (size <= 0L) {
-            size = try {
-                context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
-            } catch (e: Exception) {
-                0L
-            }
-            if (size < 0L) size = 0L
-        }
-        return FileMeta(name, size)
+        return name
     }
 
     private fun isKMLContent(context: Context, uri: Uri): Boolean {
@@ -309,21 +335,102 @@ object Importer {
         }
     }
 
-    private fun parseIso8601(str: String): Long? {
-        return try {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-                timeZone = TimeZone.getTimeZone("UTC")
-            }.parse(str)?.time
-        } catch (e: Exception) {
-            try {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
-                    timeZone = TimeZone.getTimeZone("UTC")
-                }.parse(str)?.time
-            } catch (e2: Exception) {
-                null
-            }
-        }
+}
+
+/**
+ * Analyseur de la partie date-heure, conservé par thread.
+ *
+ * En construire un par point coûtait l'analyse du motif à chaque ligne du fichier,
+ * soit plusieurs millions de fois sur une trace dense. `SimpleDateFormat` n'étant pas
+ * partageable entre threads, on en garde un exemplaire par thread plutôt qu'un seul
+ * partagé.
+ */
+private val iso8601DateTime = ThreadLocal.withInitial {
+    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+        isLenient = false
     }
+}
+
+/**
+ * Horodatage ISO 8601 d'un fichier GPX, en millisecondes depuis l'époque.
+ *
+ * L'implémentation précédente ne reconnaissait que deux formes, toutes deux en UTC :
+ * `2024-01-01T10:00:00Z` et `2024-01-01T10:00:00.123Z`. Or la forme la plus répandue
+ * dans les fichiers réels — celle que produisent la plupart des montres et
+ * applications de sport — porte un décalage horaire : `2024-01-01T10:00:00+02:00`.
+ * Elle échouait, le point prenait alors l'heure de l'import, et toute la chronologie
+ * du fichier était perdue : durée, vitesses et allure devenaient fausses.
+ *
+ * Sont désormais acceptés le suffixe `Z`, les décalages `+02:00`, `+0200` et `+02`,
+ * et l'absence de suffixe — comprise comme UTC, ce qu'impose la spécification GPX.
+ *
+ * Fonction pure, sans dépendance Android : directement testable.
+ */
+internal fun parseIso8601(str: String): Long? {
+    val s = str.trim()
+    // « yyyy-MM-ddTHH:mm:ss » : 19 caractères, le minimum exploitable.
+    if (s.length < 19) return null
+
+    val base = try {
+        iso8601DateTime.get()?.parse(s.substring(0, 19))?.time ?: return null
+    } catch (e: Exception) {
+        return null
+    }
+
+    var rest = s.substring(19)
+
+    // Fraction de seconde éventuelle. On ne garde que les millièmes : au-delà, la
+    // précision n'a aucun sens pour une trace enregistrée au mieux à 1 Hz.
+    var millis = 0L
+    if (rest.startsWith('.') || rest.startsWith(',')) {
+        val digits = rest.drop(1).takeWhile { it.isDigit() }
+        if (digits.isNotEmpty()) {
+            millis = digits.take(3).padEnd(3, '0').toLongOrNull() ?: 0L
+        }
+        rest = rest.drop(1 + digits.length)
+    }
+
+    val offsetMinutes = parseZoneOffsetMinutes(rest) ?: return null
+    return base + millis - offsetMinutes * 60_000L
+}
+
+/**
+ * Décalage horaire annoncé après l'heure, en minutes.
+ *
+ * Renvoie 0 pour `Z` comme pour un suffixe absent — la spécification GPX impose UTC
+ * quand rien n'est précisé — et null si le suffixe est présent mais illisible, pour
+ * que l'appelant préfère rejeter l'horodatage plutôt que de le décaler au hasard.
+ */
+private fun parseZoneOffsetMinutes(zone: String): Int? {
+    val z = zone.trim()
+    if (z.isEmpty() || z.equals("Z", ignoreCase = true)) return 0
+
+    val sign = when (z[0]) {
+        '+' -> 1
+        '-' -> -1
+        else -> return null
+    }
+
+    val digits = z.drop(1).replace(":", "")
+    if (!digits.all { it.isDigit() }) return null
+
+    val hours: Int
+    val minutes: Int
+    when (digits.length) {
+        4 -> {
+            hours = digits.substring(0, 2).toInt()
+            minutes = digits.substring(2, 4).toInt()
+        }
+        2 -> {
+            hours = digits.toInt()
+            minutes = 0
+        }
+        else -> return null
+    }
+    if (hours > 18 || minutes > 59) return null
+
+    return sign * (hours * 60 + minutes)
 }
 
 private data class TrackMeta(
@@ -435,6 +542,19 @@ private class KmlStyleHandler : DefaultHandler() {
 
     val table = KmlStyleTable()
 
+    /**
+     * Nombre de points du fichier, compté sans en garder aucun.
+     *
+     * Sert à dater le tracé : le KML ne porte pas d'horodatage, et connaître l'effectif
+     * exact avant d'écrire le premier point est le seul moyen de le faire se terminer
+     * à l'instant présent plutôt que dans le futur.
+     */
+    var pointCount = 0L
+        private set
+
+    private var inCoordinates = false
+    private val counter = CoordinateTokenizer { _, _, _ -> pointCount++ }
+
     private var styleId: String? = null
     private var styleMapId: String? = null
 
@@ -474,11 +594,16 @@ private class KmlStyleHandler : DefaultHandler() {
             }
             "key" -> if (inPair) inKey = true
             "styleurl" -> if (inPair) inStyleUrl = true
+            "coordinates" -> {
+                inCoordinates = true
+                counter.reset()
+            }
         }
     }
 
     override fun characters(ch: CharArray, start: Int, length: Int) {
         when {
+            inCoordinates -> counter.feed(ch, start, length)
             inColor && colorBuffer.length < MAX_COLOR_LENGTH ->
                 colorBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - colorBuffer.length))
             inKey && keyBuffer.length < MAX_STYLE_ID_LENGTH ->
@@ -490,6 +615,10 @@ private class KmlStyleHandler : DefaultHandler() {
 
     override fun endElement(uri: String?, localName: String?, qName: String?) {
         when (kmlTagOf(localName, qName)) {
+            "coordinates" -> if (inCoordinates) {
+                counter.finish()
+                inCoordinates = false
+            }
             "color" -> if (inColor) {
                 inColor = false
                 KmlColor.parse(colorBuffer.toString())?.let { styleColor = it }
