@@ -1201,7 +1201,8 @@ private val RELEASES = listOf(
     Release(
         version = "0.12.0",
         changes = listOf(
-            "Correction : en mode focus, la carte pouvait sembler zoomer ou dézoomer toute seule — y compris après avoir lâché l'écran. Le pincement était interrompu par la mise à jour de la position, ce qui déréglait durablement le cadrage"
+            "Correction : le bouton « localiser » ne change plus le zoom. Il recentre la carte sur votre position en gardant l'échelle que vous aviez choisie, au lieu de sauter à un niveau de zoom relevé au hasard du dernier geste",
+            "Correction : le pincement à deux doigts n'est plus interrompu par les mises à jour de position pendant un enregistrement, ce qui pouvait dérégler durablement le cadrage"
         )
     )
 )

@@ -518,6 +518,50 @@ plusieurs fois par seconde pendant un enregistrement. Tout ce qu'on y appelle do
 être soit idempotent et gratuit, soit gardé par une comparaison. Un setter qui
 *alloue* quelque chose n'a rien à y faire sans garde.
 
+Ce correctif est réel et gardé — mais **ce n'était toujours pas le défaut rapporté**.
+Voir la section suivante.
+
+### Le zoom sautait à l'appui sur « localiser » : la vraie cause, enfin
+
+Précision décisive de l'auteur, après deux diagnostics à côté : « quand j'appuie sur
+le bouton localiser pour passer en focus, ça zoome tout seul ou dézoome — **au moment
+où je clique** ». Pas pendant un pincement, pas pendant le trajet : à l'appui.
+
+Le recentrage faisait simplement, en plus de centrer la carte :
+
+```kotlin
+val zoomLevelToSet = prefs.getFloat("pref_default_zoom", 16.5f).toDouble()
+mapView.controller.setZoom(zoomLevelToSet)
+```
+
+Deux erreurs superposées :
+
+- **`pref_default_zoom` n'est pas un réglage**, malgré son nom. Aucun écran ne l'écrit
+  (voir « En attente d'arbitrage » : la préférence impériale a le même travers) ; il
+  est alimenté par `TrackViewModel.lastMapZoom`, donc par le dernier zoom mémorisé de
+  la carte. Or `persistMapStateThrottled` borne cette mémorisation à une fois par
+  seconde **sans rattrapage de la dernière valeur** : le zoom final d'un geste n'est
+  quasiment jamais celui qui finit en préférence, c'est un zoom relevé au milieu du
+  geste précédent. Le bouton y ramenait la carte, d'où un saut en avant ou en arrière
+  sans rapport avec quoi que ce soit de visible.
+- **Même exacte, cette valeur n'avait pas à s'imposer.** « Localiser » veut dire
+  « centre-toi sur moi », pas « change mon échelle ». Recentrer et rezoomer sont deux
+  actions distinctes ; une seule était demandée.
+
+Le zoom courant est désormais conservé. Seule exception gardée : si la carte est
+dézoomée au point que les tracés ne sont plus dessinés (`ZOOM_THRESHOLD`), on
+rapproche — sans quoi « localiser » laisserait l'utilisateur centré sur lui-même mais
+à l'échelle d'un pays.
+
+**Leçon de méthode, celle qui vaut le plus ici.** Trois versions ont visé à côté sur
+ce seul défaut, et les deux premières ont été poussées en affirmant « c'est la vraie
+cause ». Les deux correctifs sont justes en eux-mêmes et sont conservés — mais ils
+répondaient à un symptôme que l'auteur n'avait jamais décrit. La formulation initiale
+(« parfois ça zoom ou dézoom tout seul ») avait été lue comme « à un moment
+imprévisible », alors qu'elle voulait dire « sans que je le demande ». **Demander
+quand exactement le défaut se produit coûte une question ; le deviner a coûté trois
+compilations et deux diagnostics faux.**
+
 ### Le mode 3D pivotait sans arrêt : corrigé en 0.11.6
 
 Mesuré sur une vidéo d'un trajet réel : la carte basculait d'environ 100°, revenait,

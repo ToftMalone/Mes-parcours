@@ -852,20 +852,38 @@ fun MapViewContainer(
         }
     }
 
-    // Handle center cameras when recenter trigger changes explicitly or auto-follow is activated.
-    // `recenterTrigger` reste dans les clés pour forcer une nouvelle exécution quand
-    // l'utilisateur retape sur le bouton de recentrage alors que le mode focus est déjà
-    // actif (sa valeur seule ne change alors pas) ; mais la garde ne doit porter que sur
-    // l'état actuel de isAutoFollowActive. Avec `recenterTrigger > 0` dans la garde, cet
-    // effet continuait de recentrer et de réinitialiser le zoom même quand isAutoFollowActive
-    // venait de repasser à false (un simple toucher pour désengager le mode focus) : la
-    // carte revenait alors en arrière juste après le geste manuel de l'utilisateur, donnant
-    // l'impression qu'elle zoomait ou dézoomait toute seule.
+    // Recentrage de la caméra, à l'appui sur le bouton « localiser » (mode focus).
+    //
+    // Ce bloc imposait aussi le zoom, en le ramenant à `pref_default_zoom`. C'était le
+    // défaut rapporté : « quand j'appuie sur localiser pour passer en focus, ça zoome
+    // ou dézoome tout seul, au moment du clic ». Deux raisons de ne plus y toucher :
+    //
+    // - `pref_default_zoom` n'est pas un réglage choisi par l'utilisateur : c'est le
+    //   dernier zoom mémorisé par la carte. Or cette mémorisation est bornée à une fois
+    //   par seconde et sans rattrapage de la dernière valeur (voir MAP_STATE_PERSIST_MS
+    //   et `persistMapStateThrottled`) : elle retient donc presque toujours un zoom
+    //   relevé *au milieu* du dernier geste, jamais celui où l'utilisateur s'est arrêté.
+    //   Le recentrage y ramenait la carte, d'où le saut en avant ou en arrière.
+    // - Même juste, cette valeur n'aurait pas à s'imposer : « localiser » veut dire
+    //   « centre-toi sur moi », pas « change mon échelle ».
+    //
+    // Le zoom courant est donc conservé. Seule exception : une carte assez dézoomée pour
+    // que les tracés ne soient plus dessinés (ZOOM_THRESHOLD) — s'y recentrer sans
+    // rapprocher laisserait l'utilisateur devant un pays entier, ce qui n'est pas ce
+    // qu'il demande en appuyant sur « localiser ».
+    //
+    // `recenterTrigger` reste dans les clés pour forcer une nouvelle exécution quand on
+    // retape sur le bouton alors que le mode focus est déjà actif (sa valeur seule ne
+    // changerait pas), mais la garde ne porte que sur `isAutoFollowActive` : sinon
+    // l'effet se rejouait aussi au moment où le mode focus s'éteint, donc juste après le
+    // geste manuel qui vient de le désengager.
     LaunchedEffect(recenterTrigger, isAutoFollowActive) {
         if (isAutoFollowActive) {
-            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-            val zoomLevelToSet = prefs.getFloat("pref_default_zoom", 16.5f).toDouble()
-            mapView.controller.setZoom(zoomLevelToSet)
+            if (mapView.zoomLevelDouble < ZOOM_THRESHOLD) {
+                val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+                val fallbackZoom = prefs.getFloat("pref_default_zoom", 16.5f).toDouble()
+                mapView.controller.setZoom(fallbackZoom.coerceAtLeast(ZOOM_THRESHOLD))
+            }
             if (isCurrentTracking && currentUserLocation != null) {
                 mapView.controller.animateTo(GeoPoint(currentUserLocation.latitude, currentUserLocation.longitude))
             } else if (points.isNotEmpty()) {
