@@ -1199,11 +1199,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.7",
+        version = "0.11.8",
         changes = listOf(
-            "Nouveau : ouvrir ou fermer le détail d'un parcours se fait désormais par un glissement, au lieu d'un changement d'écran sec",
-            "Nouveau : les cartes de l'historique apparaissent en douceur, et glissent à leur nouvelle place plutôt que de sauter",
-            "Nouveau : pendant un enregistrement, la distance, la vitesse et l'altitude défilent en douceur à chaque mise à jour au lieu de sauter d'une valeur à l'autre"
+            "Nouveau : les boutons d'enregistrement (démarrer, mettre en pause, arrêter) surgissent désormais avec un léger effet de zoom au lieu de sauter d'un jeu de boutons à l'autre, et le bouton pause/reprendre anime son icône et sa couleur"
         )
     )
 )

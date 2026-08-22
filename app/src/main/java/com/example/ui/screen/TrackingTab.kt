@@ -1,12 +1,16 @@
 package com.example.ui.screen
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.using
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -279,145 +283,193 @@ fun TrackingTab(
                 }
             }
 
-            if (isTracking) {
-                val isPaused by viewModel.isPaused.collectAsState()
+            // Trois jeux de boutons qui se succèdent selon l'état — un seul bouton
+            // « Enregistrer », le trio d'options (nouvelle trace / reprendre / annuler),
+            // ou la paire pause-reprendre + arrêter pendant l'enregistrement. Ils se
+            // remplaçaient d'un coup jusqu'ici ; AnimatedContent les fait maintenant
+            // apparaître en surgissant (léger zoom + fondu) plutôt que sauter d'un jeu
+            // à l'autre — c'est le geste le plus répété de toute l'application.
+            val controlsMode = when {
+                isTracking -> "tracking"
+                showStartOptions -> "options"
+                else -> "idle"
+            }
 
-                // Pause / Resume FAB
-                FloatingActionButton(
-                    onClick = {
-                        if (isPaused) {
-                            viewModel.resumeRecording(context)
-                        } else {
-                            viewModel.pauseRecording(context)
+            AnimatedContent(
+                targetState = controlsMode,
+                transitionSpec = {
+                    (scaleIn(tween(220), initialScale = 0.6f) + fadeIn(tween(220))) togetherWith
+                        (scaleOut(tween(140), targetScale = 0.6f) + fadeOut(tween(140))) using
+                        SizeTransform(clip = false)
+                },
+                label = "recording_controls"
+            ) { mode ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    when (mode) {
+                        "tracking" -> {
+                            val isPaused by viewModel.isPaused.collectAsState()
+
+                            // Pause / Resume FAB : icône et couleur animées, plutôt
+                            // qu'un changement sec à chaque appui.
+                            val pauseResumeColor by animateColorAsState(
+                                targetValue = if (isPaused) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                animationSpec = tween(220),
+                                label = "pause_resume_color"
+                            )
+                            FloatingActionButton(
+                                onClick = {
+                                    if (isPaused) {
+                                        viewModel.resumeRecording(context)
+                                    } else {
+                                        viewModel.pauseRecording(context)
+                                    }
+                                },
+                                containerColor = pauseResumeColor,
+                                contentColor = Color.White,
+                                shape = CircleShape,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                    .testTag("pause_resume_fab")
+                            ) {
+                                AnimatedContent(
+                                    targetState = isPaused,
+                                    transitionSpec = {
+                                        (scaleIn(tween(180), initialScale = 0.5f) + fadeIn(tween(180))) togetherWith
+                                            (scaleOut(tween(120), targetScale = 0.5f) + fadeOut(tween(120)))
+                                    },
+                                    label = "pause_resume_icon"
+                                ) { paused ->
+                                    Icon(
+                                        imageVector = if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                        contentDescription = if (paused) "Reprendre" else "Pause",
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+
+                            // Stop FAB
+                            FloatingActionButton(
+                                onClick = {
+                                    viewModel.stopRecording(context)
+                                    currentTrackId?.let { id ->
+                                        onNavigateToDetails(id)
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                                shape = CircleShape,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.onError.copy(alpha = 0.3f), CircleShape)
+                                    .testTag("action_fab")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = "Arrêter",
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
                         }
-                    },
-                    containerColor = if (isPaused) Color(0xFF10B981) else Color(0xFFF59E0B), // Emerald for resume, Amber for pause
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                    modifier = Modifier
-                        .size(56.dp)
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                        .testTag("pause_resume_fab")
-                ) {
-                    Icon(
-                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = if (isPaused) "Reprendre" else "Pause",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
 
-                // Stop FAB
-                FloatingActionButton(
-                    onClick = {
-                        viewModel.stopRecording(context)
-                        currentTrackId?.let { id ->
-                            onNavigateToDetails(id)
+                        "options" -> {
+                            // Annuler : referme les options sans rien démarrer
+                            FloatingActionButton(
+                                onClick = { showStartOptions = false },
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                shape = CircleShape,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), CircleShape)
+                                    .testTag("cancel_start_options_fab")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Annuler",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            // Reprendre une trace existante : seulement s'il y en a une dans l'historique
+                            if (allTracks.isNotEmpty()) {
+                                FloatingActionButton(
+                                    onClick = { showResumePicker = true },
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                    contentColor = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape,
+                                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
+                                        .testTag("resume_existing_track_fab")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.History,
+                                        contentDescription = "Reprendre une trace existante",
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            // Nouvelle trace
+                            FloatingActionButton(
+                                onClick = {
+                                    viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
+                                    showStartOptions = false
+                                },
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                shape = CircleShape,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
+                                    .testTag("start_new_track_fab")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Nouvelle trace",
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
                         }
-                    },
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                    modifier = Modifier
-                        .size(72.dp)
-                        .border(1.5.dp, MaterialTheme.colorScheme.onError.copy(alpha = 0.3f), CircleShape)
-                        .testTag("action_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Stop,
-                        contentDescription = "Arrêter",
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-            } else if (showStartOptions) {
-                // Annuler : referme les options sans rien démarrer
-                FloatingActionButton(
-                    onClick = { showStartOptions = false },
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                    modifier = Modifier
-                        .size(48.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), CircleShape)
-                        .testTag("cancel_start_options_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Annuler",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
 
-                // Reprendre une trace existante : seulement s'il y en a une dans l'historique
-                if (allTracks.isNotEmpty()) {
-                    FloatingActionButton(
-                        onClick = { showResumePicker = true },
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        shape = CircleShape,
-                        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                        modifier = Modifier
-                            .size(56.dp)
-                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
-                            .testTag("resume_existing_track_fab")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "Reprendre une trace existante",
-                            modifier = Modifier.size(24.dp)
-                        )
+                        else -> {
+                            // Play FAB : révèle les deux options seulement s'il y a une trace à
+                            // reprendre — sinon le choix n'existe pas vraiment, autant démarrer
+                            // directement comme avant.
+                            FloatingActionButton(
+                                onClick = {
+                                    if (allTracks.isEmpty()) {
+                                        viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
+                                    } else {
+                                        showStartOptions = true
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                shape = CircleShape,
+                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
+                                    .testTag("action_fab")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Enregistrer",
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
                     }
-                }
-
-                // Nouvelle trace
-                FloatingActionButton(
-                    onClick = {
-                        viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
-                        showStartOptions = false
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                    modifier = Modifier
-                        .size(72.dp)
-                        .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
-                        .testTag("start_new_track_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Nouvelle trace",
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-            } else {
-                // Play FAB : révèle les deux options seulement s'il y a une trace à
-                // reprendre — sinon le choix n'existe pas vraiment, autant démarrer
-                // directement comme avant.
-                FloatingActionButton(
-                    onClick = {
-                        if (allTracks.isEmpty()) {
-                            viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
-                        } else {
-                            showStartOptions = true
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
-                    modifier = Modifier
-                        .size(72.dp)
-                        .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
-                        .testTag("action_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Enregistrer",
-                        modifier = Modifier.size(36.dp)
-                    )
                 }
             }
         }
