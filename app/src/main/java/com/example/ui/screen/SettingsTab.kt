@@ -1201,7 +1201,7 @@ private val RELEASES = listOf(
     Release(
         version = "0.12.0",
         changes = listOf(
-            "Correction : en mode focus, la carte pouvait sembler zoomer ou dézoomer toute seule juste après avoir touché l'écran pour la désengager"
+            "Correction : en mode focus, la carte pouvait sembler zoomer ou dézoomer toute seule — y compris après avoir lâché l'écran. Le pincement était interrompu par la mise à jour de la position, ce qui déréglait durablement le cadrage"
         )
     )
 )

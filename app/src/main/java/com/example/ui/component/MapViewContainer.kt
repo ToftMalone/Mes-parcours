@@ -281,6 +281,13 @@ private class MapState(
     var isMerged: Boolean = false,
     var isCurrentTracking: Boolean = false,
     var isInteractivityEnabled: Boolean = true,
+    /**
+     * Dernière valeur réellement passée à `setMultiTouchControls`, ou null tant
+     * qu'on ne l'a jamais appelée. Distinct de `isInteractivityEnabled`, qui n'est
+     * mis à jour qu'avec la reconstruction des calques : il faut ici savoir si
+     * l'appel a eu lieu, pas seulement ce que valait le réglage.
+     */
+    var appliedMultiTouch: Boolean? = null,
     var wasZoomedOut: Boolean = false,
     var bypassZoomThreshold: Boolean = false,
     var cachedOverlayTrackPolylines: List<Polyline>? = null,
@@ -420,7 +427,6 @@ fun MapViewContainer(
                 }
 
                 map.setUseDataConnection(true)
-                map.setMultiTouchControls(isInteractivityEnabled)
                 map.zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
                 
                 map.setOnTouchListener { _, event ->
@@ -432,9 +438,33 @@ fun MapViewContainer(
                 }
                 
                 // Retrieve or initialize map cache state
-                val state = map.tag as? MapState ?: MapState()
+                val state = map.tag as? MapState ?: MapState().also { map.tag = it }
                 state.bypassZoomThreshold = bypassZoomThreshold
                 val isZoomedOut = isZoomedOutTooMuch && !bypassZoomThreshold
+
+                // `setMultiTouchControls` n'est pas un simple réglage : chaque appel
+                // remplace le MultiTouchController d'osmdroid par un neuf. L'appeler à
+                // chaque recomposition — donc une à deux fois par seconde pendant un
+                // enregistrement, à chaque nouvelle position GPS — jetait le contrôleur
+                // au milieu du geste de l'utilisateur.
+                //
+                // Or c'est ce contrôleur qui referme le pincement. osmdroid pilote le vrai
+                // niveau de zoom pendant un pincement (`setMultiTouchScale` calcule
+                // log2(échelle) + le zoom relevé à l'ouverture du geste), et ne remet le
+                // point d'ancrage à null que dans le `selectObject` de fin de geste.
+                // Contrôleur remplacé en cours de route = fin de geste jamais reçue :
+                // `mMultiTouchScaleCurrentPoint` reste renseigné, et `getProjection()`
+                // continue d'y recaler toutes les projections suivantes. La carte semblait
+                // alors zoomer ou dézoomer d'elle-même, bien après que le doigt ait quitté
+                // l'écran — et seulement en mode focus, seul moment où les recompositions
+                // s'enchaînent assez vite pour tomber pendant un geste.
+                //
+                // On ne touche donc à ce réglage que lorsqu'il change réellement, comme le
+                // fait déjà le code juste au-dessus pour la source de tuiles.
+                if (state.appliedMultiTouch != isInteractivityEnabled) {
+                    state.appliedMultiTouch = isInteractivityEnabled
+                    map.setMultiTouchControls(isInteractivityEnabled)
+                }
 
                 // "auto" : la carte s'oriente dans le sens de la marche pendant un
                 // enregistrement, et revient au Nord dès qu'il est arrêté. Le mode

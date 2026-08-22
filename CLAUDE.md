@@ -469,6 +469,55 @@ actif, cas où sa valeur seule ne changerait pas), mais ne fait plus partie de l
 condition d'exécution. Le recentrage-rezoom ne se déclenche donc plus que lorsque le
 mode focus est effectivement actif — jamais au moment où il vient de s'éteindre.
 
+**Ce correctif n'a pas suffi**, l'essai sur le terrain l'a montré : la vraie cause
+était ailleurs, et celle-ci n'en était qu'une aggravation. Voir la section suivante.
+
+### La cause réelle du zoom intempestif : le contrôleur multi-touch, recréé sans cesse
+
+Symptôme inchangé après le correctif ci-dessus : « ça zoom ou dézoom tout seul »,
+y compris **après** avoir lâché l'écran, et seulement en mode focus.
+
+`MapViewContainer` appelait `map.setMultiTouchControls(isInteractivityEnabled)` dans
+le bloc `update` de l'`AndroidView`, donc à **chaque recomposition**. Or, dans
+osmdroid, ce n'est pas un réglage idempotent :
+
+```java
+public void setMultiTouchControls(final boolean on) {
+    mMultiTouchController = on ? new MultiTouchController<Object>(this, false) : null;
+}
+```
+
+Chaque appel **jette le contrôleur en cours et en fabrique un neuf**. Pendant un
+enregistrement en mode focus, chaque position GPS change `points` et
+`currentUserLocation`, donc recompose : le contrôleur était remplacé une à deux fois
+par seconde, forcément au milieu d'un pincement, qui dure plus longtemps que ça.
+
+Pourquoi c'est le zoom qui trinque : osmdroid pilote le **vrai** niveau de zoom
+pendant un pincement, relativement au zoom relevé à l'ouverture du geste —
+`setMultiTouchScale(échelle)` fait `setZoomLevel(log2(échelle) + mStartAnimationZoom)`.
+Et il ne remet le point d'ancrage à null que dans le `selectObject` de **fin** de
+geste. Un contrôleur remplacé en cours de route ne reçoit jamais cette fin :
+`mMultiTouchScaleCurrentPoint` reste renseigné pour toujours, et `getProjection()`
+continue d'y recaler chaque projection (`adjustOffsets`) à chaque image dessinée.
+D'où un déréglage qui **survit au geste** et se voit tout seul, sans que l'on touche
+l'écran.
+
+Le mode focus aggravait encore : `getDraggableObjectAtPoint` renvoie `null` tant que
+`isAnimating()` est vrai, et `animateTo` est relancé à chaque position GPS pour une
+animation d'une seconde — les pincements y étaient donc souvent refusés puis
+raccrochés à contretemps, sur une référence de zoom périmée.
+
+Le correctif tient en une garde : n'appeler `setMultiTouchControls` que lorsque la
+valeur change réellement (`MapState.appliedMultiTouch`, volontairement nullable pour
+distinguer « jamais appelé » de « appelé avec false »). C'est la discipline que le
+fichier appliquait déjà juste au-dessus à la source de tuiles et à `mapOrientation` ;
+elle avait seulement été oubliée ici.
+
+**À retenir pour tout le bloc `update`** : il s'exécute à chaque recomposition, donc
+plusieurs fois par seconde pendant un enregistrement. Tout ce qu'on y appelle doit
+être soit idempotent et gratuit, soit gardé par une comparaison. Un setter qui
+*alloue* quelque chose n'a rien à y faire sans garde.
+
 ### Le mode 3D pivotait sans arrêt : corrigé en 0.11.6
 
 Mesuré sur une vidéo d'un trajet réel : la carte basculait d'environ 100°, revenait,
