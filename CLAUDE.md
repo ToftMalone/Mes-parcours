@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.6` (`versionCode` 24). Elle n'est écrite qu'une fois,
+- Version courante : `0.11.5` (`versionCode` 23). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -391,8 +391,7 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 113 tests unitaires : `Iso8601Test` (16), `UpdateManifestTest` (11),
-  `BearingTest` (10),
+- 103 tests unitaires : `Iso8601Test` (16), `UpdateManifestTest` (11),
   `SolarTimesTest` (9), `KmlColorTest` (8), `TrackSegmentsTest` (7),
   `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `TunnelDetectorTest` (6), `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest`
@@ -445,32 +444,15 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
 - Le tracé en diagonale (voir ci-dessous) reste non corrigé, à la demande de l'auteur.
 
-### Le mode 3D pivotait sans arrêt : corrigé en 0.11.6
+### À vérifier sur le terrain, rien n'a été modifié
 
-Mesuré sur une vidéo d'un trajet réel : la carte basculait d'environ 100°, revenait,
-et recommençait deux à trois fois par seconde — trente-quatre changements de sens en
-quatorze secondes.
-
-**La cause n'était pas le bruit du GPS**, contrairement à ce que cette section
-supposait. `computeCurrentBearing` se rabattait sur les points du tracé affiché dès
-que la position GPS n'avait pas changé depuis le passage précédent. Or l'écran était
-consulté **avec l'enregistrement en pause** : `livePoints` ne bouge plus dans ce cas
-et conserve indéfiniment le cap qu'on avait au moment de la pause. La carte alternait
-donc entre le cap réel et ce cap fossilisé, à la cadence des recompositions.
-
-Le repli sur le tracé ne vaut désormais que **faute de position connue**. Quand une
-position existe mais n'a pas assez bougé, la fonction renvoie null et l'appelant garde
-le dernier cap : mieux vaut conserver le précédent qu'en inventer un autre.
-
-Le lissage recommandé ici a été ajouté dans la foulée (`smoothedBearing`,
-`BEARING_SMOOTHING`) : l'orientation se rapproche de la cible sur **l'arc le plus
-court**, ce qui supprime le tour complet au passage par le nord et remplace les
-à-coups par une rotation continue. `BearingTest` verrouille les deux points.
-
-Leçon à garder : ce défaut a été rendu visible par le passage à `sample` en 0.11.5,
-qui fait réévaluer l'affichage deux fois par seconde au lieu d'une fois par position
-GPS. Le piège était là depuis toujours ; il ne se déclenchait simplement pas assez
-souvent pour se voir.
+- **Le mode 3D pivote sans arrêt.** Le cap est calculé entre deux positions
+  consécutives avec un seuil de 1,5 m — sous le plancher de bruit du GPS — puis
+  appliqué sans lissage : à faible vitesse, l'orientation suit le bruit. Prédiction à
+  confirmer : le défaut doit se calmer nettement en voiture et s'affoler à l'arrêt. Si
+  c'est le cas, conditionner la mise à jour du cap à la vitesse (`TrackPoint.speed`
+  existe) et lisser par interpolation sur l'arc le plus court, ce qui règle du même
+  coup le passage par le nord.
 
 ### Chargement des tracés pendant le suivi automatique : la cause, trouvée en 0.11.5
 
