@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.preference.PreferenceManager
+import com.example.BuildConfig
 import org.osmdroid.config.Configuration
 import java.io.File
 
@@ -22,8 +23,12 @@ object OsmConfig {
             config.load(appContext, prefs)
 
             // 2. Identité annoncée aux serveurs de tuiles, comme l'exige la politique
-            // d'usage d'OpenStreetMap. Sans espace : c'est un jeton de user-agent.
-            config.userAgentValue = "MesParcours/1.0 (${appContext.packageName})"
+            // d'usage d'OpenStreetMap : elle demande une version réelle, pour pouvoir
+            // écarter une version précise si elle se comportait mal. Le « 1.0 » figé
+            // qui traînait ici n'a jamais correspondu à quoi que ce soit de publié.
+            // Sans espace : c'est un jeton de user-agent.
+            config.userAgentValue =
+                "MesParcours/${BuildConfig.VERSION_NAME} (${appContext.packageName})"
 
             // 3. Explicitly set valid app-private cache paths AFTER config.load()
             val cacheDir = appContext.externalCacheDir ?: appContext.cacheDir

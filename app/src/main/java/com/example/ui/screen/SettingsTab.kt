@@ -68,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -675,10 +676,34 @@ fun TrackThicknessSettingsCard() {
     var thicknessDp by remember { mutableStateOf(TrackStylePreferences.getThicknessDp(context)) }
     var textValue by remember { mutableStateOf(formatThicknessDp(thicknessDp)) }
 
+    /** Retient une épaisseur à l'écran, ramenée dans les bornes autorisées. */
     fun applyThickness(dp: Float) {
-        val clamped = dp.coerceIn(TrackStylePreferences.MIN_THICKNESS_DP, TrackStylePreferences.MAX_THICKNESS_DP)
-        thicknessDp = clamped
-        TrackStylePreferences.setThicknessDp(context, clamped)
+        thicknessDp = dp.coerceIn(
+            TrackStylePreferences.MIN_THICKNESS_DP,
+            TrackStylePreferences.MAX_THICKNESS_DP
+        )
+    }
+
+    /**
+     * Enregistre l'épaisseur retenue.
+     *
+     * Séparé de [applyThickness] pour ne pas écrire dans les préférences à chaque
+     * pixel de glissement du curseur : une seule traversée du curseur déclenchait
+     * des dizaines d'écritures, chacune réveillant les écoutes de préférences.
+     */
+    fun persistThickness() {
+        TrackStylePreferences.setThicknessDp(context, thicknessDp)
+    }
+
+    /**
+     * Réaffiche dans le champ la valeur réellement retenue.
+     *
+     * Sans ça, taper « 99 » laissait « 99 » à l'écran alors que l'épaisseur avait été
+     * ramenée au maximum, et « abc » restait affiché sans que rien ne le signale : le
+     * champ contredisait en silence le curseur et l'aperçu situés juste au-dessus.
+     */
+    fun normalizeText() {
+        textValue = formatThicknessDp(thicknessDp)
     }
 
     SettingsCard(modifier = Modifier.testTag("track_thickness_card")) {
@@ -752,8 +777,9 @@ fun TrackThicknessSettingsCard() {
             value = thicknessDp,
             onValueChange = {
                 applyThickness(it)
-                textValue = formatThicknessDp(it)
+                normalizeText()
             },
+            onValueChangeFinished = { persistThickness() },
             valueRange = TrackStylePreferences.MIN_THICKNESS_DP..TrackStylePreferences.MAX_THICKNESS_DP,
             modifier = Modifier.fillMaxWidth().testTag("track_thickness_slider")
         )
@@ -780,13 +806,22 @@ fun TrackThicknessSettingsCard() {
             value = textValue,
             onValueChange = { input ->
                 textValue = input
-                input.replace(',', '.').toFloatOrNull()?.let { applyThickness(it) }
+                input.replace(',', '.').toFloatOrNull()?.let {
+                    applyThickness(it)
+                    persistThickness()
+                }
             },
             label = { Text("Valeur précise (dp)") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().testTag("track_thickness_field")
+            modifier = Modifier
+                .fillMaxWidth()
+                // Une saisie hors bornes ou illisible est ramenée à l'affichage dès
+                // que l'on quitte le champ, plutôt que de rester là à contredire
+                // l'épaisseur réellement appliquée.
+                .onFocusChanged { focus -> if (!focus.isFocused) normalizeText() }
+                .testTag("track_thickness_field")
         )
 
         // La couleur se règle depuis l'historique, par appui long sur une catégorie.
@@ -1164,9 +1199,17 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.1",
+        version = "0.11.2",
         changes = listOf(
-            "Correction : l'écran Détails d'un parcours affichait la trace en cours d'enregistrement dans sa couleur habituelle au lieu du rouge, comme si elle était déjà terminée"
+            "Correction : le bandeau de mise à jour écarté revenait, et une recherche réseau était relancée, à chaque aller-retour vers un parcours",
+            "Correction : après une éviction de l'application par le système, l'enregistrement s'arrêtait en silence au lieu de reprendre",
+            "Correction : arrêter un enregistrement dont l'application avait été fermée entre-temps laissait un parcours « en cours » impossible à refermer",
+            "Correction : le chronomètre prenait du retard sur les longues sorties et se figeait à la perte du signal GPS",
+            "Correction : les fichiers GPX horodatés avec un décalage horaire — le cas le plus courant — perdaient toute leur chronologie à l'import",
+            "Correction : un fichier KML dont la taille n'était pas connue s'importait daté dans le futur",
+            "Correction : la suite d'un parcours consulté pendant son propre enregistrement n'apparaissait plus sur la carte",
+            "Correction : le champ d'épaisseur du trait gardait à l'écran une valeur refusée ou hors bornes",
+            "Les fichiers importés ne peuvent plus déclarer d'entités XML, et l'APK d'une mise à jour est vérifié par son empreinte avant installation"
         )
     )
 )

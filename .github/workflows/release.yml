@@ -122,12 +122,18 @@ jobs:
           APK_NAME="mes-parcours-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "${APK_NAME}"
 
+          # Empreinte de l'APK publié. L'application la compare à ce qu'elle a
+          # téléchargé avant de le présenter à l'installateur : un fichier tronqué
+          # en route est ainsi écarté au lieu d'échouer plus tard, de façon obscure.
+          APK_SHA256=$(sha256sum "${APK_NAME}" | cut -d' ' -f1)
+
           jq -n \
             --argjson versionCode "${VERSION_CODE}" \
             --arg versionName "${VERSION_NAME}" \
             --arg apkUrl "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APK_NAME}" \
+            --arg sha256 "${APK_SHA256}" \
             --argjson notes "${NOTES_JSON}" \
-            '{versionCode: $versionCode, versionName: $versionName, apkUrl: $apkUrl, notes: $notes}' \
+            '{versionCode: $versionCode, versionName: $versionName, apkUrl: $apkUrl, sha256: $sha256, notes: $notes}' \
             > update.json
 
           echo "apk=${APK_NAME}" >> "${GITHUB_OUTPUT}"

@@ -7,6 +7,5 @@ data class LiveStats(
     val avgSpeedMps: Double = 0.0,
     val maxSpeedMps: Double = 0.0,
     val elevationGain: Double = 0.0,
-    val elevationLoss: Double = 0.0,
-    val paceMinPerKm: Double = 0.0
+    val elevationLoss: Double = 0.0
 )

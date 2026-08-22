@@ -94,4 +94,48 @@ class UpdateManifestTest {
         val ten = AvailableUpdate(10, "0.9.10-thierry", "https://x.test/a.apk", emptyList())
         assertTrue(ten.isNewerThan(9))
     }
+
+    // ------------------------------------------------------------------
+    // Empreinte de l'APK. Facultative : les publications antérieures à son
+    // introduction n'en portent pas et doivent rester installables.
+    // ------------------------------------------------------------------
+
+    private fun manifestWithSha(sha: String) = """
+        {
+          "versionCode": 9,
+          "versionName": "0.9.9",
+          "apkUrl": "https://x.test/a.apk",
+          "sha256": "$sha",
+          "notes": []
+        }
+    """.trimIndent()
+
+    @Test
+    fun `une empreinte valide est retenue`() {
+        val sha = "a".repeat(64)
+        assertEquals(sha, UpdateManifest.parse(manifestWithSha(sha))?.sha256)
+    }
+
+    @Test
+    fun `une empreinte en majuscules est ramenee en minuscules`() {
+        // sha256sum produit des minuscules, et c'est à cette forme que le
+        // téléchargement se compare. Comparer sans normaliser échouerait toujours.
+        val update = UpdateManifest.parse(manifestWithSha("A".repeat(64)))
+        assertEquals("a".repeat(64), update?.sha256)
+    }
+
+    @Test
+    fun `un manifeste sans empreinte reste installable`() {
+        // Le cas des versions publiées avant l'ajout du champ.
+        assertNull(UpdateManifest.parse(validJson)?.sha256)
+    }
+
+    @Test
+    fun `une empreinte malformee est ignoree plutot que retenue`() {
+        // La retenir telle quelle rendrait la mise à jour ininstallable : la
+        // comparaison échouerait à tous les coups, sans que rien ne l'explique.
+        assertNull(UpdateManifest.parse(manifestWithSha("trop court"))?.sha256)
+        assertNull(UpdateManifest.parse(manifestWithSha("z".repeat(64)))?.sha256)
+        assertNull(UpdateManifest.parse(manifestWithSha("a".repeat(63)))?.sha256)
+    }
 }

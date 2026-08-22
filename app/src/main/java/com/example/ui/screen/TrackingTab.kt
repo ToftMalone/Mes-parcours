@@ -1,26 +1,12 @@
 package com.example.ui.screen
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,18 +30,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,7 +50,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,29 +58,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.example.data.model.Track
-import com.example.data.model.TrackPoint
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.data.model.LiveStats
 import com.example.ui.component.MapViewContainer
 import com.example.ui.viewmodel.TrackViewModel
@@ -515,119 +483,6 @@ private fun ResumeTrackPickerDialog(
     )
 }
 
-@Composable
-fun SportRadarBackground() {
-    val transition = rememberInfiniteTransition(label = "RadarSweep")
-    
-    // Smooth infinite angle rotation
-    val angleSweep by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "SweepAngle"
-    )
-
-    // Animated glow pulse
-    val scalePulse by transition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "RadarPulse"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                        Color.Transparent
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(280.dp)) {
-            val radius = size.minDimension / 2f
-
-            // Outer ring
-            drawCircle(
-                color = Color(0xFF10B981),
-                radius = radius * scalePulse,
-                style = Stroke(width = 1.5f),
-                alpha = 0.25f
-            )
-
-            // Inner ring
-            drawCircle(
-                color = Color(0xFF8B5CF6),
-                radius = radius * 0.5f * scalePulse,
-                style = Stroke(width = 1f),
-                alpha = 0.2f
-            )
-
-            // Dynamic diagonal grid reference lines
-            drawLine(
-                color = Color.Gray,
-                start = androidx.compose.ui.geometry.Offset(0f, center.y),
-                end = androidx.compose.ui.geometry.Offset(size.width, center.y),
-                strokeWidth = 1f,
-                alpha = 0.15f
-            )
-            drawLine(
-                color = Color.Gray,
-                start = androidx.compose.ui.geometry.Offset(center.x, 0f),
-                end = androidx.compose.ui.geometry.Offset(center.x, size.height),
-                strokeWidth = 1f,
-                alpha = 0.15f
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                modifier = Modifier
-                    .size(80.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "GPS Prêt pour exploration",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Enregistrez votre itinéraire en un seul geste",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
 
 @Composable
 fun PermissionDeniedState(onGrantClick: () -> Unit) {
@@ -998,162 +853,5 @@ fun StandbyStatsCard(
     }
 }
 
-@Composable
-fun StatColumn(
-    icon: ImageVector,
-    label: String,
-    value: String
-) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(14.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Black,
-            fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
 
-@Composable
-fun GpsStatusSquare(
-    gpsStatus: String,
-    gpsAccuracy: Float?,
-    activeAlertState: AlertState?,
-    pulseAlpha: Float,
-    modifier: Modifier = Modifier
-) {
-    val isSignalFound = gpsStatus == "Signal trouvé"
-    
-    // Animate background color of the square based on activeAlertState
-    val squareBgColor by androidx.compose.animation.animateColorAsState(
-        targetValue = when (activeAlertState) {
-            AlertState.LOST -> Color(0xFFEA580C)
-            AlertState.FOUND -> Color(0xFF10B981)
-            null -> MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
-        },
-        animationSpec = tween(durationMillis = 300),
-        label = "GpsSquareBg"
-    )
-
-    // Animate scale of the square during alerts
-    val alertScale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (activeAlertState != null) 1.2f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow),
-        label = "GpsSquareScale"
-    )
-
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.CenterEnd
-    ) {
-        // Expandable banner that slides out to the left
-        androidx.compose.animation.AnimatedVisibility(
-            visible = activeAlertState != null,
-            enter = androidx.compose.animation.expandHorizontally(expandFrom = Alignment.End) + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.shrinkHorizontally(shrinkTowards = Alignment.End) + androidx.compose.animation.fadeOut(),
-            modifier = Modifier.padding(end = 32.dp)
-        ) {
-            val text = if (activeAlertState == AlertState.LOST) "Signal perdu 😨" else "Signal trouvé 😄"
-            val alertBgColor = if (activeAlertState == AlertState.LOST) Color(0xFFEA580C) else Color(0xFF10B981)
-            
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(alertBgColor)
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                    .padding(start = 12.dp, end = 20.dp, top = 6.dp, bottom = 6.dp)
-            ) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
-
-        // The actual Status Square (or tiny card)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = squareBgColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .size(44.dp)
-                .graphicsLayer(
-                    scaleX = alertScale,
-                    scaleY = alertScale
-                )
-                .border(
-                    width = 1.dp,
-                    color = when (activeAlertState) {
-                        AlertState.LOST -> Color.White.copy(alpha = 0.4f)
-                        AlertState.FOUND -> Color.White.copy(alpha = 0.4f)
-                        null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    },
-                    shape = RoundedCornerShape(14.dp)
-                )
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (activeAlertState != null) {
-                    val alertIcon = if (activeAlertState == AlertState.LOST) Icons.Default.LocationOff else Icons.Default.MyLocation
-                    Icon(
-                        imageVector = alertIcon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    // Normal state: red or green dot
-                    val dotColor = if (isSignalFound) Color(0xFF10B981) else Color(0xFFEF4444)
-                    val dotAlpha = if (isSignalFound) 1.0f else pulseAlpha
-                    
-                    if (!isSignalFound) {
-                        // Ambient pulsing red circle below the dot
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFEF4444).copy(alpha = 0.15f * (1.0f - pulseAlpha)))
-                        )
-                    } else {
-                        // Ambient green circle
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF10B981).copy(alpha = 0.12f))
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(dotColor.copy(alpha = dotAlpha))
-                    )
-                }
-            }
-        }
-    }
-}
 

@@ -7,14 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import com.example.ui.screen.MainScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
-import com.example.util.OsmConfig
 
 class MainActivity : ComponentActivity() {
 
@@ -33,9 +30,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        OsmConfig.init(applicationContext)
+        // OsmConfig.init est déjà appelé par TrackApplication.onCreate, qui s'exécute
+        // avant toute activité : le refaire ici ne servait à rien.
         super.onCreate(savedInstanceState)
-        
+
         val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
         FormatUtils.isMetric = prefs.getBoolean("pref_is_metric", true)
 

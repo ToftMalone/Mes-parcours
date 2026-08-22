@@ -28,12 +28,13 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     suspend fun getTrackById(trackId: Long): Track? = trackDao.getTrackById(trackId)
 
-    suspend fun getPointsForTrack(trackId: Long): List<TrackPoint> = trackDao.getPointsForTrack(trackId)
-
     suspend fun resumeExistingTrack(trackId: Long): Boolean {
         val track = trackDao.getTrackById(trackId) ?: return false
         val updated = track.copy(isRecording = true)
         trackDao.updateTrack(updated)
+        // La trace va se remettre à grossir : ce qui avait été mis en cache quand elle
+        // était figée ne la décrit déjà plus.
+        invalidatePointCaches(trackId)
         val resume = loadResumeState(updated)
         _currentTrackId.value = trackId
         _isTracking.value = true
@@ -84,8 +85,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 avgSpeedMps = avgSpeed,
                 maxSpeedMps = track.maxSpeed,
                 elevationGain = track.elevationGain,
-                elevationLoss = track.elevationLoss,
-                paceMinPerKm = if (avgSpeed > 0.1) (1000.0 / avgSpeed) / 60.0 else 0.0
+                elevationLoss = track.elevationLoss
             )
         )
     }
@@ -135,6 +135,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             )
             trackDao.updateTrack(updated)
         }
+        // La trace est figée : ce qui en sera calculé à partir de maintenant peut être
+        // mis en cache, mais rien de ce qui précède ne doit y subsister.
+        invalidatePointCaches(trackId)
         _currentTrackId.value = null
         _isTracking.value = false
         _isPaused.value = false
@@ -184,8 +187,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * renvoie simplement tous les points, exactement comme auparavant.
      */
     suspend fun getDisplayPoints(trackId: Long, viewport: MapViewport?): List<TrackPoint> {
-        val meta = pointMetaCache[trackId]
-            ?: trackDao.getTrackPointMeta(trackId)?.also { pointMetaCache[trackId] = it }
+        // Une trace en cours d'enregistrement grossit à chaque seconde : son effectif
+        // et son emprise seraient déjà faux à la lecture suivante. Les mettre en cache
+        // figeait l'affichage sur ce qu'elle contenait à la première consultation — la
+        // suite du tracé n'apparaissait plus tant qu'on ne quittait pas l'application.
+        // Le cache ne vaut que pour les traces figées, seules assez denses d'ailleurs
+        // pour que le calcul coûte quelque chose.
+        val isLive = _isTracking.value && _currentTrackId.value == trackId
+
+        val meta = (if (isLive) null else pointMetaCache[trackId])
+            ?: trackDao.getTrackPointMeta(trackId)?.also { if (!isLive) pointMetaCache[trackId] = it }
             ?: return emptyList()
 
         val minId = meta.minId
@@ -196,9 +207,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
 
         val globalStride = ceilDiv(meta.pointCount.toLong(), skeletonBudget.toLong())
-        val skeleton = skeletonCache[trackId]
+        val skeleton = (if (isLive) null else skeletonCache[trackId])
             ?: trackDao.getSkeletonPoints(trackId, minId, globalStride)
-                .also { skeletonCache[trackId] = it }
+                .also { if (!isLive) skeletonCache[trackId] = it }
 
         if (viewport == null) return skeleton
 
@@ -462,12 +473,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      *
      * Ne modifie jamais [sourceTrackId] : le résultat est un nouveau parcours,
      * l'original reste disponible tel quel dans l'historique.
+     *
+     * Le tout dans une transaction unique, comme la fusion et l'import : une
+     * interruption en cours de route laissait sinon dans l'historique une copie
+     * tronquée, indiscernable d'un nettoyage réussi.
      */
     suspend fun removeStationaryPoints(
         sourceTrackId: Long,
         thresholdMeters: Double,
         newName: String
-    ): Long {
+    ): Long = database.withTransaction {
         val source = trackDao.getTrackById(sourceTrackId)
             ?: throw IllegalArgumentException("Parcours introuvable")
 
@@ -528,7 +543,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             )
         }
 
-        return newTrackId
+        newTrackId
     }
 
     fun getSelectedImportedTracksFlow(): Flow<List<Track>> {
@@ -594,10 +609,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         _liveStats.value = stats
     }
 
-    fun setLivePoints(points: List<TrackPoint>) {
-        _livePoints.value = points
-    }
-
     private val _gpsStatus = MutableStateFlow("Recherche de signal...")
     val gpsStatus: StateFlow<String> = _gpsStatus.asStateFlow()
 
@@ -653,7 +664,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         return trackDao.getActiveRecordingTrack()
     }
 
-    suspend fun checkForAndRestoreActiveTrack(): Track? {
+    /**
+     * Retrouve un enregistrement laissé ouvert et remet l'état en direct à sa hauteur.
+     *
+     * @param markPaused Faut-il présenter la trace retrouvée comme mise en pause ?
+     * Vrai au lancement de l'application, qui découvre une trace sans que rien ne
+     * l'alimente. Faux quand c'est le service qui appelle pour reprendre tout de
+     * suite : marquer une pause qu'il vient justement de lever affichait « en pause »
+     * à l'écran alors que les positions s'enregistraient bel et bien.
+     */
+    suspend fun checkForAndRestoreActiveTrack(markPaused: Boolean = true): Track? {
         if (_isTracking.value && _currentTrackId.value != null) {
             val id = _currentTrackId.value!!
             return trackDao.getTrackById(id)
@@ -662,7 +682,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         if (activeTrack != null) {
             val resume = loadResumeState(activeTrack)
             restoreActiveTrackingState(activeTrack.id, resume.points, resume.stats)
-            _isPaused.value = true
+            _isPaused.value = markPaused
             return activeTrack
         }
         return null
@@ -714,7 +734,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         } else 0L
 
         val avgSpeed = if (totalSpeedPoints > 0) speedSumMps / totalSpeedPoints else 0.0
-        val paceMinPerKm = if (avgSpeed > 0.1) (1000.0 / avgSpeed) / 60.0 else 0.0
 
         return LiveStats(
             durationSec = maxOf(0L, elapsedSeconds),
@@ -723,8 +742,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             avgSpeedMps = avgSpeed,
             maxSpeedMps = maxSpeedMps,
             elevationGain = elevationGainMeters,
-            elevationLoss = elevationLossMeters,
-            paceMinPerKm = paceMinPerKm
+            elevationLoss = elevationLossMeters
         )
     }
 

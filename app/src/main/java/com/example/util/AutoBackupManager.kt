@@ -134,7 +134,7 @@ object AutoBackupManager {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_save)
-                .setContentTitle("Sauvegarde automatique réusssie")
+                .setContentTitle("Sauvegarde automatique réussie")
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setAutoCancel(true)

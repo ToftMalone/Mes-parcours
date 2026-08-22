@@ -30,8 +30,8 @@ android {
     applicationId = "com.toche.mesparcours"
     minSdk = 24
     targetSdk = 36
-    versionCode = 19
-    versionName = "0.11.1"
+    versionCode = 20
+    versionName = "0.11.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -86,6 +86,17 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+}
+
+/**
+ * Où Room dépose le schéma de chaque version de la base.
+ *
+ * Exigé dès lors que `AppDatabase` déclare `exportSchema = true` : sans ce chemin, la
+ * compilation échoue. Ces fichiers rendent le schéma inspectable et vérifiable, au
+ * lieu de n'exister que dans le code généré.
+ */
+ksp {
+  arg("room.schemaLocation", "${projectDir}/schemas")
 }
 
 // Les dépendances mises en commentaire ont été écartées sans être supprimées : les

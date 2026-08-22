@@ -441,10 +441,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
-    private fun safeFileName(name: String): String = name
-        .replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-        .replace("\\s+".toRegex(), "_")
-
     private fun exportToUri(
         context: Context,
         uri: android.net.Uri,
@@ -473,38 +469,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             }
         }
     }
-
-    private fun shareTrack(context: Context, track: Track, format: ExportFormat) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                // Sous-dossier dédié : c'est le seul chemin exposé par le FileProvider.
-                val exportDir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
-                val cacheFile = java.io.File(
-                    exportDir,
-                    "${safeFileName(track.name)}${format.extension}"
-                )
-                cacheFile.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    writeTrack(track, writer, format)
-                }
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    shareCachedFile(context, cacheFile, "application/octet-stream")
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(
-                        context,
-                        "Erreur d'exportation : ${e.localizedMessage}",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-    }
-
-    fun shareGPX(context: Context, track: Track) = shareTrack(context, track, ExportFormat.GPX)
-
-    fun shareKML(context: Context, track: Track) = shareTrack(context, track, ExportFormat.KML)
 
     fun saveGPXToUri(
         context: Context,
@@ -546,42 +510,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
         return uri
     }
-
-    /** Partage un fichier déjà écrit dans le cache. À appeler depuis le thread principal. */
-    private fun shareCachedFile(context: Context, cacheFile: java.io.File, fileType: String) {
-        try {
-            val fileName = cacheFile.name
-
-            // Generate content URI using FileProvider
-            val authority = "${context.packageName}.fileprovider"
-            val fileUri = androidx.core.content.FileProvider.getUriForFile(
-                context,
-                authority,
-                cacheFile
-            )
-
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = fileType
-                putExtra(Intent.EXTRA_STREAM, fileUri)
-                putExtra(Intent.EXTRA_SUBJECT, "Parcours : $fileName")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-
-            val chooserIntent = Intent.createChooser(shareIntent, "Exporter le parcours").apply {
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(chooserIntent)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Toast crash/failure with user UI feedback
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                android.widget.Toast.makeText(context, "Erreur d'exportation : ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-
 
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
