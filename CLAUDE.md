@@ -9,7 +9,7 @@ toutes les données restent sur l'appareil.
 - Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Version courante : `0.11.9` (`versionCode` 27). Elle n'est écrite qu'une fois,
+- Version courante : `0.12.0` (`versionCode` 28). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -445,7 +445,7 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
 - Le tracé en diagonale (voir ci-dessous) reste non corrigé, à la demande de l'auteur.
 
-### Le mode focus zoomait tout seul : corrigé en 0.11.9
+### Le mode focus zoomait tout seul : corrigé en 0.12.0
 
 Rapporté ainsi : « quand je mets le mode focus parfois ça zoom ou dézoom tout seul ».
 

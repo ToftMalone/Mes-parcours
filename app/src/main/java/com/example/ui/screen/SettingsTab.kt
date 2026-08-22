@@ -1199,7 +1199,7 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.11.9",
+        version = "0.12.0",
         changes = listOf(
             "Correction : en mode focus, la carte pouvait sembler zoomer ou dézoomer toute seule juste après avoir touché l'écran pour la désengager"
         )
