@@ -1,7 +1,6 @@
 package com.example.ui.screen
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,7 +9,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.using
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -299,8 +297,7 @@ fun TrackingTab(
                 targetState = controlsMode,
                 transitionSpec = {
                     (scaleIn(tween(220), initialScale = 0.6f) + fadeIn(tween(220))) togetherWith
-                        (scaleOut(tween(140), targetScale = 0.6f) + fadeOut(tween(140))) using
-                        SizeTransform(clip = false)
+                        (scaleOut(tween(140), targetScale = 0.6f) + fadeOut(tween(140)))
                 },
                 label = "recording_controls"
             ) { mode ->
