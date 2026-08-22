@@ -1,6 +1,12 @@
 package com.example.ui.screen
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -530,6 +536,34 @@ fun PermissionDeniedState(onGrantClick: () -> Unit) {
     }
 }
 
+/**
+ * Anime le changement d'une statistique en direct (distance, vitesse, altitude) par
+ * un défilement vertical façon compteur, plutôt qu'un saut sec à chaque nouveau point
+ * GPS — c'est-à-dire environ une fois par seconde pendant l'enregistrement.
+ *
+ * Toujours le même sens de défilement, que la valeur monte ou descende. La distinguer
+ * demanderait de réanalyser une chaîne déjà mise en forme (unité, virgule décimale)
+ * pour un gain visuel marginal : le nombre a l'air vivant dans les deux cas.
+ */
+@Composable
+private fun AnimatedStatValue(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier
+) {
+    AnimatedContent(
+        targetState = text,
+        transitionSpec = {
+            (slideInVertically(tween(180)) { it / 2 } + fadeIn(tween(180))) togetherWith
+                (slideOutVertically(tween(180)) { -it / 2 } + fadeOut(tween(180)))
+        },
+        label = "stat_value",
+        modifier = modifier
+    ) { value ->
+        Text(text = value, style = style)
+    }
+}
+
 @Composable
 fun LiveStatsCard(
     stats: LiveStats,
@@ -626,7 +660,7 @@ fun LiveStatsCard(
                             letterSpacing = 0.5.sp
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
+                        AnimatedStatValue(
                             text = FormatUtils.formatDistance(stats.distanceMeters),
                             style = androidx.compose.ui.text.TextStyle(
                                 fontSize = 18.sp,
@@ -657,7 +691,7 @@ fun LiveStatsCard(
                             letterSpacing = 0.5.sp
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
+                        AnimatedStatValue(
                             text = FormatUtils.formatSpeed(currentSpeed),
                             style = androidx.compose.ui.text.TextStyle(
                                 fontSize = 18.sp,
@@ -692,7 +726,7 @@ fun LiveStatsCard(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
+                            AnimatedStatValue(
                                 text = FormatUtils.formatElevationOrUnknown(currentAltitude),
                                 style = androidx.compose.ui.text.TextStyle(
                                     fontSize = 18.sp,
