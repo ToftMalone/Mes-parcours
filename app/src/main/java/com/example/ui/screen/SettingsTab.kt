@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SatelliteAlt
 import androidx.compose.material.icons.filled.Save
@@ -130,8 +129,10 @@ fun SettingsTab(
             NightModeSettingsCard()
 
             SettingsGroupHeader(title = "Tracés", icon = Icons.Default.Timeline)
+            // La couleur n'est plus un réglage global : elle se choisit parcours par
+            // parcours, sur sa pastille colorée dans l'historique. Il ne reste ici que
+            // ce qui vaut pour tous les tracés à la fois.
             TrackThicknessSettingsCard()
-            ImportedTrackColorCard()
 
             SettingsGroupHeader(title = "Sauvegarde", icon = Icons.Default.CloudSync)
             AutoBackupSettingsCard()
@@ -622,40 +623,6 @@ fun NightModeSettingsCard() {
 // ---------------------------------------------------------------------------
 // Tracés
 // ---------------------------------------------------------------------------
-
-/**
- * Couleurs des parcours importés.
- *
- * Ce choix n'existait que derrière un appui long sur l'onglet « Importés » de
- * l'historique : un geste que rien n'annonce, sur un onglet précis parmi deux. Qui
- * ouvrait la palette depuis « Enregistrés » n'y voyait rien — et pour cause, un
- * parcours enregistré ne vient d'aucun fichier. Le réglage restait donc introuvable
- * pour qui ne l'avait pas vu faire. Sa place est ici, là où on cherche les réglages ;
- * le geste de l'historique n'est plus qu'un raccourci.
- */
-@Composable
-fun ImportedTrackColorCard() {
-    val context = LocalContext.current
-    var fromFile by remember {
-        mutableStateOf(TrackStylePreferences.isImportedColorFromFile(context))
-    }
-
-    SettingsCard(modifier = Modifier.testTag("imported_track_color_card")) {
-        SettingsToggleRow(
-            icon = Icons.Default.Palette,
-            title = "Garder les couleurs des fichiers",
-            description = "Chaque parcours importé reprend la couleur que portait son " +
-                    "fichier, celle choisie dans Google Earth. Les fichiers qui n'en " +
-                    "portent pas, les GPX notamment, gardent la couleur de la palette.",
-            checked = fromFile,
-            onCheckedChange = { checked ->
-                fromFile = checked
-                TrackStylePreferences.setImportedColorFromFile(context, checked)
-            },
-            switchTestTag = "imported_color_from_file_switch"
-        )
-    }
-}
 
 /** "3,5" plutôt que "3.5" : une virgule quel que soit le réglage régional de l'appareil. */
 private fun formatThicknessDp(value: Float): String =
@@ -1199,10 +1166,11 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.12.0",
+        version = "0.13.0",
         changes = listOf(
-            "Correction : le bouton « localiser » ne change plus le zoom. Il recentre la carte sur votre position en gardant l'échelle que vous aviez choisie, au lieu de sauter à un niveau de zoom relevé au hasard du dernier geste",
-            "Correction : le pincement à deux doigts n'est plus interrompu par les mises à jour de position pendant un enregistrement, ce qui pouvait dérégler durablement le cadrage"
+            "Nouveau : la couleur se choisit désormais parcours par parcours, et non plus par catégorie. Appuyez sur la pastille colorée d'un parcours dans l'historique pour la changer",
+            "Nouveau : pour un parcours importé d'un fichier coloré, une pastille en forme de globe lui rend la couleur qu'il portait dans Google Earth",
+            "Vos parcours gardent exactement l'apparence qu'ils avaient : chacun conserve la couleur que sa catégorie lui donnait jusqu'ici"
         )
     )
 )

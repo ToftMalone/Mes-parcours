@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.12.0` (`versionCode` 28). Elle n'est écrite qu'une fois,
+- Version courante : `0.13.0` (`versionCode` 29). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -146,12 +146,42 @@ AppDatabase / TrackDao  ──  entités Track + TrackPoint
   `SolarTimes`, `TunnelDetector`, `Altitude`, `ElevationAccumulator`, `FormatUtils`,
   `KmlColor`, préférences de style
 
-## Couleurs des parcours importés
+## Couleur d'un parcours
 
-Un KML porte la couleur de chaque tracé ; l'application peut la conserver plutôt que
-d'appliquer une couleur unique. Le réglage est un interrupteur dans
-« Paramètres → Tracés », doublé d'un raccourci par appui long sur l'onglet
-« Importés » de l'historique.
+**La couleur appartient au parcours, pas à la catégorie** (depuis la `0.13.0`). Elle
+est enregistrée dans `Track.displayColor` et se choisit en appuyant sur la pastille
+colorée du parcours, dans l'historique. Les trois couleurs par catégorie qui vivaient
+en préférences, l'appui long sur les onglets et l'interrupteur global « garder les
+couleurs des fichiers » ont tous disparu avec ce changement.
+
+`TrackStylePreferences.resolveTrackColor` est le seul endroit qui tranche, dans cet
+ordre :
+
+1. `displayColor` — le choix explicite de l'utilisateur pour ce parcours ;
+2. `sourceColor` — la couleur que portait son fichier ;
+3. la couleur par défaut de sa catégorie (`defaultColorFor`).
+
+Le choix explicite passe **devant** la couleur du fichier, et c'est voulu : sans cela,
+choisir une couleur franche sur un KML coloré ne changerait rien à l'écran, la pastille
+se cochant sans effet visible. Symétriquement, « couleur d'origine » se dit en remettant
+`displayColor` à null — d'où le choix d'une colonne nullable plutôt qu'un drapeau à part.
+
+`displayColor` prime aussi sur `TrackPoint.segmentColor` au dessin : une couleur
+demandée à la main vaut pour le parcours entier, tronçons compris.
+
+**La reprise des couleurs existantes est obligatoire.** La migration 7→8 ne peut pas
+remplir `displayColor` elle-même : la valeur à écrire vivait dans les préférences, que
+le SQL d'une migration ne sait pas lire. `TrackRepository.backfillDisplayColors`, appelé
+au démarrage depuis `TrackApplication` et gardé par une préférence, écrit donc à chaque
+parcours existant la couleur qu'il affichait avant la mise à jour. Sans elle, tout
+l'historique d'un utilisateur ayant réglé ses couleurs changerait d'apparence sans qu'il
+ait rien demandé. Elle tient en un seul `UPDATE … WHERE displayColor IS NULL`, donc
+rejouable et sans charger un parcours en mémoire.
+
+## Couleurs lues dans les fichiers importés
+
+Un KML porte la couleur de chaque tracé, que l'application conserve (voir l'ordre de
+résolution ci-dessus).
 
 Trois pièges, chacun visible à l'écran s'il n'était pas traité :
 
@@ -215,9 +245,9 @@ pourquoi. À relire avant d'y toucher.
    silencieusement de se mettre à jour.
 2. **Toutes les migrations Room sont obligatoires.** Retirer l'une des migrations
    déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
-   (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`) — rendrait la
-   base illisible pour tout utilisateur venant d'une version antérieure. Toute
-   nouvelle version de schéma doit venir avec la sienne.
+   (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`), `MIGRATION_7_8`
+   (`Track.displayColor`) — rendrait la base illisible pour tout utilisateur venant
+   d'une version antérieure. Toute nouvelle version de schéma doit venir avec la sienne.
    Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
    la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec
    `fallbackToDestructiveMigrationOnDowngrade()` — une migration oubliée fait

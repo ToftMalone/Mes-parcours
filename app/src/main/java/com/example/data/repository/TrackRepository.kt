@@ -9,6 +9,7 @@ import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.model.TrackPointMeta
 import com.example.util.Importer
+import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
@@ -574,6 +575,28 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     suspend fun updateTrack(track: Track) {
         trackDao.updateTrack(track)
+    }
+
+    /**
+     * Donne à chaque parcours existant la couleur qu'il affichait avant le passage aux
+     * couleurs par parcours, puis note que c'est fait.
+     *
+     * Appelée à chaque démarrage mais ne travaille qu'une fois : sans cette reprise,
+     * tous les parcours d'un utilisateur ayant réglé ses couleurs par catégorie
+     * changeraient d'apparence à la mise à jour, sans qu'il ait rien demandé.
+     */
+    suspend fun backfillDisplayColors(context: android.content.Context) {
+        if (TrackStylePreferences.hasMigratedColors(context)) return
+        val legacy = TrackStylePreferences.readLegacyCategoryColors(context)
+        trackDao.backfillDisplayColors(
+            recorded = legacy.recorded,
+            imported = legacy.imported,
+            merged = legacy.merged,
+            fromFile = if (legacy.fromFile) 1 else 0
+        )
+        TrackStylePreferences.setMigratedColors(context)
+        // Rien à invalider : les caches ne retiennent que des points, et Room réémet
+        // de lui-même les flux de parcours après cet UPDATE.
     }
 
     suspend fun insertPoint(point: TrackPoint) {

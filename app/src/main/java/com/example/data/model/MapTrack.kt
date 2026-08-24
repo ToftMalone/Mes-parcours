@@ -13,5 +13,7 @@ data class MapTrack(
     val isMerged: Boolean,
     /** Couleur lue dans le fichier importé, null s'il n'en portait pas. */
     val sourceColor: Int?,
+    /** Couleur choisie par l'utilisateur pour ce parcours, null s'il n'a rien choisi. */
+    val displayColor: Int? = null,
     val points: List<TrackPoint>
 )

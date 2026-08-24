@@ -246,6 +246,7 @@ fun DetailView(
                         isImported = currentTrack.isImported,
                         isMerged = currentTrack.isMerged,
                         sourceColor = currentTrack.sourceColor,
+                        displayColor = currentTrack.displayColor,
                         isCurrentTracking = isCurrentRecording,
                         onViewportChanged = { viewModel.updateMapViewport(it) }
                     )

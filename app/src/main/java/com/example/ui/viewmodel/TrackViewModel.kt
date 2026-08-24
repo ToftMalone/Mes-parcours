@@ -261,6 +261,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 isImported = track.isImported,
                 isMerged = track.isMerged,
                 sourceColor = track.sourceColor,
+                displayColor = track.displayColor,
                 points = repository.getDisplayPoints(track.id, viewport)
             )
         }
@@ -359,6 +360,17 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             action = TrackingService.ACTION_RESUME
         }
         context.startService(intent)
+    }
+
+    /**
+     * Fixe la couleur d'un parcours, ou la remet en automatique avec [color] à null —
+     * auquel cas le parcours retrouve la couleur de son fichier d'origine s'il en a une.
+     */
+    fun setTrackColor(track: Track, color: Int?) {
+        if (track.displayColor == color) return
+        viewModelScope.launch {
+            repository.updateTrack(track.copy(displayColor = color))
+        }
     }
 
     fun renameTrack(track: Track, newName: String) {

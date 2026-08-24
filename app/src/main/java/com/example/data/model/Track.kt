@@ -28,5 +28,18 @@ data class Track(
      * de « le fichier demandait du noir ». Sans cette distinction, un parcours sans
      * couleur se dessinerait en noir au lieu de reprendre celle de la palette.
      */
-    val sourceColor: Int? = null
+    val sourceColor: Int? = null,
+    /**
+     * Couleur choisie par l'utilisateur pour **ce parcours précis** (ARGB), ou null
+     * pour « automatique » : la couleur du fichier d'origine si le fichier en portait
+     * une, sinon la couleur par défaut de la catégorie.
+     *
+     * Nullable pour la même raison que `sourceColor` : « je n'ai rien choisi » et
+     * « j'ai choisi le noir » doivent rester distincts. Sans cette distinction, un
+     * parcours jamais colorié à la main perdrait la couleur de son fichier.
+     *
+     * Remplace les trois couleurs par catégorie qui existaient jusqu'ici en
+     * préférences : la couleur appartient désormais au parcours, pas à l'onglet.
+     */
+    val displayColor: Int? = null
 )

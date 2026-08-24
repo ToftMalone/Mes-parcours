@@ -27,6 +27,37 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE isRecording = 1 ORDER BY id DESC LIMIT 1")
     suspend fun getActiveRecordingTrack(): Track?
 
+    /**
+     * Écrit dans `displayColor` la couleur que chaque parcours affichait du temps des
+     * couleurs par catégorie, pour que le passage aux couleurs par parcours ne change
+     * rien à l'écran.
+     *
+     * Reproduit exactement l'ancienne résolution : couleur du fichier si le réglage
+     * « garder les couleurs d'origine » était actif et que le fichier en portait une,
+     * sinon la couleur de la catégorie.
+     *
+     * En SQL plutôt qu'en Kotlin : une seule requête, aucun parcours chargé en mémoire.
+     * `WHERE displayColor IS NULL` la rend rejouable sans écraser un choix déjà fait.
+     */
+    @Query(
+        """
+        UPDATE tracks SET displayColor = CASE
+            WHEN isMerged = 1 THEN
+                CASE WHEN :fromFile = 1 AND sourceColor IS NOT NULL THEN sourceColor ELSE :merged END
+            WHEN isImported = 1 THEN
+                CASE WHEN :fromFile = 1 AND sourceColor IS NOT NULL THEN sourceColor ELSE :imported END
+            ELSE :recorded
+        END
+        WHERE displayColor IS NULL
+        """
+    )
+    suspend fun backfillDisplayColors(
+        recorded: Int,
+        imported: Int,
+        merged: Int,
+        fromFile: Int
+    )
+
     @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id ASC")
     suspend fun getPointsForTrack(trackId: Long): List<TrackPoint>
 

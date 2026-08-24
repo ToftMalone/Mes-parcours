@@ -17,7 +17,7 @@ import com.example.data.model.TrackPoint
  * l'exécution. L'incrémenter sans ajouter la migration correspondante fait échouer ce
  * test — c'est précisément ce qu'on lui demande.
  */
-internal const val DATABASE_VERSION = 7
+internal const val DATABASE_VERSION = 8
 
 /**
  * `exportSchema = true` : Room écrit le schéma de chaque version dans
@@ -91,6 +91,26 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * Ajoute `displayColor` : la couleur choisie par l'utilisateur pour un parcours
+         * donné, la couleur ayant cessé d'appartenir à la catégorie pour appartenir au
+         * parcours lui-même.
+         *
+         * Nullable et sans valeur par défaut, comme les précédentes : « aucune couleur
+         * choisie » doit rester distinct de « noir choisi », et une valeur par défaut
+         * ferait réécrire toute la table au lieu du seul schéma.
+         *
+         * Les parcours déjà en base sortent donc de cette migration avec `displayColor`
+         * à null. C'est `TrackRepository.backfillDisplayColors` qui leur écrit ensuite,
+         * une seule fois, la couleur qu'ils affichaient jusqu'ici : cette couleur venait
+         * des préférences, que le SQL d'une migration ne sait pas lire.
+         */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tracks` ADD COLUMN `displayColor` INTEGER")
+            }
+        }
+
+        /**
          * Toutes les migrations déclarées, dans l'ordre.
          *
          * Exposée pour que le test de migration applique exactement la même liste que
@@ -98,7 +118,7 @@ abstract class AppDatabase : RoomDatabase() {
          * ajoutée ici et oubliée là.
          */
         @androidx.annotation.VisibleForTesting
-        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {

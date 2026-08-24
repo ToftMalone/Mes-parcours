@@ -1,11 +1,32 @@
 package com.example
 
 import android.app.Application
+import com.example.data.repository.TrackRepository
 import com.example.util.OsmConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class TrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         OsmConfig.init(this)
+
+        // Reprise des couleurs, une seule fois, au premier lancement après le passage
+        // aux couleurs par parcours : chaque parcours déjà en base reçoit explicitement
+        // celle qu'il affichait jusqu'ici. Sans cela, un utilisateur ayant réglé ses
+        // couleurs par catégorie verrait tout son historique changer d'apparence sans
+        // avoir rien demandé.
+        //
+        // Sur un fil d'arrière-plan : c'est une écriture en base, et la migration Room
+        // se déclenche à cette première ouverture. Un échec ne doit pas empêcher
+        // l'application de démarrer — au pire les couleurs se recalculent par défaut.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching {
+                TrackRepository.getInstance(this@TrackApplication)
+                    .backfillDisplayColors(this@TrackApplication)
+            }
+        }
     }
 }

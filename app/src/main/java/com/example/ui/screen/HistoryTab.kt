@@ -7,7 +7,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +60,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -85,18 +83,9 @@ fun HistoryTab(
     val context = androidx.compose.ui.platform.LocalContext.current
     var selectedTab by remember { mutableStateOf(0) } // 0 = Enregistrés, 1 = Importés, 2 = Fusionnés
 
-    // Couleur d'affichage de chaque catégorie, modifiable par appui long sur l'onglet.
-    var recordedColor by remember { mutableStateOf(TrackStylePreferences.getRecordedColor(context)) }
-    var importedColor by remember { mutableStateOf(TrackStylePreferences.getImportedColor(context)) }
-    var mergedColor by remember { mutableStateOf(TrackStylePreferences.getMergedColor(context)) }
-
-    // Les parcours importés gardent-ils la couleur de leur fichier d'origine ?
-    var importedColorFromFile by remember {
-        mutableStateOf(TrackStylePreferences.isImportedColorFromFile(context))
-    }
-
-    // Catégorie dont la palette est ouverte : 0, 1 ou 2 comme les onglets ; null = fermée.
-    var colorPickerCategory by remember { mutableStateOf<Int?>(null) }
+    // Parcours dont la palette est ouverte ; null = fermée. La couleur appartient au
+    // parcours, plus à la catégorie : c'est donc une trace précise que l'on colore.
+    var colorPickerTrack by remember { mutableStateOf<Track?>(null) }
 
     val filePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
@@ -195,16 +184,12 @@ fun HistoryTab(
                     divider = {},
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                 ) {
-                    // Appui long sur un onglet : choix de la couleur de la catégorie.
-                    //
-                    // Le geste reste posé sur le Text, donc sensible sur les seules
-                    // lettres du libellé. L'élargir à tout l'onglet par un Box en
-                    // fillMaxWidth a été essayé et retiré : dans le créneau `text` d'un
-                    // Tab, cette largeur est réclamée sur la rangée entière, le premier
-                    // onglet la prend toute, et le second sort de l'écran — que la
-                    // rangée rogne. L'onglet « Importés » disparaissait purement et
-                    // simplement. Le réglage est de toute façon atteignable depuis
-                    // l'écran des paramètres, qui est sa vraie place.
+                    // Les onglets ne portent plus l'appui long qui ouvrait la couleur de
+                    // la catégorie : la couleur appartient désormais au parcours, et se
+                    // choisit sur sa carte. Ce geste caché était de toute façon
+                    // indevinable, et sa zone sensible se limitait aux lettres du
+                    // libellé — l'élargir avait fait disparaître l'onglet « Importés »
+                    // (voir l'historique de ce fichier).
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
@@ -212,13 +197,7 @@ fun HistoryTab(
                             Text(
                                 text = "Enregistrés (${recordedTracks.size})",
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onTap = { selectedTab = 0 },
-                                        onLongPress = { colorPickerCategory = 0 }
-                                    )
-                                }
+                                style = MaterialTheme.typography.titleSmall
                             )
                         }
                     )
@@ -229,13 +208,7 @@ fun HistoryTab(
                             Text(
                                 text = "Importés (${importedTracks.size})",
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onTap = { selectedTab = 1 },
-                                        onLongPress = { colorPickerCategory = 1 }
-                                    )
-                                }
+                                style = MaterialTheme.typography.titleSmall
                             )
                         }
                     )
@@ -246,24 +219,17 @@ fun HistoryTab(
                             Text(
                                 text = "Fusionnés (${mergedTracks.size})",
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onTap = { selectedTab = 2 },
-                                        onLongPress = { colorPickerCategory = 2 }
-                                    )
-                                }
+                                style = MaterialTheme.typography.titleSmall
                             )
                         }
                     )
                 }
             }
 
-            // Le geste serait indevinable sans un rappel discret.
+            // La pastille de couleur d'une carte est cliquable, mais rien ne le dit.
             item {
                 Text(
-                    text = "Appui long sur une catégorie pour changer sa couleur — " +
-                            "ou garder celles des fichiers importés",
+                    text = "Appuyez sur la pastille colorée d'un parcours pour changer sa couleur",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
@@ -312,7 +278,8 @@ fun HistoryTab(
                         StaggeredHistoryCard(index) {
                             TrackHistoryCard(
                                 track = track,
-                                trackColor = Color(recordedColor),
+                                trackColor = Color(trackDisplayColor(track)),
+                                onColorClick = { colorPickerTrack = track },
                                 onClick = { onNavigateToDetails(track.id) },
                                 onDeleteClick = { trackToDelete = track },
                                 onResumeClick = {
@@ -391,13 +358,8 @@ fun HistoryTab(
                         StaggeredHistoryCard(index) {
                             TrackHistoryCard(
                                 track = track,
-                                trackColor = Color(
-                                    TrackStylePreferences.resolveImportedColor(
-                                        fromFile = importedColorFromFile,
-                                        sourceColor = track.sourceColor,
-                                        fallback = importedColor
-                                    )
-                                ),
+                                trackColor = Color(trackDisplayColor(track)),
+                                onColorClick = { colorPickerTrack = track },
                                 onClick = { onNavigateToDetails(track.id) },
                                 onDeleteClick = { trackToDelete = track },
                                 onResumeClick = {
@@ -431,16 +393,8 @@ fun HistoryTab(
                         StaggeredHistoryCard(index) {
                             TrackHistoryCard(
                                 track = track,
-                                // Un parcours fusionné à partir de fichiers garde les
-                                // couleurs de ceux-ci quand le réglage le demande ; sinon
-                                // il prend la couleur de sa propre catégorie.
-                                trackColor = Color(
-                                    TrackStylePreferences.resolveImportedColor(
-                                        fromFile = importedColorFromFile,
-                                        sourceColor = track.sourceColor,
-                                        fallback = mergedColor
-                                    )
-                                ),
+                                trackColor = Color(trackDisplayColor(track)),
+                                onColorClick = { colorPickerTrack = track },
                                 onClick = { onNavigateToDetails(track.id) },
                                 onDeleteClick = { trackToDelete = track },
                                 onResumeClick = {
@@ -466,21 +420,22 @@ fun HistoryTab(
         }
     }
 
-    // Palette de couleurs, ouverte par appui long sur un onglet de catégorie
-    colorPickerCategory?.let { category ->
-        // Les parcours enregistrés ne viennent d'aucun fichier : eux seuls n'ont pas
-        // de couleur d'origine à conserver, et la pastille en dégradé n'a donc rien
-        // à leur proposer.
-        val comesFromFiles = category != 0
+    // Palette de couleurs d'un parcours précis, ouverte depuis sa pastille colorée.
+    colorPickerTrack?.let { picked ->
+        // La trace vient de la liste, qui se recompose à chaque écriture : on relit
+        // donc la version à jour, sinon la sélection ne bougerait pas sous le doigt.
+        val track = tracks.firstOrNull { it.id == picked.id } ?: picked
+
+        // Seul un parcours dont le fichier portait une couleur peut la retrouver.
+        // La proposer sur un GPX, ou sur un enregistrement, serait une option qui ne
+        // fait rien.
+        val hasFileColor = track.sourceColor != null
+
         AlertDialog(
-            onDismissRequest = { colorPickerCategory = null },
+            onDismissRequest = { colorPickerTrack = null },
             title = {
                 Text(
-                    text = when (category) {
-                        0 -> "Couleur des parcours enregistrés"
-                        1 -> "Couleur des parcours importés"
-                        else -> "Couleur des parcours fusionnés"
-                    },
+                    text = "Couleur de « ${track.name} »",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -488,62 +443,43 @@ fun HistoryTab(
             text = {
                 Column {
                     ColorPaletteRow(
-                        selectedColor = when (category) {
-                            0 -> recordedColor
-                            1 -> importedColor
-                            else -> mergedColor
-                        },
+                        selectedColor = track.displayColor
+                            ?: TrackStylePreferences.resolveTrackColor(
+                                displayColor = null,
+                                sourceColor = track.sourceColor,
+                                isImported = track.isImported,
+                                isMerged = track.isMerged
+                            ),
                         onColorSelected = { color ->
-                            when (category) {
-                                0 -> {
-                                    recordedColor = color
-                                    TrackStylePreferences.setRecordedColor(context, color)
-                                }
-                                1 -> {
-                                    importedColor = color
-                                    TrackStylePreferences.setImportedColor(context, color)
-                                }
-                                else -> {
-                                    mergedColor = color
-                                    TrackStylePreferences.setMergedColor(context, color)
-                                }
-                            }
-                            if (comesFromFiles) {
-                                // Choisir une couleur franche, c'est renoncer à celle
-                                // du fichier : sans quoi la pastille se sélectionnerait
-                                // sans que le tracé change à l'écran.
-                                importedColorFromFile = false
-                                TrackStylePreferences.setImportedColorFromFile(context, false)
-                            }
+                            viewModel.setTrackColor(track, color)
                         },
-                        showFileColorOption = comesFromFiles,
-                        isFileColorSelected = importedColorFromFile,
+                        showFileColorOption = hasFileColor,
+                        // « Couleur d'origine » n'est retenue que tant que l'utilisateur
+                        // n'a rien choisi lui-même : displayColor à null, c'est
+                        // exactement cela.
+                        isFileColorSelected = track.displayColor == null,
                         onFileColorSelected = {
-                            importedColorFromFile = true
-                            TrackStylePreferences.setImportedColorFromFile(context, true)
+                            viewModel.setTrackColor(track, null)
                         }
                     )
 
-                    if (comesFromFiles) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if (importedColorFromFile) {
-                                "Chaque parcours garde la couleur de son fichier. " +
-                                    "Ceux qui n'en portent pas — les GPX, notamment — " +
-                                    "utilisent la couleur choisie ici."
-                            } else {
-                                "La première pastille garde les couleurs d'origine des " +
-                                    "fichiers, telles que Google Earth les a enregistrées."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (hasFileColor) {
+                            "Le globe garde la couleur que ce fichier portait dans " +
+                                "Google Earth. Chaque parcours se colore séparément."
+                        } else {
+                            "Ce parcours ne vient d'aucun fichier coloré — les GPX n'en " +
+                                "portent jamais. Choisissez-lui une couleur."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
             confirmButton = {
                 Button(
-                    onClick = { colorPickerCategory = null },
+                    onClick = { colorPickerTrack = null },
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -624,6 +560,20 @@ private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable 
     }
 }
 
+/**
+ * Couleur d'affichage d'un parcours : son choix explicite, à défaut celle de son
+ * fichier, à défaut celle par défaut de sa catégorie.
+ *
+ * Simple raccourci pour ne pas réécrire les quatre arguments sur chaque carte.
+ */
+private fun trackDisplayColor(track: Track): Int =
+    TrackStylePreferences.resolveTrackColor(
+        displayColor = track.displayColor,
+        sourceColor = track.sourceColor,
+        isImported = track.isImported,
+        isMerged = track.isMerged
+    )
+
 @Composable
 fun TrackHistoryCard(
     track: Track,
@@ -633,10 +583,11 @@ fun TrackHistoryCard(
     showMapSelection: Boolean = false,
     isSelectedForMap: Boolean = false,
     onMapSelectionToggle: (Boolean) -> Unit = {},
-    /** Couleur de la catégorie, choisie par l'utilisateur dans l'historique. */
+    /** Ouvre la palette de ce parcours ; null rend la pastille inerte. */
+    onColorClick: (() -> Unit)? = null,
+    /** Couleur d'affichage de ce parcours précis. */
     trackColor: Color = Color(
-        if (track.isImported) TrackStylePreferences.DEFAULT_COLOR_IMPORTED
-        else TrackStylePreferences.DEFAULT_COLOR_RECORDED
+        TrackStylePreferences.defaultColorFor(track.isImported, track.isMerged)
     )
 ) {
     Card(
@@ -664,15 +615,32 @@ fun TrackHistoryCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // La pastille colorée ouvre la palette de ce parcours : c'est
+                // l'élément qui porte déjà sa couleur, donc celui sur lequel on pense
+                // à appuyer pour la changer. Le cadre s'affiche pour signaler qu'elle
+                // se touche, et le libellé d'accessibilité le dit aussi.
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = trackColor.copy(alpha = 0.12f),
-                    modifier = Modifier.size(44.dp)
+                    border = onColorClick?.let {
+                        androidx.compose.foundation.BorderStroke(1.dp, trackColor.copy(alpha = 0.5f))
+                    },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .then(
+                            if (onColorClick != null) {
+                                Modifier
+                                    .clickable(onClick = onColorClick)
+                                    .testTag("track_color_button_${track.id}")
+                            } else Modifier
+                        )
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Map,
-                            contentDescription = track.activityType,
+                            contentDescription = if (onColorClick != null) {
+                                "Changer la couleur de ${track.name}"
+                            } else track.activityType,
                             tint = trackColor,
                             modifier = Modifier.size(22.dp)
                         )
@@ -989,13 +957,72 @@ private fun MergedEmptyState() {
 }
 
 /**
- * Rangée de pastilles de couleur, affichée dans la boîte de dialogue ouverte par
- * un appui long sur une catégorie. La couleur retenue s'applique aux tracés sur
- * la carte et aux fiches de l'historique.
+ * Pastille « garder la couleur d'origine du fichier », dessinée en globe terrestre.
  *
- * Pour les parcours importés, une pastille supplémentaire ouvre la rangée : elle ne
- * porte pas une couleur mais un dégradé, parce qu'elle en désigne autant qu'il y a
- * de fichiers. C'est le choix « garder les couleurs d'origine ».
+ * Un dégradé arc-en-ciel occupait cette place : il disait « plusieurs couleurs » mais
+ * pas d'où elles venaient. Le globe renvoie à Google Earth, seule origine possible
+ * d'une couleur de fichier ici.
+ *
+ * Dessiné, et non repris du logo de Google : c'est une marque déposée, et ce dépôt est
+ * public sous licence GPL-3.0 — y verser l'image de quelqu'un d'autre reviendrait à la
+ * redistribuer sous une licence qui ne lui appartient pas.
+ */
+@Composable
+private fun SourceColorSwatch(selected: Boolean, onClick: () -> Unit) {
+    val size = if (selected) 38.dp else 32.dp
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                shape = CircleShape
+            )
+            .clickable { onClick() }
+            .testTag("color_swatch_from_file")
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().padding(3.dp)) {
+            val d = this.size.minDimension
+            val r = d / 2f
+            val c = androidx.compose.ui.geometry.Offset(this.size.width / 2f, this.size.height / 2f)
+
+            // L'océan, plus clair en haut à gauche : le relief tient à ce seul dégradé.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF4FC3F7), Color(0xFF1565C0)),
+                    center = androidx.compose.ui.geometry.Offset(c.x - r * 0.3f, c.y - r * 0.35f),
+                    radius = d
+                ),
+                radius = r,
+                center = c
+            )
+
+            // Trois masses de terre. Des ovales plutôt que des contours réels : à cette
+            // taille le détail se perdrait, seule la silhouette continent/océan se lit.
+            fun land(cx: Float, cy: Float, w: Float, h: Float, color: Color) {
+                drawOval(
+                    color = color,
+                    topLeft = androidx.compose.ui.geometry.Offset(c.x + r * cx, c.y + r * cy),
+                    size = androidx.compose.ui.geometry.Size(r * w, r * h)
+                )
+            }
+            // Ce qui déborde du disque est rogné par le `clip(CircleShape)` posé sur la
+            // Box parente : les ovales peuvent donc mordre le bord sans le déformer.
+            land(-0.75f, -0.60f, 0.80f, 0.55f, Color(0xFF66BB6A))
+            land(-0.20f, 0.00f, 0.95f, 0.70f, Color(0xFF43A047))
+            land(-0.85f, 0.25f, 0.55f, 0.45f, Color(0xFF81C784))
+        }
+    }
+}
+
+/**
+ * Rangée de pastilles de couleur, affichée dans la boîte de dialogue d'un parcours.
+ * La couleur retenue s'applique à son tracé sur la carte et à sa fiche d'historique.
+ *
+ * Pour un parcours venu d'un fichier coloré, une pastille supplémentaire ouvre la
+ * rangée : le globe, qui rend au parcours la couleur que son fichier portait.
  */
 @Composable
 fun ColorPaletteRow(
@@ -1014,32 +1041,7 @@ fun ColorPaletteRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (showFileColorOption) {
-            Box(
-                modifier = Modifier
-                    .size(if (isFileColorSelected) 38.dp else 32.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.sweepGradient(
-                            listOf(
-                                Color(0xFFD32F2F),
-                                Color(0xFFFF9800),
-                                Color(0xFFFFEB3B),
-                                Color(0xFF39FF14),
-                                Color(0xFF2196F3),
-                                Color(0xFF8B5CF6),
-                                Color(0xFFD32F2F)
-                            )
-                        )
-                    )
-                    .border(
-                        width = if (isFileColorSelected) 3.dp else 1.dp,
-                        color = if (isFileColorSelected) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                        shape = CircleShape
-                    )
-                    .clickable { onFileColorSelected() }
-                    .testTag("color_swatch_from_file")
-            )
+            SourceColorSwatch(selected = isFileColorSelected, onClick = onFileColorSelected)
         }
 
         TrackStylePreferences.COLOR_PALETTE.forEach { color ->

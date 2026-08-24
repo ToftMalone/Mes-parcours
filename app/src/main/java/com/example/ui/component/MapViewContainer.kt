@@ -296,12 +296,10 @@ private class MapState(
     var mapMode: String = "2d",
     // Apparence choisie par l'utilisateur : tout changement invalide les polylignes en cache.
     var strokeWidth: Float = 12f,
-    var recordedColor: Int = 0,
-    var importedColor: Int = 0,
-    var mergedColor: Int = 0,
-    var importedColorFromFile: Boolean = false,
     /** Couleur d'origine du parcours affiché en plein écran, s'il en a une. */
-    var sourceColor: Int? = null
+    var sourceColor: Int? = null,
+    /** Couleur choisie par l'utilisateur pour le parcours affiché en plein écran. */
+    var displayColor: Int? = null
 )
 
 private fun createBlueDotIcon(context: Context): android.graphics.drawable.Drawable {
@@ -360,6 +358,8 @@ fun MapViewContainer(
     isImported: Boolean = false,
     isMerged: Boolean = false,
     sourceColor: Int? = null,
+    /** Couleur choisie par l'utilisateur pour le parcours affiché, null s'il n'a rien choisi. */
+    displayColor: Int? = null,
     isCurrentTracking: Boolean = false,
     zoomBannerTopPadding: androidx.compose.ui.unit.Dp = 110.dp,
     isAutoFollowActive: Boolean = false,
@@ -494,17 +494,10 @@ fun MapViewContainer(
 
                 // Apparence choisie dans les paramètres / l'historique
                 val strokeWidth = TrackStylePreferences.getStrokeWidth(map.context)
-                val recordedColor = TrackStylePreferences.getRecordedColor(map.context)
-                val importedColor = TrackStylePreferences.getImportedColor(map.context)
-                val mergedColor = TrackStylePreferences.getMergedColor(map.context)
-                val importedColorFromFile = TrackStylePreferences.isImportedColorFromFile(map.context)
 
                 val styleChanged = state.strokeWidth != strokeWidth ||
-                                   state.recordedColor != recordedColor ||
-                                   state.importedColor != importedColor ||
-                                   state.mergedColor != mergedColor ||
-                                   state.importedColorFromFile != importedColorFromFile ||
-                                   state.sourceColor != sourceColor
+                                   state.sourceColor != sourceColor ||
+                                   state.displayColor != displayColor
 
                 val configChanged = state.isImported != isImported ||
                                     state.isMerged != isMerged ||
@@ -540,11 +533,8 @@ fun MapViewContainer(
                     state.isInteractivityEnabled = isInteractivityEnabled
                     state.mapMode = mapMode
                     state.strokeWidth = strokeWidth
-                    state.recordedColor = recordedColor
-                    state.importedColor = importedColor
-                    state.mergedColor = mergedColor
-                    state.importedColorFromFile = importedColorFromFile
                     state.sourceColor = sourceColor
+                    state.displayColor = displayColor
                     map.tag = state
 
                     rebuildMapOverlays(map, state, isZoomedOut)
@@ -1260,20 +1250,15 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
                     if (segment.points.isNotEmpty()) {
                         // La couleur se décide tronçon par tronçon : un même fichier
                         // importé peut réunir des dizaines de trajets, chacun de la
-                        // sienne.
-                        val segmentColor = when {
-                            overlayTrack.isMerged -> TrackStylePreferences.resolveImportedColor(
-                                fromFile = state.importedColorFromFile,
-                                sourceColor = segment.sourceColor,
-                                fallback = state.mergedColor
-                            )
-                            overlayTrack.isImported -> TrackStylePreferences.resolveImportedColor(
-                                fromFile = state.importedColorFromFile,
-                                sourceColor = segment.sourceColor,
-                                fallback = state.importedColor
-                            )
-                            else -> state.recordedColor
-                        }
+                        // sienne. Une couleur choisie à la main sur le parcours passe
+                        // devant : elle vaut pour lui tout entier, tronçons compris,
+                        // sinon la choisir ne se verrait pas sur un KML coloré.
+                        val segmentColor = TrackStylePreferences.resolveTrackColor(
+                            displayColor = overlayTrack.displayColor,
+                            sourceColor = segment.sourceColor ?: overlayTrack.sourceColor,
+                            isImported = overlayTrack.isImported,
+                            isMerged = overlayTrack.isMerged
+                        )
 
                         val polyline = Polyline().apply {
                             outlinePaint.color = segmentColor
@@ -1305,19 +1290,15 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
                 if (segment.points.isNotEmpty()) {
                     // Le rouge de l'enregistrement en cours prime sur tout : c'est le
                     // seul signal qui distingue la trace en train de s'écrire.
-                    val trackLineColor = when {
-                        state.isCurrentTracking -> Color.parseColor("#D32F2F")
-                        state.isMerged -> TrackStylePreferences.resolveImportedColor(
-                            fromFile = state.importedColorFromFile,
+                    val trackLineColor = if (state.isCurrentTracking) {
+                        Color.parseColor("#D32F2F")
+                    } else {
+                        TrackStylePreferences.resolveTrackColor(
+                            displayColor = state.displayColor,
                             sourceColor = segment.sourceColor ?: state.sourceColor,
-                            fallback = state.mergedColor
+                            isImported = state.isImported,
+                            isMerged = state.isMerged
                         )
-                        state.isImported -> TrackStylePreferences.resolveImportedColor(
-                            fromFile = state.importedColorFromFile,
-                            sourceColor = segment.sourceColor ?: state.sourceColor,
-                            fallback = state.importedColor
-                        )
-                        else -> state.recordedColor
                     }
 
                     val polyline = Polyline().apply {
