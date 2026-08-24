@@ -142,8 +142,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Un nom et une adresse qui ne correspondent à aucun compte GitHub réel :
+          # contrairement à l'adresse officielle du bot (41898282+github-actions[bot]@…),
+          # celle-ci n'est rattachée à personne, donc ces commits n'apparaissent plus dans
+          # la liste des contributeurs du dépôt. « .invalid » est le domaine réservé par la
+          # RFC 2606 pour ce genre d'usage : jamais un vrai domaine.
+          git config user.name "Mes parcours (CI)"
+          git config user.email "ci@mes-parcours.invalid"
 
           for tentative in 1 2 3; do
             # On repart systématiquement de la pointe distante, en gardant les

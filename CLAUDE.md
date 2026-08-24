@@ -92,6 +92,12 @@ par les artefacts. Trois conséquences à connaître :
 - Ces APK sont **tracés** : après une compilation locale, `git status` les
   signalera modifiés. `git update-index --skip-worktree <chemin>` les fait taire
   sur une machine donnée.
+- Ces commits ne portent **pas** l'identité `github-actions[bot]`, à la demande de
+  l'auteur qui ne voulait pas le voir dans la liste des contributeurs du dépôt.
+  L'adresse utilisée (`ci@mes-parcours.invalid`, domaine réservé par la RFC 2606)
+  ne correspond à aucun compte GitHub : ces commits n'y sont donc rattachés à
+  personne. Ne pas revenir à l'adresse officielle du bot
+  (`…@users.noreply.github.com`) sans le vouloir explicitement.
 
 Le poids s'accumule dans l'historique — une vingtaine de Mio par version, que git
 ne saura plus oublier sans réécriture. C'est le prix accepté du téléchargement
