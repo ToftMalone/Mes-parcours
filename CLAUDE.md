@@ -548,6 +548,9 @@ inverser, et l'assombrir la rendrait illisible.
 ### En attente d'une action de l'auteur
 
 - Rien ne bloque plus la chaîne de publication.
+- **La 1.0 est en attente de retours d'usage sur la 0.15**, essayée un mois avant
+  toute décision. Le découpage et les deux convertisseurs CSV (ajoutés en 0.14 et
+  0.15) ont déjà été confirmés fonctionnels sur le terrain par l'auteur.
 
 ### Audit du 0.11.2
 
@@ -945,15 +948,19 @@ inadvertance :
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.
 
-### Reste à arbitrer
+### Arbitré, avant la 1.0
 
 - **`TrackRepository._livePoints` grandit sans borne pendant un enregistrement**, et
   chaque point recopie toute la liste (`_livePoints.value + point`). Le coût est donc
   quadratique sur la durée, et la liste finit par tenir plusieurs mégaoctets. Le
   plafond existe déjà pour la reprise (`liveTailLimit`, 20 000 points) ; l'appliquer
   ici bornerait le coût, au prix du début du tracé qui disparaîtrait de l'écran sur un
-  enregistrement de plus de cinq heures. À trancher avec l'auteur, l'effet étant
-  visible.
+  enregistrement de plus de cinq heures. **Laissé tel quel, à la demande de
+  l'auteur** : le coût reste hypothétique (peu d'enregistrements dépassent cinq
+  heures), l'effet du correctif serait lui bien visible.
+
+### Reste à arbitrer
+
 - Les entrées de `libs.versions.toml` correspondant aux dépendances retirées sont
   restées : inertes à la compilation, elles documentent ce qui a existé.
 
