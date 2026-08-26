@@ -29,8 +29,11 @@ importer un parcours qu'on vous a envoyé, ou exporter les vôtres pour les part
 Rien n'est simplifié au passage : tous les points sont conservés, même sur un fichier
 énorme.
 
-**Elle sait fusionner plusieurs parcours en un seul**, remis dans l'ordre chronologique.
-Pratique quand une longue sortie s'est retrouvée coupée en morceaux.
+**Elle sait fusionner et découper.** Réunir plusieurs parcours en un seul, remis dans
+l'ordre chronologique — pratique quand une longue sortie s'est retrouvée coupée en
+morceaux. Ou l'inverse : séparer un parcours en plusieurs, à chaque tronçon ou à
+chaque longue pause. C'est ce qu'il faut pour un fichier Google Earth qui réunit
+des dizaines de voyages en un seul bloc.
 
 **Elle sauvegarde vos sorties toute seule.** À la fin de chaque enregistrement, un
 fichier est déposé dans votre dossier `Téléchargements`, prêt à être récupéré ou

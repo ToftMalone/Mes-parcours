@@ -155,6 +155,44 @@ interface TrackDao {
     )
     suspend fun copyPointsInto(destinationId: Long, sourceId: Long, maxSourceId: Long)
 
+    /**
+     * Recopie dans [destinationId] les points de [sourceId] dont l'identifiant va de
+     * [fromId] inclus à [untilId] exclu. C'est ce qui permet au découpage de verser
+     * une tranche du parcours d'origine dans un parcours neuf sans charger un seul
+     * point en mémoire.
+     *
+     * Le `ORDER BY` est indispensable pour la même raison que dans [copyPointsInto] :
+     * sans lui, le planificateur peut emprunter l'index (trackId, latitude) et
+     * recopier les points dans l'ordre des latitudes plutôt que dans celui du trajet.
+     *
+     * Pour la dernière tranche, passer `Long.MAX_VALUE` en [untilId].
+     */
+    @Query(
+        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor) " +
+                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor " +
+                "FROM track_points WHERE trackId = :sourceId AND id >= :fromId AND id < :untilId ORDER BY id ASC"
+    )
+    suspend fun copyPointRangeInto(
+        destinationId: Long,
+        sourceId: Long,
+        fromId: Long,
+        untilId: Long
+    )
+
+    /**
+     * Retire la marque de rupture du premier point d'un parcours.
+     *
+     * Une tranche découpée commence précisément sur le point qui ouvrait un nouveau
+     * tronçon : dans son parcours d'origine c'était une rupture, dans le parcours
+     * neuf c'est simplement le début du tracé. Laisser la marque ferait ouvrir un
+     * tronçon vide avant le premier point.
+     */
+    @Query(
+        "UPDATE track_points SET isDiscontinuous = 0 " +
+                "WHERE id = (SELECT MIN(id) FROM track_points WHERE trackId = :trackId)"
+    )
+    suspend fun clearFirstPointDiscontinuity(trackId: Long)
+
     /** Marque le premier point inséré après [afterId] comme début d'un nouveau tronçon. */
     @Query(
         "UPDATE track_points SET isDiscontinuous = 1 " +

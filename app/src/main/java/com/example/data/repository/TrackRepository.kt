@@ -9,6 +9,7 @@ import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.model.TrackPointMeta
 import com.example.util.Importer
+import com.example.util.TrackStatsAccumulator
 import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -488,6 +489,210 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Découpage d'un parcours
+    // ------------------------------------------------------------------
+
+    /** Ce qui décide de l'endroit où le parcours est coupé. */
+    enum class SplitMode {
+        /**
+         * Aux ruptures de tronçon déjà présentes dans le parcours. C'est ce que
+         * portent les fichiers importés : un export Google Earth réunit couramment
+         * des dizaines de voyages, chacun dans son propre `<coordinates>`.
+         */
+        SEGMENT_BREAKS,
+
+        /**
+         * Là où le temps s'est arrêté plus longtemps qu'un seuil choisi. Utile sur un
+         * enregistrement réel coupé par une nuit ou une longue pause.
+         *
+         * Sans effet sur un GPX sans balise `<time>` ou sur un KML, dont les points
+         * reçoivent un horodatage synthétique régulier à l'import : il n'y a alors
+         * aucun trou à trouver, et le découpage le signale au lieu d'échouer.
+         */
+        TIME_GAP
+    }
+
+    /** Nombre de points relus par lot pendant le repérage des coupures. */
+    private val splitScanPageSize = 2_000
+
+    /**
+     * Une tranche repérée pendant la lecture, avant d'être écrite en base.
+     *
+     * Les bornes sont des identifiants de points, jamais des positions : c'est ce qui
+     * permet à SQLite de recopier la tranche lui-même.
+     */
+    private data class PlannedPiece(
+        val fromId: Long,
+        val untilId: Long,
+        val startTime: Long,
+        val endTime: Long,
+        val stats: LiveStats
+    )
+
+    /**
+     * Découpe [sourceTrackId] en plusieurs parcours, selon [mode].
+     *
+     * Le parcours d'origine n'est modifié en rien, et n'est supprimé que si
+     * [deleteSource] le demande — les morceaux contiennent alors exactement les mêmes
+     * points, rien n'est perdu.
+     *
+     * Deux temps, et c'est délibéré :
+     *
+     * 1. **Une seule lecture** du parcours, page par page, qui repère les coupures et
+     *    cumule au passage les statistiques de chaque morceau
+     *    ([TrackStatsAccumulator]). Rien d'autre que la page courante n'est en
+     *    mémoire : un parcours de plusieurs millions de points passe. Cette lecture
+     *    se fait **hors transaction**, pour ne pas tenir la base en écriture pendant
+     *    toute sa durée.
+     * 2. **Une transaction unique** qui crée les parcours et fait recopier les points
+     *    par SQLite (`INSERT … SELECT`, invariant 5). Une interruption ne laisse donc
+     *    jamais un découpage à moitié fait.
+     *
+     * Lève [IllegalArgumentException] si le parcours est introuvable ou en cours
+     * d'enregistrement, et [IllegalStateException] s'il n'y a rien à découper.
+     */
+    suspend fun splitTrack(
+        sourceTrackId: Long,
+        mode: SplitMode,
+        gapMillis: Long,
+        baseName: String,
+        deleteSource: Boolean
+    ): List<Long> {
+        val source = trackDao.getTrackById(sourceTrackId)
+            ?: throw IllegalArgumentException("Parcours introuvable")
+        if (source.isRecording) {
+            throw IllegalArgumentException("Ce parcours est en cours d'enregistrement")
+        }
+
+        // --- 1. Repérage des coupures, en une passe ---
+
+        val pieces = mutableListOf<PlannedPiece>()
+        var accumulator = TrackStatsAccumulator()
+        var pieceFromId = 0L
+        var pieceStartTime = 0L
+        var pieceEndTime = 0L
+        var previous: TrackPoint? = null
+        var afterId = 0L
+
+        while (true) {
+            val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+
+            for (point in page) {
+                val prev = previous
+                if (prev == null) {
+                    // Tout premier point du parcours : il ouvre la première tranche.
+                    pieceFromId = point.id
+                    pieceStartTime = point.timestamp
+                } else {
+                    val startsNewPiece = when (mode) {
+                        SplitMode.SEGMENT_BREAKS -> point.isDiscontinuous
+                        SplitMode.TIME_GAP -> point.timestamp - prev.timestamp >= gapMillis
+                    }
+                    if (startsNewPiece) {
+                        // La tranche courante s'arrête juste avant ce point : sa borne
+                        // haute est exclusive, donc c'est l'identifiant de ce point.
+                        pieces += PlannedPiece(
+                            fromId = pieceFromId,
+                            untilId = point.id,
+                            startTime = pieceStartTime,
+                            endTime = pieceEndTime,
+                            stats = accumulator.result()
+                        )
+                        accumulator = TrackStatsAccumulator()
+                        pieceFromId = point.id
+                        pieceStartTime = point.timestamp
+                    }
+                }
+                accumulator.add(point)
+                pieceEndTime = point.timestamp
+                previous = point
+            }
+        }
+
+        if (previous == null) {
+            throw IllegalStateException("Ce parcours ne contient aucun point")
+        }
+
+        // Dernière tranche : elle va jusqu'au bout, d'où la borne haute maximale.
+        pieces += PlannedPiece(
+            fromId = pieceFromId,
+            untilId = Long.MAX_VALUE,
+            startTime = pieceStartTime,
+            endTime = pieceEndTime,
+            stats = accumulator.result()
+        )
+
+        if (pieces.size < 2) {
+            throw IllegalStateException(
+                when (mode) {
+                    SplitMode.SEGMENT_BREAKS ->
+                        "Ce parcours ne contient qu'un seul tronçon : il n'y a rien à découper."
+                    SplitMode.TIME_GAP ->
+                        "Aucune pause assez longue n'a été trouvée dans ce parcours."
+                }
+            )
+        }
+
+        // --- 2. Écriture ---
+
+        return database.withTransaction {
+            val newTrackIds = mutableListOf<Long>()
+
+            pieces.forEachIndexed { index, piece ->
+                val stats = piece.stats
+                val newTrackId = trackDao.insertTrack(
+                    Track(
+                        name = "$baseName (${index + 1})",
+                        activityType = source.activityType,
+                        startTime = piece.startTime,
+                        endTime = piece.endTime,
+                        totalDistance = stats.distanceMeters,
+                        duration = stats.durationSec,
+                        maxSpeed = stats.maxSpeedMps,
+                        avgSpeed = stats.avgSpeedMps,
+                        elevationGain = stats.elevationGain,
+                        elevationLoss = stats.elevationLoss,
+                        isRecording = false,
+                        // La provenance ne change pas : un morceau de parcours importé
+                        // reste importé, et reste rangé dans l'onglet où l'on avait
+                        // l'habitude de trouver son parent.
+                        isImported = source.isImported,
+                        isMerged = source.isMerged,
+                        // Jamais affiché d'office : un découpage en trente morceaux
+                        // les allumerait tous d'un coup sur la carte.
+                        isSelectedForMap = false,
+                        // Les morceaux gardent l'apparence du parent, y compris la
+                        // couleur choisie à la main s'il en avait une.
+                        sourceColor = source.sourceColor,
+                        displayColor = source.displayColor
+                    )
+                )
+
+                trackDao.copyPointRangeInto(
+                    destinationId = newTrackId,
+                    sourceId = sourceTrackId,
+                    fromId = piece.fromId,
+                    untilId = piece.untilId
+                )
+                trackDao.clearFirstPointDiscontinuity(newTrackId)
+
+                newTrackIds += newTrackId
+            }
+
+            if (deleteSource) {
+                trackDao.deletePointsForTrack(sourceTrackId)
+                trackDao.deleteTrack(sourceTrackId)
+            }
+
+            invalidatePointCaches(sourceTrackId)
+
+            newTrackIds
+        }
+    }
+
     fun getSelectedImportedTracksFlow(): Flow<List<Track>> {
         return trackDao.getSelectedImportedTracksFlow()
     }
@@ -652,62 +857,17 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         return null
     }
 
+    /**
+     * Statistiques d'une liste de points déjà en mémoire.
+     *
+     * Simple enveloppe autour de [TrackStatsAccumulator], qui porte le calcul lui-même
+     * et sert aussi au découpage, où les points arrivent en flux. Une seconde
+     * implémentation pour les listes finirait par diverger de celle des flux.
+     */
     fun calculateStatsFromPoints(points: List<TrackPoint>): LiveStats {
-        if (points.isEmpty()) return LiveStats()
-        var totalDistanceMeters = 0.0
-        var maxSpeedMps = 0.0
-        var speedSumMps = 0.0
-        var totalSpeedPoints = 0
-
-        // Même algorithme de dénivelé qu'à l'enregistrement, pour que reprendre une
-        // trace ne change pas ses totaux.
-        val elevation = com.example.util.ElevationAccumulator()
-        points.firstOrNull()?.let { elevation.add(it.altitude) }
-
-        for (i in 1 until points.size) {
-            val prev = points[i - 1]
-            val curr = points[i]
-            if (curr.isDiscontinuous) {
-                elevation.breakSegment()
-            } else {
-                val dist = FloatArray(1)
-                android.location.Location.distanceBetween(
-                    prev.latitude, prev.longitude,
-                    curr.latitude, curr.longitude,
-                    dist
-                )
-                val d = dist[0].toDouble()
-                if (d > 1.0) {
-                    totalDistanceMeters += d
-                }
-            }
-            elevation.add(curr.altitude)
-
-            val speed = curr.speed.toDouble()
-            if (speed > maxSpeedMps) maxSpeedMps = speed
-            if (speed > 0.1) {
-                speedSumMps += speed
-                totalSpeedPoints++
-            }
-        }
-        val elevationGainMeters = elevation.gainMeters
-        val elevationLossMeters = elevation.lossMeters
-
-        val elapsedSeconds = if (points.size >= 2) {
-            (points.last().timestamp - points.first().timestamp) / 1000L
-        } else 0L
-
-        val avgSpeed = if (totalSpeedPoints > 0) speedSumMps / totalSpeedPoints else 0.0
-
-        return LiveStats(
-            durationSec = maxOf(0L, elapsedSeconds),
-            distanceMeters = totalDistanceMeters,
-            currentSpeedMps = points.lastOrNull()?.speed?.toDouble() ?: 0.0,
-            avgSpeedMps = avgSpeed,
-            maxSpeedMps = maxSpeedMps,
-            elevationGain = elevationGainMeters,
-            elevationLoss = elevationLossMeters
-        )
+        val accumulator = TrackStatsAccumulator()
+        for (point in points) accumulator.add(point)
+        return accumulator.result()
     }
 
     companion object {

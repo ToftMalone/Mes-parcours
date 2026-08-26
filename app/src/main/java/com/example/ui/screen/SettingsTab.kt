@@ -1166,11 +1166,13 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.13.0",
+        version = "0.14",
         changes = listOf(
-            "Nouveau : la couleur se choisit désormais parcours par parcours, et non plus par catégorie. Appuyez sur la pastille colorée d'un parcours dans l'historique pour la changer",
-            "Nouveau : pour un parcours importé d'un fichier coloré, une pastille en forme de globe lui rend la couleur qu'il portait dans Google Earth",
-            "Vos parcours gardent exactement l'apparence qu'ils avaient : chacun conserve la couleur que sa catégorie lui donnait jusqu'ici"
+            "Nouveau : l'outil « Découper un parcours » sépare un parcours en plusieurs. Au choix, à chaque tronçon — pour un fichier importé qui réunit plusieurs trajets — ou à chaque longue pause, pour un enregistrement qui couvre plusieurs sorties",
+            "Chaque morceau reçoit ses propres statistiques, sa part du tracé et l'apparence du parcours d'origine. Celui-ci reste intact, sauf si vous demandez sa suppression",
+            "L'outil « Supprimer les points immobiles » a été retiré",
+            "La recherche de mise à jour est plus stricte : l'application refuse désormais toute version dont elle ne peut pas vérifier l'empreinte, et ne télécharge plus que depuis GitHub",
+            "Votre dernière position de carte ne part plus dans la sauvegarde cloud de Google"
         )
     )
 )

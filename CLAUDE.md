@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.13.0` (`versionCode` 29). Elle n'est écrite qu'une fois,
+- Version courante : `0.14` (`versionCode` 30). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -217,15 +217,70 @@ couleur**, une polyligne osmdroid n'en portant qu'une.
 
 `ui/screen/ToolsTab.kt` centralise les opérations qui portent sur un ou plusieurs
 parcours déjà enregistrés. Chaque outil suit le même gabarit : une carte de sélection
-de parcours (`MergeTrackRow`), un ou deux réglages, un bouton de confirmation.
+de parcours (`SingleTrackRow` pour un seul, `MergeTrackRow` pour plusieurs), un ou
+deux réglages, un bouton de confirmation.
 
-- **Fusionner des traces** — le seul outil à ce jour. Voir l'invariant 5 : la fusion
-  se fait dans SQLite, aucun point ne transite par la mémoire.
+- **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
+  aucun point ne transite par la mémoire.
+- **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
 
-**« Supprimer les points immobiles » a été retiré** à la demande de l'auteur (voir
-« Poids mort »). Le gabarit à sélection unique (`SingleTrackRow`) est parti avec lui,
-son seul appelant : à rétablir depuis l'historique git si un outil à un seul parcours
-revient.
+**« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
+l'auteur (voir « Poids mort »).
+
+### Découper un parcours
+
+`TrackRepository.splitTrack` sépare un parcours en plusieurs, selon `SplitMode` :
+
+- `SEGMENT_BREAKS` — à chaque `TrackPoint.isDiscontinuous`. C'est le mode qui traite
+  le cas courant du fichier importé réunissant des dizaines de voyages, chacun dans
+  son propre `<coordinates>`.
+- `TIME_GAP` — dès qu'un intervalle dépasse un seuil choisi. **Sans effet sur un GPX
+  sans `<time>` ni sur un KML** : l'import leur donne un horodatage synthétique
+  régulier, il n'y a donc aucun trou à trouver. Le découpage le signale au lieu
+  d'échouer, et l'interface oriente vers le bon mode par ses sous-titres.
+
+Quatre points structurent l'implémentation, et chacun a sa raison :
+
+1. **Une seule lecture, hors transaction.** Le parcours est relu page par page pour
+   repérer les coupures ; seule la page courante est en mémoire, donc un parcours de
+   plusieurs millions de points passe. Cette lecture est longue : la tenir dans une
+   transaction bloquerait la base en écriture pendant toute sa durée. Les bornes
+   relevées sont des **identifiants de points**, ce qui rend la suite indépendante de
+   ce qui a été lu.
+2. **Les statistiques sont cumulées pendant cette même passe**, par
+   `TrackStatsAccumulator`. Sans cela il faudrait relire chaque morceau après
+   l'avoir créé — soit deux fois le parcours — ou reprendre les statistiques du
+   parent, ce qui donnerait à chaque morceau la distance du trajet entier.
+3. **L'écriture tient dans une transaction unique** : création des parcours, puis
+   `copyPointRangeInto` qui laisse SQLite recopier chaque tranche (invariant 5, même
+   `ORDER BY id` indispensable). Une interruption ne laisse jamais un découpage à
+   moitié fait.
+4. **`clearFirstPointDiscontinuity` sur chaque morceau.** Le premier point d'une
+   tranche est précisément celui qui ouvrait un nouveau tronçon ; dans son parcours
+   neuf, il ne fait qu'ouvrir le tracé. Garder la marque ferait dessiner un tronçon
+   vide avant lui.
+
+Le parcours d'origine n'est **jamais modifié**, et n'est supprimé que si l'utilisateur
+coche la case — les morceaux contiennent alors exactement les mêmes points. Chacun
+hérite de la provenance (`isImported`, `isMerged`) et de l'apparence (`sourceColor`,
+`displayColor`) du parent, mais jamais de `isSelectedForMap` : un découpage en trente
+morceaux les allumerait tous d'un coup sur la carte.
+
+Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
+qui dit lequel des deux modes n'a rien trouvé.
+
+### `TrackStatsAccumulator`
+
+`util/TrackStats.kt` porte **le seul calcul de statistiques du projet**.
+`TrackRepository.calculateStatsFromPoints` n'en est plus qu'une enveloppe pour une
+liste déjà en mémoire. Ne pas réintroduire un second calcul pour les flux : deux
+implémentations parallèles finiraient par diverger, et le même parcours afficherait
+alors des chiffres différents selon le chemin emprunté. `SplitTrackTest` compare les
+deux voies sur les mêmes points, précisément pour verrouiller ce point.
+
+Le premier point reçu n'apporte ni distance ni vitesse — il n'a pas de précédent avec
+quoi les mesurer — mais il ouvre l'altitude de référence. C'est ce que faisait déjà la
+boucle d'origine en démarrant à l'indice 1.
 
 ## Invariants à ne pas casser
 
@@ -421,8 +476,9 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 113 tests unitaires en 17 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `BearingTest` (10), `SolarTimesTest` (9), `KmlColorTest` (8), `TrackSegmentsTest` (7),
+- 126 tests unitaires en 18 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest` (9), `KmlColorTest` (8),
+  `TrackSegmentsTest` (7),
   `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `TunnelDetectorTest` (6), `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest`
   (6), `MergeTracksTest` (5), `MigrationChainTest` (3), plus trois tests d'échafaudage

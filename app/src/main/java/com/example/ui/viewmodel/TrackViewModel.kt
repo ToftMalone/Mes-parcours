@@ -435,6 +435,45 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    /**
+     * Découpe un parcours en plusieurs, et renvoie les identifiants créés.
+     *
+     * La lecture des points se fait sur [kotlinx.coroutines.Dispatchers.IO] comme
+     * pour la fusion : elle relit tout le parcours et n'a rien à faire sur le thread
+     * principal.
+     */
+    fun splitTrack(
+        trackId: Long,
+        mode: TrackRepository.SplitMode,
+        gapMillis: Long,
+        baseName: String,
+        deleteSource: Boolean,
+        onSuccess: (List<Long>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val newTrackIds = repository.splitTrack(
+                    sourceTrackId = trackId,
+                    mode = mode,
+                    gapMillis = gapMillis,
+                    baseName = baseName,
+                    deleteSource = deleteSource
+                )
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(newTrackIds)
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    // Le message porté par l'exception est déjà rédigé pour être lu
+                    // (« il n'y a rien à découper »…) : le préfixer le rendrait moins
+                    // clair, pas plus.
+                    onError(e.localizedMessage ?: "Erreur de découpage")
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Export
     //
