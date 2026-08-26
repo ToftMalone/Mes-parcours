@@ -435,27 +435,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
-    fun removeStationaryPoints(
-        trackId: Long,
-        thresholdMeters: Double,
-        newName: String,
-        onSuccess: (Long) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val newTrackId = repository.removeStationaryPoints(trackId, thresholdMeters, newName)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onSuccess(newTrackId)
-                }
-            } catch (e: Exception) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError("Erreur de nettoyage : ${e.localizedMessage}")
-                }
-            }
-        }
-    }
-
     // ------------------------------------------------------------------
     // Export
     //

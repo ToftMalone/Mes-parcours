@@ -34,14 +34,28 @@ object UpdateDownloader {
     private const val BUFFER_SIZE = 64 * 1024
 
     /**
-     * Dossier de destination, propre à l'application : aucune permission de stockage
-     * n'est nécessaire, et le fichier disparaît avec l'application.
+     * Dossier de destination, dans le stockage **interne** de l'application.
+     *
+     * Le stockage externe conviendrait par bien des aspects — aucune permission
+     * requise, effacé avec l'application — mais il reste modifiable par toute autre
+     * application détenant la permission de stockage sur Android 9 et antérieur, que
+     * l'on continue de couvrir. Or l'empreinte est vérifiée pendant l'écriture,
+     * plusieurs secondes avant que l'utilisateur n'appuie sur « Installer » : dans
+     * cet intervalle, un fichier posé là pouvait être remplacé, et la vérification
+     * déjà faite ne protégeait plus rien. Android refuse bien un APK signé d'une
+     * autre clé **portant le même nom de paquet**, mais un APK au nom de paquet
+     * différent s'installerait sans obstacle — validé de confiance par un
+     * utilisateur en pleine mise à jour.
+     *
+     * Le stockage interne, lui, est inaccessible aux autres applications sur toutes
+     * les versions d'Android. D'où aussi l'entrée `files-path` de `file_paths.xml` :
+     * c'est le FileProvider qui expose ensuite le fichier au seul installateur.
      */
-    private fun downloadDir(context: Context): File? =
-        context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+    private fun downloadDir(context: Context): File =
+        File(context.filesDir, "updates")
 
     private fun apkFile(context: Context, update: AvailableUpdate): File? {
-        val dir = downloadDir(context) ?: return null
+        val dir = downloadDir(context)
         if (!dir.exists() && !dir.mkdirs()) return null
         return File(dir, "mes-parcours-${update.versionCode}.apk")
     }
@@ -109,8 +123,7 @@ object UpdateDownloader {
                 return@withContext null
             }
 
-            val expected = update.sha256
-            if (expected != null && expected != digest.digest().toHexString()) {
+            if (update.sha256 != digest.digest().toHexString()) {
                 // Fichier corrompu, tronqué, ou servi par autre chose que la
                 // publication attendue : on ne le présente pas à l'installateur.
                 partial.delete()
@@ -168,11 +181,22 @@ object UpdateDownloader {
         }
     }
 
+    /**
+     * Emplacement des téléchargements avant le passage au stockage interne.
+     *
+     * Une installation mise à jour depuis une version antérieure y garde un APK d'une
+     * vingtaine de mégaoctets que plus rien ne viendrait effacer. On le nettoie donc
+     * en même temps que les autres, une fois pour toutes.
+     */
+    private fun legacyDownloadDir(context: Context): File? =
+        context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+
     /** Supprime les APK déjà téléchargés : ils ne servent plus après installation. */
     fun clearDownloads(context: Context) {
-        val dir = downloadDir(context) ?: return
-        dir.listFiles()
-            ?.filter { it.name.startsWith("mes-parcours-") }
-            ?.forEach { it.delete() }
+        for (dir in listOfNotNull(downloadDir(context), legacyDownloadDir(context))) {
+            dir.listFiles()
+                ?.filter { it.name.startsWith("mes-parcours-") }
+                ?.forEach { it.delete() }
+        }
     }
 }

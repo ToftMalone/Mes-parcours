@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MergeType
-import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,8 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,8 +58,7 @@ import com.example.util.TrackStylePreferences
 
 /** Outils disponibles. Le menu s'étoffera au fil des versions. */
 private enum class Tool {
-    MERGE,
-    REMOVE_STATIONARY
+    MERGE
 }
 
 @Composable
@@ -79,12 +75,6 @@ fun ToolsTab(
             modifier = modifier
         )
         Tool.MERGE -> MergeTracksTool(
-            viewModel = viewModel,
-            onNavigateToDetails = onNavigateToDetails,
-            onBack = { openTool = null },
-            modifier = modifier
-        )
-        Tool.REMOVE_STATIONARY -> RemoveStationaryPointsTool(
             viewModel = viewModel,
             onNavigateToDetails = onNavigateToDetails,
             onBack = { openTool = null },
@@ -127,14 +117,6 @@ private fun ToolsMenu(
                 subtitle = "Réunir plusieurs parcours en un seul, dans l'ordre chronologique",
                 onClick = { onOpenTool(Tool.MERGE) },
                 testTag = "open_merge_tool_button"
-            )
-
-            ToolMenuEntry(
-                icon = Icons.Filled.CleaningServices,
-                title = "Supprimer les points immobiles",
-                subtitle = "Créer une copie sans les points trop rapprochés, pour un tracé plus net",
-                onClick = { onOpenTool(Tool.REMOVE_STATIONARY) },
-                testTag = "open_remove_stationary_tool_button"
             )
         }
     }
@@ -481,231 +463,6 @@ private fun MergeTrackRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-/** Ligne à sélection unique, pour les outils qui n'opèrent que sur un seul parcours. */
-@Composable
-private fun SingleTrackRow(
-    track: Track,
-    selected: Boolean,
-    onSelect: () -> Unit
-) {
-    val categoryColor = Color(
-        if (track.isImported) TrackStylePreferences.DEFAULT_COLOR_IMPORTED
-        else TrackStylePreferences.DEFAULT_COLOR_RECORDED
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                else Color.Transparent
-            )
-            .clickable(onClick = onSelect)
-            .padding(vertical = 4.dp, horizontal = 4.dp)
-            .testTag("single_track_row_${track.id}"),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onSelect,
-            modifier = Modifier.testTag("single_track_radio_${track.id}")
-        )
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(categoryColor)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = track.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = trackSubtitle(track),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Supprimer les points immobiles
-// ---------------------------------------------------------------------------
-
-private fun formatThreshold(meters: Float): String =
-    String.format(java.util.Locale.getDefault(), "%.1f m", meters)
-
-@Composable
-private fun RemoveStationaryPointsTool(
-    viewModel: TrackViewModel,
-    onNavigateToDetails: (Long) -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val tracks by viewModel.allTracks.collectAsState()
-    val eligibleTracks = tracks.filter { !it.isRecording }
-
-    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
-    val selectedTrack = eligibleTracks.find { it.id == selectedTrackId }
-
-    var thresholdMeters by remember { mutableStateOf(1f) }
-    var newName by remember { mutableStateOf("") }
-    var isCleaning by remember { mutableStateOf(false) }
-
-    // Nom de copie proposé par défaut, à chaque changement de sélection.
-    LaunchedEffect(selectedTrack?.id) {
-        val track = selectedTrack
-        if (track != null) {
-            newName = "${track.name} (nettoyé)"
-        }
-    }
-
-    if (eligibleTracks.isEmpty()) {
-        ToolsEmptyState(
-            onBack = onBack,
-            modifier = modifier,
-            title = "Nettoyage indisponible",
-            message = "Il faut au moins un parcours enregistré ou importé pour pouvoir en nettoyer les points immobiles.",
-            screenTestTag = "remove_stationary_tool",
-            backButtonTestTag = "remove_stationary_tool_back_button"
-        )
-        return
-    }
-
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .testTag("remove_stationary_tool"),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.testTag("remove_stationary_tool_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour aux outils",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
-                    Text(
-                        text = "Supprimer les points immobiles",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "Crée une copie plus nette, sans toucher à l'original",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 1,
-                title = "Parcours à nettoyer",
-                subtitle = selectedTrack?.name ?: "Choisissez un parcours"
-            ) {
-                eligibleTracks.sortedByDescending { it.startTime }.forEach { track ->
-                    SingleTrackRow(
-                        track = track,
-                        selected = track.id == selectedTrackId,
-                        onSelect = { selectedTrackId = track.id }
-                    )
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 2,
-                title = "Distance minimale entre deux points",
-                subtitle = "En dessous de ${formatThreshold(thresholdMeters)}, un point est jugé immobile et retiré"
-            ) {
-                Slider(
-                    value = thresholdMeters,
-                    onValueChange = { thresholdMeters = it },
-                    valueRange = 0.5f..5f,
-                    steps = 8,
-                    enabled = selectedTrack != null,
-                    modifier = Modifier.fillMaxWidth().testTag("stationary_threshold_slider")
-                )
-            }
-
-            ToolStepCard(
-                stepNumber = 3,
-                title = "Nom de la copie nettoyée",
-                subtitle = "Le parcours d'origine n'est pas modifié"
-            ) {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    singleLine = true,
-                    enabled = selectedTrack != null,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().testTag("cleaned_track_name_field")
-                )
-            }
-
-            val canClean = selectedTrack != null && newName.isNotBlank() && !isCleaning
-
-            Button(
-                onClick = {
-                    val track = selectedTrack ?: return@Button
-                    isCleaning = true
-                    viewModel.removeStationaryPoints(
-                        trackId = track.id,
-                        thresholdMeters = thresholdMeters.toDouble(),
-                        newName = newName,
-                        onSuccess = { newTrackId ->
-                            isCleaning = false
-                            Toast.makeText(context, "Copie nettoyée créée !", Toast.LENGTH_LONG).show()
-                            onNavigateToDetails(newTrackId)
-                        },
-                        onError = { error ->
-                            isCleaning = false
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                        }
-                    )
-                },
-                enabled = canClean,
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("confirm_remove_stationary_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CleaningServices,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isCleaning) "Nettoyage en cours…" else "Créer la copie nettoyée",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

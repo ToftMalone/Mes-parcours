@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   L'historique des parcours est une donnée de localisation : elle ne doit pas
-   partir dans la sauvegarde cloud Google. Le transfert direct d'appareil à
-   appareil reste autorisé, il ne quitte pas la main de l'utilisateur.
+   L'historique des parcours est une donnée de localisation : il ne doit pas partir
+   dans la sauvegarde cloud Google. Le transfert direct d'appareil à appareil reste
+   autorisé, il ne quitte pas la main de l'utilisateur.
+
+   Les préférences sont exclues du cloud pour la même raison : `pref_last_lat` /
+   `pref_last_lng` y conservent la dernière position de carte affichée, réécrite à
+   chaque déplacement. Exclure la base sans exclure les préférences laissait partir
+   le point le plus parlant de tous.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="database" path="my_tracks_db" />
         <exclude domain="database" path="my_tracks_db-wal" />
         <exclude domain="database" path="my_tracks_db-shm" />
+        <exclude domain="sharedpref" path="." />
         <exclude domain="external" path="." />
     </cloud-backup>
     <device-transfer>

@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
    Règles de sauvegarde pour Android 11 et antérieur.
-   L'historique des parcours (données de localisation) est exclu de la sauvegarde
-   automatique, ainsi que le cache de tuiles cartographiques.
+
+   L'historique des parcours est une donnée de localisation : il ne doit pas partir
+   dans la sauvegarde automatique. Le cache de tuiles non plus, qui trahirait les
+   zones consultées.
+
+   Les préférences sont exclues pour la même raison, et ce n'est pas de la prudence
+   de principe : `pref_last_lat` / `pref_last_lng` y conservent la dernière position
+   de carte affichée, réécrite à chaque déplacement. Sans cette exclusion, exclure la
+   base ne servait à rien — le point le plus parlant de tous partait quand même.
 -->
 <full-backup-content>
     <exclude domain="database" path="my_tracks_db" />
     <exclude domain="database" path="my_tracks_db-wal" />
     <exclude domain="database" path="my_tracks_db-shm" />
+    <exclude domain="sharedpref" path="." />
     <exclude domain="external" path="." />
 </full-backup-content>

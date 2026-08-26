@@ -216,23 +216,16 @@ couleur**, une polyligne osmdroid n'en portant qu'une.
 ## Outils
 
 `ui/screen/ToolsTab.kt` centralise les opérations qui portent sur un ou plusieurs
-parcours déjà enregistrés — fusion, nettoyage. Chaque outil suit le même gabarit :
-une carte de sélection de parcours (`SingleTrackRow` pour un seul, `MergeTrackRow`
-pour plusieurs), un ou deux réglages, un bouton de confirmation.
+parcours déjà enregistrés. Chaque outil suit le même gabarit : une carte de sélection
+de parcours (`MergeTrackRow`), un ou deux réglages, un bouton de confirmation.
 
-- **Supprimer les points immobiles** écarte tout point à moins d'une distance
-  choisie (par défaut 1 m) du dernier point conservé, sauf les marqueurs de rupture
-  de tronçon (`TrackPoint.isDiscontinuous`), toujours gardés pour ne pas recoller
-  deux tronçons distincts.
-  **Le résultat est toujours une copie** : `TrackRepository.removeStationaryPoints`
-  ne modifie jamais la trace d'origine, qui reste intacte dans l'historique — un
-  choix délibéré, la suppression de points étant irréversible contrairement à la
-  fusion (qui ne fait que recombiner des données, sans en perdre). Les statistiques
-  de la copie (distance, vitesses, dénivelé) sont recalculées à partir des points
-  effectivement conservés, avec le même seuil que `loadResumeState`
-  (`statsRecomputeLimit`, 200 000 points) : au-delà, celles de la trace d'origine
-  sont reprises telles quelles plutôt que de charger des millions de points en
-  mémoire pour le recalcul.
+- **Fusionner des traces** — le seul outil à ce jour. Voir l'invariant 5 : la fusion
+  se fait dans SQLite, aucun point ne transite par la mémoire.
+
+**« Supprimer les points immobiles » a été retiré** à la demande de l'auteur (voir
+« Poids mort »). Le gabarit à sélection unique (`SingleTrackRow`) est parti avec lui,
+son seul appelant : à rétablir depuis l'historique git si un outil à un seul parcours
+revient.
 
 ## Invariants à ne pas casser
 
@@ -428,14 +421,13 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 113 tests unitaires : `Iso8601Test` (16), `UpdateManifestTest` (11),
-  `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `TrackSegmentsTest` (7),
+- 113 tests unitaires en 17 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `BearingTest` (10), `SolarTimesTest` (9), `KmlColorTest` (8), `TrackSegmentsTest` (7),
   `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `TunnelDetectorTest` (6), `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest`
-  (6), `MergeTracksTest` (5), `MigrationChainTest` (3), `RemoveStationaryPointsTest`
-  (2), plus trois tests d'échafaudage hérités (`ExampleUnitTest`,
-  `ExampleRobolectricTest`, `GreetingScreenshotTest` avec Roborazzi).
+  (6), `MergeTracksTest` (5), `MigrationChainTest` (3), plus trois tests d'échafaudage
+  hérités (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
+  Roborazzi).
   Ce décompte s'était mis à mentir : il annonçait 72 tests pour 11 suites alors que le
   dépôt en portait 80 pour 15, `KmlExportTest` n'y ayant jamais été ajouté. À tenir à
   jour en même temps que les tests eux-mêmes.
@@ -481,6 +473,67 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   `MediaStoreExporter` emprunte alors le stockage public sans que
   `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
 - Le tracé en diagonale (voir ci-dessous) reste non corrigé, à la demande de l'auteur.
+
+### Audit de sécurité d'avant la 1.0
+
+Relecture complète orientée sécurité : manifeste, chaîne de mise à jour, import et
+export, stockage, requêtes en base, workflows d'intégration continue. Neuf points
+relevés, **six corrigés**, trois laissés tels quels et documentés ci-dessous.
+
+Rien de grave n'a été trouvé, et l'essentiel était déjà en place — à ne pas défaire :
+analyseur XML durci contre les entités (invariant 4), requêtes Room toutes
+paramétrées, échappement XML à l'export, noms de fichiers d'export nettoyés, trafic
+en clair refusé par défaut, `PendingIntent` tous immuables, service et FileProvider
+non exportés, et des workflows qui passent leurs entrées par l'environnement plutôt
+que de les interpoler dans un shell.
+
+**Corrigés :**
+
+1. **Les préférences partaient dans la sauvegarde cloud.** `backup_rules.xml` et
+   `data_extraction_rules.xml` excluaient la base et le stockage externe, mais pas le
+   domaine `sharedpref` — où `pref_last_lat` / `pref_last_lng` conservent la dernière
+   position de carte affichée, réécrite à chaque déplacement, donc en pratique le
+   domicile. Exclure l'historique sans exclure les préférences laissait partir le
+   point le plus parlant de tous. Les deux fichiers excluent désormais `sharedpref`.
+2. **L'APK de mise à jour était déposé sur le stockage externe.** L'empreinte est
+   vérifiée pendant l'écriture, mais plusieurs secondes s'écoulent avant que
+   l'utilisateur n'appuie sur « Installer » : sur Android 9 et antérieur, que l'on
+   couvre encore, toute application ayant la permission de stockage pouvait remplacer
+   le fichier dans cet intervalle. Android refuse bien un APK signé d'une autre clé
+   **portant le même nom de paquet** — mais un APK au nom de paquet différent
+   s'installerait, validé de confiance par un utilisateur en pleine mise à jour.
+   `UpdateDownloader` écrit maintenant dans `filesDir`, inaccessible aux autres
+   applications sur toutes les versions, et `file_paths.xml` expose ce chemin par
+   `files-path` au lieu d'`external-files-path`.
+3. **L'empreinte SHA-256 est devenue obligatoire.** Voir « Mise à jour de
+   l'application » pour le raisonnement.
+4. **L'adresse de l'APK est contrainte à GitHub**, et plus seulement à HTTPS. La
+   vérification porte sur l'hôte analysé, jamais sur le texte de l'adresse :
+   `https://github.com.exemple.test/` commence bien par « https://github.com ».
+5. **La lecture du manifeste est bornée** à 65 536 caractères. Sans plafond, une
+   réponse anormale faisait grossir la mémoire jusqu'au plantage, pour une requête
+   que l'utilisateur n'a même pas demandée.
+6. **Le journal de diagnostic d'`EnvironmentUtils` est gardé par `BuildConfig.DEBUG`.**
+   Il détaillait la marque, le modèle et l'empreinte de l'appareil en version
+   distribuée, où ils ne servent personne.
+
+**Écartés, sciemment :**
+
+- **Le récepteur de démarrage est exporté sans protection.** C'est obligatoire pour
+  recevoir `BOOT_COMPLETED` ; on ne peut donc pas le fermer. Une application tierce
+  peut lui adresser une intention explicite en imitant l'action, mais il ne fait
+  quelque chose que s'il existe déjà un enregistrement interrompu à reprendre : ni
+  fuite, ni démarrage d'enregistrement à froid.
+- **Le cache de tuiles est dans `externalCacheDir`** — déjà relevé par l'audit du
+  0.11.2. Lisible par une autre application sur Android 9 et antérieur, ce qui
+  trahit les zones consultées.
+- **La sauvegarde automatique écrit dans `Download/Mes parcours/`.** C'est la
+  fonctionnalité voulue, pas un défaut ; sur Android 9 et antérieur, toute
+  application ayant la permission de lecture accède donc à l'intégralité des
+  trajets. Arbitrage entre des fichiers faciles à récupérer et des fichiers confinés.
+
+Reste aussi la vue satellite servie par Google, déjà arbitrée dans l'audit du 0.11.2 :
+c'est le seul endroit où la promesse « rien ne quitte l'appareil » est prise en défaut.
 
 ### Le mode focus zoomait tout seul : corrigé en 0.12.0
 
@@ -784,6 +837,13 @@ inadvertance :
   position actif, un point bleu fictif tournait dans Paris. Corrigé — l'invariant 8
   vaut pour les deux.
 
+- Troisième passe, avant la 1.0, à la demande de l'auteur : **l'outil « Supprimer
+  les points immobiles »**. Sont partis avec lui `TrackRepository.removeStationaryPoints`,
+  `TrackViewModel.removeStationaryPoints`, les composables `RemoveStationaryPointsTool`
+  et `SingleTrackRow` (dont il était le seul appelant), `formatThreshold`, l'entrée
+  `Tool.REMOVE_STATIONARY` et `RemoveStationaryPointsTest`. `statsRecomputeLimit` et
+  `calculateStatsFromPoints` restent : `loadResumeState` s'en sert toujours.
+
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.
 
@@ -819,8 +879,13 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
 
 - La comparaison porte sur **`versionCode`**, un entier. Comparer « 0.9.10 » et
   « 0.9.9 » comme des chaînes conclurait l'inverse.
-- `apkUrl` **doit être en HTTPS** : ce fichier va être installé, son transport doit
-  être authentifié. `UpdateManifest.parse` rejette le reste.
+- `apkUrl` **doit être en HTTPS et servie par `github.com`** : ce fichier va être
+  installé — c'est le seul endroit du projet où une adresse lue ailleurs décide de ce
+  qui s'exécutera sur l'appareil. Exiger HTTPS authentifie le transport ; contraindre
+  l'hôte fait qu'un manifeste altéré ne peut pas rediriger l'installation ailleurs.
+  La vérification porte sur **l'hôte analysé**, jamais sur le texte de l'adresse :
+  `https://github.com.exemple.test/` commence bien par « https://github.com » sans
+  être GitHub. `UpdateManifest.parse` rejette le reste.
 - Tant que `UpdateConfig.GITHUB_OWNER` ou `GITHUB_REPO` est vide, **aucune requête
   n'est émise** et l'application se comporte comme avant.
 - Un échec de recherche est silencieux : ne pas joindre GitHub ne concerne pas
@@ -828,13 +893,20 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
 - `util/update/UpdateDownloader` télécharge dans un `.part` renommé à la fin, pour ne
   jamais présenter un APK tronqué à l'installateur, et vérifie la taille annoncée.
 - **`sha256` : l'empreinte de l'APK, vérifiée pendant l'écriture.** Le contrôle de
-  taille ne suffisait pas : `contentLength` vaut -1 quand le serveur répond en
-  découpage par blocs, et un téléchargement interrompu passait alors inaperçu. Le
-  champ est **facultatif** — les publications antérieures à son introduction n'en
-  portent pas et doivent rester installables — et une empreinte présente mais
-  malformée est ignorée plutôt que retenue, sinon la comparaison échouerait toujours
-  et la mise à jour deviendrait ininstallable. `release.yml` la calcule au moment de
-  la publication.
+  taille ne suffit pas : `contentLength` vaut -1 quand le serveur répond en découpage
+  par blocs, et un téléchargement interrompu passe alors inaperçu. `release.yml` la
+  calcule au moment de la publication.
+  Le champ est **obligatoire depuis l'audit d'avant la 1.0**, absent comme malformé :
+  un manifeste sans empreinte exploitable ne donne plus lieu à aucune proposition.
+  Il était facultatif pour que les publications antérieures à son introduction
+  restent installables — ménagement sans objet, l'application ne consultant jamais
+  que `releases/latest`, dont toute publication produite par `release.yml` porte une
+  empreinte. Proposer une mise à jour que l'on ne saura pas vérifier est pire que ne
+  rien proposer.
+- **L'APK est téléchargé dans le stockage interne** (`filesDir/updates`), et exposé à
+  l'installateur par le FileProvider. Le stockage externe restait modifiable par une
+  autre application entre la vérification de l'empreinte et l'appui sur « Installer » :
+  voir « Audit de sécurité d'avant la 1.0 », point 2.
 - L'installation silencieuse est impossible pour une application ordinaire : le
   système affiche toujours son écran de confirmation.
 
