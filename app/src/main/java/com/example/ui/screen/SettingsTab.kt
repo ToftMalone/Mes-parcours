@@ -1166,13 +1166,11 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.14",
+        version = "0.15",
         changes = listOf(
-            "Nouveau : l'outil « Découper un parcours » sépare un parcours en plusieurs. Au choix, à chaque tronçon — pour un fichier importé qui réunit plusieurs trajets — ou à chaque longue pause, pour un enregistrement qui couvre plusieurs sorties",
-            "Chaque morceau reçoit ses propres statistiques, sa part du tracé et l'apparence du parcours d'origine. Celui-ci reste intact, sauf si vous demandez sa suppression",
-            "L'outil « Supprimer les points immobiles » a été retiré",
-            "La recherche de mise à jour est plus stricte : l'application refuse désormais toute version dont elle ne peut pas vérifier l'empreinte, et ne télécharge plus que depuis GitHub",
-            "Votre dernière position de carte ne part plus dans la sauvegarde cloud de Google"
+            "Nouveau : l'outil « Convertir en CSV » transforme un GPX ou un KML en tableau, lisible dans un tableur",
+            "Nouveau : l'outil « Convertir un CSV » fait l'inverse — un tableau CSV devient un parcours GPX et/ou KML",
+            "Les deux passent par Téléchargements/Mes parcours, comme la sauvegarde automatique"
         )
     )
 )

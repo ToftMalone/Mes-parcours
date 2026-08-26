@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.14` (`versionCode` 30). Elle n'est écrite qu'une fois,
+- Version courante : `0.15` (`versionCode` 31). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -223,6 +223,8 @@ deux réglages, un bouton de confirmation.
 - **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
   aucun point ne transite par la mémoire.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
+- **Convertir en CSV** et **Convertir un CSV** — vers et depuis un format lisible
+  dans un tableur, décrits plus bas.
 
 **« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
 l'auteur (voir « Poids mort »).
@@ -268,6 +270,46 @@ morceaux les allumerait tous d'un coup sur la carte.
 
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
+
+### Convertir en CSV, convertir un CSV
+
+`util/CsvConverter.kt` traduit un fichier vers un autre, **sans jamais toucher
+Room** : ni les deux sens ne créent, ne lisent, ni ne modifient un parcours de
+l'historique. Ce sont de simples conversions de fichier à fichier, ce qui les
+distingue de tous les autres outils de cet écran.
+
+Le CSV porte sept colonnes fixes, toujours dans cet ordre : `latitude`, `longitude`,
+`altitude_m`, `horodatage`, `vitesse_m_s`, `nouveau_troncon`, `couleur_troncon`. À la
+lecture, seules les deux premières sont exigées — un tableau façonné à la main avec
+seulement des coordonnées reste utilisable, le reste retombe sur un repli :
+altitude et vitesse à zéro, horodatage synthétique et régulier (même principe que
+l'import KML sans `<time>`), pas de rupture de tronçon, pas de couleur.
+
+**GPX/KML → CSV** réutilise directement `Importer.importFromUri` : son `onBatch` est
+redirigé vers l'écriture CSV au lieu d'une insertion en base, `trackId = 0` n'étant
+qu'un espace réservé jamais écrit nulle part. Le fichier durci contre les entités XML
+(invariant 4) protège donc aussi ce chemin, sans rien dupliquer.
+
+**CSV → GPX/KML** lit le CSV une seule fois par format demandé (deux lectures si les
+deux formats sont cochés, plutôt qu'une écriture simultanée dans les deux) : un CSV
+façonné à la main tient en quelques milliers de lignes au grand maximum, la relecture
+ne coûte rien face à la simplicité du code qui en résulte. Le nom et l'heure du
+parcours de tête (`<metadata><time>` en GPX) sont ceux de la conversion elle-même,
+pas ceux du premier point : les découvrir demanderait de lire le fichier avant de
+pouvoir ouvrir l'écriture, ce que l'écriture en flux interdit justement d'attendre.
+Seule cette ligne d'en-tête est concernée ; chaque point porte son propre horodatage,
+exact ou synthétique selon ce que la colonne contenait.
+
+Le premier point lu ne peut jamais porter la marque de rupture, quoi que dise sa
+colonne — même raisonnement que `clearFirstPointDiscontinuity` pour le découpage : le
+tout premier point d'un parcours ne fait qu'ouvrir le tracé.
+
+Les deux sens écrivent dans Téléchargements/Mes parcours, comme la sauvegarde
+automatique : pas de sélecteur de destination, un seul bouton suffit.
+
+Fonctions pures et testables sans Robolectric — `writeRow`, `parseHeader`,
+`parseRow` — à la manière de `KmlExportTest` pour l'export : `CsvConverterTest` les
+vérifie directement, aller-retour écriture/lecture compris.
 
 ### `TrackStatsAccumulator`
 
@@ -476,13 +518,13 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 126 tests unitaires en 18 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest` (9), `KmlColorTest` (8),
-  `TrackSegmentsTest` (7),
-  `KmlStyleTableTest` (7), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
-  `TunnelDetectorTest` (6), `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest`
-  (6), `MergeTracksTest` (5), `MigrationChainTest` (3), plus trois tests d'échafaudage
-  hérités (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
+- 142 tests unitaires en 19 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `SplitTrackTest` (13), `CsvConverterTest` (16), `BearingTest` (10), `SolarTimesTest`
+  (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
+  `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
+  `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`
+  (5), `MigrationChainTest` (3), plus trois tests d'échafaudage hérités
+  (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
   Roborazzi).
   Ce décompte s'était mis à mentir : il annonçait 72 tests pour 11 suites alors que le
   dépôt en portait 80 pour 15, `KmlExportTest` n'y ayant jamais été ajouté. À tenir à

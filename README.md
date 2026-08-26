@@ -35,6 +35,10 @@ morceaux. Ou l'inverse : séparer un parcours en plusieurs, à chaque tronçon o
 chaque longue pause. C'est ce qu'il faut pour un fichier Google Earth qui réunit
 des dizaines de voyages en un seul bloc.
 
+**Elle convertit vers et depuis un tableur.** Un GPX ou un KML se transforme en CSV,
+lisible et modifiable dans n'importe quel tableur — et inversement, un CSV devient un
+parcours GPX et/ou KML.
+
 **Elle sauvegarde vos sorties toute seule.** À la fin de chaque enregistrement, un
 fichier est déposé dans votre dossier `Téléchargements`, prêt à être récupéré ou
 envoyé où vous voulez.
