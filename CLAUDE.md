@@ -351,26 +351,23 @@ change de taille selon l'écran qui l'affiche — ce qui était le cas.
 **Ne pas réintroduire de `TextStyle` ni de `fontWeight` écrits à la main dans les
 écrans** : c'est exactement ce qui avait fait diverger les écrans entre eux.
 
-## Couleurs de l'application
+## Effet d'appui des boutons de la carte
 
-`AppColorPreferences` (dans `Theme.kt`) décide d'où viennent les couleurs, selon
-`pref_dynamic_colors` :
+`TrackingTab.tapBurst` joue, **à l'intérieur** d'un bouton rond, une onde qui s'étend
+depuis le centre et un reflet qui le balaie en diagonale.
 
-- **Couleurs dynamiques** (défaut) — Material You les tire du fond d'écran. C'est ce
-  que faisait l'application depuis toujours, et le défaut est conservé : une mise à
-  jour ne doit pas changer l'apparence sans qu'on l'ait demandé.
-- **Palette de l'application** — celle de `Color.kt`, la même sur tous les téléphones.
+Deux précautions le tiennent dans ses limites, et elles ne sont pas cosmétiques : ces
+boutons flottent au-dessus de la carte, où le moindre débordement dessinerait sur le
+tracé. Le `clip(CircleShape)` doit rester **avant** `tapBurst` dans la chaîne de
+modificateurs — c'est lui qui enferme le dessin dans le disque ; et `drawWithContent`
+peint par-dessus le contenu déjà rendu plutôt qu'à côté.
 
-À savoir avant de retoucher `Color.kt` : sur Android 12 et suivants, **cette palette
-n'était jamais affichée** tant que le réglage n'existait pas. Régler ses couleurs ne
-se voyait que sur Android 11 et antérieur.
+Le déclencheur est un **compteur**, pas un booléen : deux appuis de suite doivent
+rejouer l'effet, ce qu'un drapeau repassant à la même valeur ne ferait pas.
 
-Le réglage n'apparaît pas en deçà d'Android 12 (`isDynamicColorAvailable`) : les
-couleurs dynamiques n'y existent pas, le choix serait sans effet.
-
-La lecture est réactive (`rememberDynamicColorEnabled`), sur le modèle de
-`rememberNightModeSource` : sans l'écoute des préférences, basculer le réglage
-n'aurait d'effet qu'au prochain démarrage.
+Rien n'est dessiné au repos — la progression vaut 1 tant qu'aucun appui n'a eu lieu,
+et la fonction de dessin sort immédiatement. L'effet ne coûte donc rien entre deux
+clics, ce qui compte sur un écran qui se recompose à chaque position GPS.
 
 ## Invariants à ne pas casser
 
