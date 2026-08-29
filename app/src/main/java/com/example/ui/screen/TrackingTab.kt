@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -57,7 +58,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,6 +76,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.LiveStats
 import com.example.ui.component.MapViewContainer
+import com.example.ui.theme.AppMotion
 import com.example.ui.theme.AppTextStyles
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
@@ -260,6 +266,7 @@ fun TrackingTab(
 
             // Recenter Camera Button
             if (currentUserLocation != null || livePoints.isNotEmpty()) {
+                val recenterPress = rememberFabPress()
                 FloatingActionButton(
                     onClick = {
                         isAutoFollowActive = true
@@ -269,7 +276,9 @@ fun TrackingTab(
                     contentColor = if (isAutoFollowActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
                     shape = CircleShape,
                     elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                    interactionSource = recenterPress.interactionSource,
                     modifier = Modifier
+                        .pressScale(recenterPress)
                         .size(56.dp)
                         .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
                         .testTag("recenter_button")
@@ -317,6 +326,7 @@ fun TrackingTab(
                                 animationSpec = tween(220),
                                 label = "pause_resume_color"
                             )
+                            val pausePress = rememberFabPress()
                             FloatingActionButton(
                                 onClick = {
                                     if (isPaused) {
@@ -329,7 +339,9 @@ fun TrackingTab(
                                 contentColor = Color.White,
                                 shape = CircleShape,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                interactionSource = pausePress.interactionSource,
                                 modifier = Modifier
+                                    .pressScale(pausePress)
                                     .size(56.dp)
                                     .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
                                     .testTag("pause_resume_fab")
@@ -351,6 +363,7 @@ fun TrackingTab(
                             }
 
                             // Stop FAB
+                            val stopPress = rememberFabPress()
                             FloatingActionButton(
                                 onClick = {
                                     viewModel.stopRecording(context)
@@ -362,7 +375,9 @@ fun TrackingTab(
                                 contentColor = MaterialTheme.colorScheme.onError,
                                 shape = CircleShape,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                interactionSource = stopPress.interactionSource,
                                 modifier = Modifier
+                                    .pressScale(stopPress)
                                     .size(72.dp)
                                     .border(1.5.dp, MaterialTheme.colorScheme.onError.copy(alpha = 0.3f), CircleShape)
                                     .testTag("action_fab")
@@ -377,13 +392,16 @@ fun TrackingTab(
 
                         "options" -> {
                             // Annuler : referme les options sans rien démarrer
+                            val cancelPress = rememberFabPress()
                             FloatingActionButton(
                                 onClick = { showStartOptions = false },
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 shape = CircleShape,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                interactionSource = cancelPress.interactionSource,
                                 modifier = Modifier
+                                    .pressScale(cancelPress)
                                     .size(48.dp)
                                     .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), CircleShape)
                                     .testTag("cancel_start_options_fab")
@@ -397,13 +415,16 @@ fun TrackingTab(
 
                             // Reprendre une trace existante : seulement s'il y en a une dans l'historique
                             if (allTracks.isNotEmpty()) {
+                                val resumeExistingPress = rememberFabPress()
                                 FloatingActionButton(
                                     onClick = { showResumePicker = true },
                                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                                     contentColor = MaterialTheme.colorScheme.primary,
                                     shape = CircleShape,
                                     elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                    interactionSource = resumeExistingPress.interactionSource,
                                     modifier = Modifier
+                                        .pressScale(resumeExistingPress)
                                         .size(56.dp)
                                         .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
                                         .testTag("resume_existing_track_fab")
@@ -417,6 +438,7 @@ fun TrackingTab(
                             }
 
                             // Nouvelle trace
+                            val newTrackPress = rememberFabPress()
                             FloatingActionButton(
                                 onClick = {
                                     viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
@@ -426,7 +448,9 @@ fun TrackingTab(
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                                 shape = CircleShape,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                interactionSource = newTrackPress.interactionSource,
                                 modifier = Modifier
+                                    .pressScale(newTrackPress)
                                     .size(72.dp)
                                     .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
                                     .testTag("start_new_track_fab")
@@ -443,6 +467,7 @@ fun TrackingTab(
                             // Play FAB : révèle les deux options seulement s'il y a une trace à
                             // reprendre — sinon le choix n'existe pas vraiment, autant démarrer
                             // directement comme avant.
+                            val playPress = rememberFabPress()
                             FloatingActionButton(
                                 onClick = {
                                     if (allTracks.isEmpty()) {
@@ -455,7 +480,9 @@ fun TrackingTab(
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                                 shape = CircleShape,
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                                interactionSource = playPress.interactionSource,
                                 modifier = Modifier
+                                    .pressScale(playPress)
                                     .size(72.dp)
                                     .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
                                     .testTag("action_fab")
@@ -595,6 +622,57 @@ fun PermissionDeniedState(onGrantClick: () -> Unit) {
  * demanderait de réanalyser une chaîne déjà mise en forme (unité, virgule décimale)
  * pour un gain visuel marginal : le nombre a l'air vivant dans les deux cas.
  */
+/**
+ * Source d'interaction et échelle animée d'un même bouton, à poser ensemble.
+ *
+ * Les deux vont de pair : la source dit au bouton de signaler ses appuis, l'échelle
+ * les traduit. Les séparer laisserait poser l'une sans l'autre, et le bouton
+ * s'enfoncerait sans jamais revenir — ou pas du tout.
+ */
+private class FabPress(
+    val interactionSource: MutableInteractionSource,
+    val scale: State<Float>
+)
+
+/**
+ * Réponse à l'appui d'un bouton : il s'enfonce légèrement, puis revient.
+ *
+ * C'est le retour tactile de Material, et il complète le halo que Material dessine
+ * déjà tout seul — celui-ci dit « touché », l'échelle dit « enfoncé ».
+ *
+ * Un **ressort** plutôt qu'une durée fixe : le retour repart de la vitesse en cours,
+ * si bien qu'un doigt relâché à mi-course ne provoque aucune rupture. Une durée
+ * fixe supposerait que le geste s'arrête au moment prévu, ce que l'utilisateur ne
+ * fait jamais.
+ */
+@Composable
+private fun rememberFabPress(): FabPress {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale = animateFloatAsState(
+        targetValue = if (pressed) AppMotion.PressedScale else 1f,
+        animationSpec = AppMotion.PressSpring,
+        label = "fab_press"
+    )
+    return FabPress(interactionSource, scale)
+}
+
+/**
+ * Applique l'échelle d'appui, **sans jamais relancer de mise en page**.
+ *
+ * La valeur est lue à l'intérieur du bloc `graphicsLayer`, donc au moment du dessin
+ * et non à la recomposition : changer d'échelle ne remesure rien, la carte graphique
+ * se contente de redessiner la couche déjà rendue. C'est ce qui rend l'effet fluide
+ * sur un écran qui se recompose déjà deux fois par seconde pendant un enregistrement.
+ *
+ * Lire la valeur en dehors du bloc — ou passer par `Modifier.scale(...)` — ferait
+ * l'inverse : une recomposition par image.
+ */
+private fun Modifier.pressScale(press: FabPress): Modifier = graphicsLayer {
+    scaleX = press.scale.value
+    scaleY = press.scale.value
+}
+
 @Composable
 private fun AnimatedStatValue(
     text: String,

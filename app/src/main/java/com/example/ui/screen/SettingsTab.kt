@@ -1170,6 +1170,8 @@ private val RELEASES = listOf(
         changes = listOf(
             "L'interface respire mieux : titres, libellés et mesures suivent désormais une même échelle, au lieu d'être réglés écran par écran",
             "Les chiffres ne tressautent plus pendant un enregistrement — tous les chiffres ont maintenant la même largeur",
+            "Le passage d'un onglet à l'autre se fait en fondu, au lieu de basculer d'un coup",
+            "Les boutons de la carte s'enfoncent légèrement sous le doigt, puis reviennent",
             "Les deux outils de conversion CSV ont été retirés"
         )
     )

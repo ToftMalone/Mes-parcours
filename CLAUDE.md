@@ -309,6 +309,49 @@ change de taille selon l'écran qui l'affiche — ce qui était le cas.
 **Ne pas réintroduire de `TextStyle` ni de `fontWeight` écrits à la main dans les
 écrans** : c'est exactement ce qui avait fait diverger les écrans entre eux.
 
+## Mouvement
+
+`ui/theme/Motion.kt` porte le vocabulaire de mouvement, repris des jetons de
+Material 3 : trois courbes (`Emphasized`, `EmphasizedDecelerate`,
+`EmphasizedAccelerate`), trois durées, et le ressort d'appui. Même raison d'être que
+`Type.kt` pour la typographie — les durées étaient écrites à la main à chaque appel,
+`tween(220)`, `tween(180)`, `tween(150)`, sans que rien ne dise pourquoi l'une plutôt
+que l'autre.
+
+**La règle de fluidité, à ne jamais enfreindre : n'animer que ce que la carte
+graphique sait faire seule** — opacité, échelle, translation, via `graphicsLayer`.
+Animer une taille, une marge ou un poids relance une mesure de mise en page à chaque
+image, et c'est la cause la plus courante de saccade. Cette distinction compte
+doublement ici : l'écran d'enregistrement se recompose deux fois par seconde.
+
+Corollaire moins évident, appliqué par `pressScale` : **la valeur animée se lit à
+l'intérieur du bloc `graphicsLayer`**, donc au moment du dessin. La lire en dehors —
+ou passer par `Modifier.scale(...)` — provoquerait une recomposition par image là où
+un simple redessin de la couche suffit.
+
+### Ce qui est animé
+
+- **Passage d'un onglet à l'autre** (`MainScreen`) — fondu croisé, *opacité seule*.
+  Pas de glissement, qui suggérerait un ordre entre des onglets qui n'en ont pas ; et
+  surtout pas de mise à l'échelle : l'onglet d'enregistrement porte une carte osmdroid
+  vivante, que la mettre à l'échelle obligerait à redessiner dans un tampon à chaque
+  image. Ce qui part s'efface vite, ce qui arrive prend son temps en commençant juste
+  après — sans ce décalage, les deux écrans se superposent à mi-transition.
+- **Appui sur un bouton flottant** (`TrackingTab.rememberFabPress` / `pressScale`) —
+  le bouton s'enfonce puis revient, par un **ressort** et non une durée fixe : le
+  retour repart de la vitesse en cours, si bien qu'un doigt relâché à mi-course ne
+  provoque aucune rupture. Complète le halo que Material dessine déjà seul. Les sept
+  boutons l'ont, et c'est voulu : un retour tactile que seuls certains boutons
+  auraient donnerait l'impression que les autres ne répondent pas.
+- **Entrée et sortie de l'écran de détail** (`MainScreen`) — glissement latéral, aligné
+  sur le vocabulaire commun. La sortie est l'exacte inverse de l'entrée, sinon revenir
+  en arrière ne donne pas l'impression de défaire.
+
+Les animations plus anciennes — jeux de boutons qui se succèdent, chiffres des
+statistiques en direct, cartes de l'historique en cascade — gardent leurs durées
+propres. Elles fonctionnent ; les aligner sur le vocabulaire est un chantier à part,
+sans effet visible, qui ne vaut pas le risque d'y toucher pour rien.
+
 ## Invariants à ne pas casser
 
 Ces points ont chacun corrigé un bug réel ; les commentaires du code expliquent
