@@ -1,9 +1,6 @@
 package com.example.ui.screen
 
-import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,8 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.ContentCut
-import androidx.compose.material.icons.filled.GridOn
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,7 +57,6 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.Track
 import com.example.data.repository.TrackRepository
 import com.example.ui.viewmodel.TrackViewModel
-import com.example.util.CsvConverter
 import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
 import kotlin.math.roundToInt
@@ -70,9 +64,7 @@ import kotlin.math.roundToInt
 /** Outils disponibles. Le menu s'étoffera au fil des versions. */
 private enum class Tool {
     MERGE,
-    SPLIT,
-    CSV_EXPORT,
-    CSV_IMPORT
+    SPLIT
 }
 
 @Composable
@@ -95,16 +87,6 @@ fun ToolsTab(
             modifier = modifier
         )
         Tool.SPLIT -> SplitTrackTool(
-            viewModel = viewModel,
-            onBack = { openTool = null },
-            modifier = modifier
-        )
-        Tool.CSV_EXPORT -> CsvExportTool(
-            viewModel = viewModel,
-            onBack = { openTool = null },
-            modifier = modifier
-        )
-        Tool.CSV_IMPORT -> CsvImportTool(
             viewModel = viewModel,
             onBack = { openTool = null },
             modifier = modifier
@@ -153,22 +135,6 @@ private fun ToolsMenu(
                 subtitle = "Séparer un parcours en plusieurs, par tronçon ou par longue pause",
                 onClick = { onOpenTool(Tool.SPLIT) },
                 testTag = "open_split_tool_button"
-            )
-
-            ToolMenuEntry(
-                icon = Icons.Filled.GridOn,
-                title = "Convertir en CSV",
-                subtitle = "Transformer un GPX ou un KML en tableau, lisible dans un tableur",
-                onClick = { onOpenTool(Tool.CSV_EXPORT) },
-                testTag = "open_csv_export_tool_button"
-            )
-
-            ToolMenuEntry(
-                icon = Icons.Filled.SwapHoriz,
-                title = "Convertir un CSV",
-                subtitle = "Transformer un tableau CSV en parcours GPX et/ou KML",
-                onClick = { onOpenTool(Tool.CSV_IMPORT) },
-                testTag = "open_csv_import_tool_button"
             )
         }
     }
@@ -858,320 +824,6 @@ private fun SplitTrackTool(
 
             Spacer(modifier = Modifier.height(8.dp))
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Convertir en CSV (GPX/KML → CSV)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun CsvExportTool(
-    viewModel: TrackViewModel,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
-    var isConverting by remember { mutableStateOf(false) }
-
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri -> selectedUri = uri }
-
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .testTag("csv_export_tool"),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.testTag("csv_export_tool_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour aux outils",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
-                    Text(
-                        text = "Convertir en CSV",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "Un GPX ou un KML transformé en tableau",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 1,
-                title = "Fichier à convertir",
-                subtitle = if (selectedUri != null) {
-                    "Un fichier est sélectionné"
-                } else {
-                    "Choisissez un fichier GPX ou KML"
-                }
-            ) {
-                Button(
-                    onClick = { filePicker.launch("*/*") },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.fillMaxWidth().testTag("csv_export_pick_file_button")
-                ) {
-                    Text(if (selectedUri != null) "Changer de fichier" else "Choisir un fichier")
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 2,
-                title = "Résultat",
-                subtitle = "Le fichier CSV rejoint Téléchargements/Mes parcours, à côté de vos sauvegardes"
-            ) {}
-
-            val canConvert = selectedUri != null && !isConverting
-
-            Button(
-                onClick = {
-                    val uri = selectedUri ?: return@Button
-                    isConverting = true
-                    viewModel.convertGpxKmlToCsv(
-                        context = context,
-                        uri = uri,
-                        onSuccess = { result ->
-                            isConverting = false
-                            Toast.makeText(
-                                context,
-                                "CSV créé : ${result.pointCount} points",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            selectedUri = null
-                            onBack()
-                        },
-                        onError = { error ->
-                            isConverting = false
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                        }
-                    )
-                },
-                enabled = canConvert,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("confirm_csv_export_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.GridOn,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isConverting) "Conversion en cours…" else "Convertir en CSV",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Convertir un CSV (CSV → GPX/KML)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun CsvImportTool(
-    viewModel: TrackViewModel,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
-    var wantGpx by remember { mutableStateOf(true) }
-    var wantKml by remember { mutableStateOf(true) }
-    var isConverting by remember { mutableStateOf(false) }
-
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri -> selectedUri = uri }
-
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .testTag("csv_import_tool"),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.testTag("csv_import_tool_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour aux outils",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
-                    Text(
-                        text = "Convertir un CSV",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "Un tableau transformé en parcours",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 1,
-                title = "Fichier à convertir",
-                subtitle = if (selectedUri != null) {
-                    "Un fichier est sélectionné — il doit porter au moins les colonnes " +
-                        "« ${CsvConverter.COLUMN_LATITUDE} » et « ${CsvConverter.COLUMN_LONGITUDE} »"
-                } else {
-                    "Choisissez un fichier CSV"
-                }
-            ) {
-                Button(
-                    onClick = { filePicker.launch("*/*") },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.fillMaxWidth().testTag("csv_import_pick_file_button")
-                ) {
-                    Text(if (selectedUri != null) "Changer de fichier" else "Choisir un fichier")
-                }
-            }
-
-            ToolStepCard(
-                stepNumber = 2,
-                title = "Formats à produire",
-                subtitle = "Le résultat rejoint Téléchargements/Mes parcours"
-            ) {
-                FormatCheckboxRow(
-                    checked = wantGpx,
-                    onCheckedChange = { wantGpx = it },
-                    label = "Format GPX (.gpx)",
-                    testTag = "csv_import_want_gpx"
-                )
-                FormatCheckboxRow(
-                    checked = wantKml,
-                    onCheckedChange = { wantKml = it },
-                    label = "Format KML (.kml)",
-                    testTag = "csv_import_want_kml"
-                )
-            }
-
-            val canConvert = selectedUri != null && (wantGpx || wantKml) && !isConverting
-
-            Button(
-                onClick = {
-                    val uri = selectedUri ?: return@Button
-                    isConverting = true
-                    viewModel.convertCsvToGpxKml(
-                        context = context,
-                        uri = uri,
-                        wantGpx = wantGpx,
-                        wantKml = wantKml,
-                        onSuccess = { result ->
-                            isConverting = false
-                            Toast.makeText(
-                                context,
-                                "Converti : ${result.pointCount} points",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            selectedUri = null
-                            onBack()
-                        },
-                        onError = { error ->
-                            isConverting = false
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                        }
-                    )
-                },
-                enabled = canConvert,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("confirm_csv_import_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.SwapHoriz,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isConverting) "Conversion en cours…" else "Convertir",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-@Composable
-private fun FormatCheckboxRow(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    label: String,
-    testTag: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 4.dp)
-            .testTag(testTag),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }
 

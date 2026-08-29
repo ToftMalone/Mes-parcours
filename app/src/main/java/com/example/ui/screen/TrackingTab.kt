@@ -9,8 +9,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -72,8 +70,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -264,23 +260,17 @@ fun TrackingTab(
 
             // Recenter Camera Button
             if (currentUserLocation != null || livePoints.isNotEmpty()) {
-                var recenterBurst by remember { mutableIntStateOf(0) }
-                val recenterTint = if (isAutoFollowActive) MaterialTheme.colorScheme.onPrimary
-                                   else MaterialTheme.colorScheme.primary
                 FloatingActionButton(
                     onClick = {
                         isAutoFollowActive = true
                         recenterTrigger++
-                        recenterBurst++
                     },
                     containerColor = if (isAutoFollowActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                    contentColor = recenterTint,
+                    contentColor = if (isAutoFollowActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
                     shape = CircleShape,
                     elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(CircleShape)
-                        .tapBurst(recenterBurst, recenterTint)
                         .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape)
                         .testTag("recenter_button")
                 ) {
@@ -327,10 +317,8 @@ fun TrackingTab(
                                 animationSpec = tween(220),
                                 label = "pause_resume_color"
                             )
-                            var pauseBurst by remember { mutableIntStateOf(0) }
                             FloatingActionButton(
                                 onClick = {
-                                    pauseBurst++
                                     if (isPaused) {
                                         viewModel.resumeRecording(context)
                                     } else {
@@ -343,8 +331,6 @@ fun TrackingTab(
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
                                 modifier = Modifier
                                     .size(56.dp)
-                                    .clip(CircleShape)
-                                    .tapBurst(pauseBurst, Color.White)
                                     .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
                                     .testTag("pause_resume_fab")
                             ) {
@@ -365,10 +351,8 @@ fun TrackingTab(
                             }
 
                             // Stop FAB
-                            var stopBurst by remember { mutableIntStateOf(0) }
                             FloatingActionButton(
                                 onClick = {
-                                    stopBurst++
                                     viewModel.stopRecording(context)
                                     currentTrackId?.let { id ->
                                         onNavigateToDetails(id)
@@ -380,8 +364,6 @@ fun TrackingTab(
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
                                 modifier = Modifier
                                     .size(72.dp)
-                                    .clip(CircleShape)
-                                    .tapBurst(stopBurst, MaterialTheme.colorScheme.onError)
                                     .border(1.5.dp, MaterialTheme.colorScheme.onError.copy(alpha = 0.3f), CircleShape)
                                     .testTag("action_fab")
                             ) {
@@ -461,10 +443,8 @@ fun TrackingTab(
                             // Play FAB : révèle les deux options seulement s'il y a une trace à
                             // reprendre — sinon le choix n'existe pas vraiment, autant démarrer
                             // directement comme avant.
-                            var playBurst by remember { mutableIntStateOf(0) }
                             FloatingActionButton(
                                 onClick = {
-                                    playBurst++
                                     if (allTracks.isEmpty()) {
                                         viewModel.startRecording(context, "Nouveau Parcours", "Parcours")
                                     } else {
@@ -477,8 +457,6 @@ fun TrackingTab(
                                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
                                 modifier = Modifier
                                     .size(72.dp)
-                                    .clip(CircleShape)
-                                    .tapBurst(playBurst, MaterialTheme.colorScheme.onPrimary)
                                     .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f), CircleShape)
                                     .testTag("action_fab")
                             ) {
@@ -617,66 +595,6 @@ fun PermissionDeniedState(onGrantClick: () -> Unit) {
  * demanderait de réanalyser une chaîne déjà mise en forme (unité, virgule décimale)
  * pour un gain visuel marginal : le nombre a l'air vivant dans les deux cas.
  */
-/**
- * Effet joué **à l'intérieur** d'un bouton rond au moment de l'appui : une onde qui
- * s'étend depuis le centre, doublée d'un reflet qui balaie le bouton en diagonale.
- *
- * Deux précautions le tiennent dans ses limites, et elles comptent : ces boutons
- * flottent au-dessus de la carte, où le moindre débordement dessinerait sur le tracé.
- * Le `clip` en tête de chaîne enferme le dessin dans le disque du bouton, et
- * `drawWithContent` peint par-dessus le contenu déjà rendu plutôt qu'à côté.
- *
- * [trigger] est un compteur, pas un booléen : deux appuis de suite doivent rejouer
- * l'effet, ce qu'un drapeau repassant à la même valeur ne déclencherait pas.
- *
- * Rien n'est dessiné au repos ([progress] vaut 1 tant qu'aucun appui n'a eu lieu) :
- * l'effet ne coûte donc rien entre deux clics.
- */
-@Composable
-private fun Modifier.tapBurst(trigger: Int, tint: Color): Modifier {
-    val progress = remember { Animatable(1f) }
-
-    LaunchedEffect(trigger) {
-        // Le premier passage a lieu à l'affichage, sans que personne n'ait appuyé.
-        if (trigger > 0) {
-            progress.snapTo(0f)
-            progress.animateTo(1f, animationSpec = tween(480, easing = FastOutSlowInEasing))
-        }
-    }
-
-    return this.drawWithContent {
-        drawContent()
-
-        val p = progress.value
-        if (p >= 1f) return@drawWithContent
-
-        val fade = 1f - p
-
-        // L'onde : part du centre et gagne tout le bouton en s'effaçant.
-        drawCircle(
-            color = tint.copy(alpha = 0.30f * fade),
-            radius = size.minDimension / 2f * (0.20f + p * 0.90f),
-            center = center
-        )
-
-        // Le reflet : une bande claire qui traverse en diagonale. Elle part hors du
-        // bouton et finit hors de lui, si bien qu'on ne voit que la traversée.
-        val travel = -size.width + p * size.width * 2.2f
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    tint.copy(alpha = 0.40f * fade),
-                    Color.Transparent
-                ),
-                start = Offset(travel, 0f),
-                end = Offset(travel + size.width * 0.65f, size.height)
-            ),
-            size = size
-        )
-    }
-}
-
 @Composable
 private fun AnimatedStatValue(
     text: String,

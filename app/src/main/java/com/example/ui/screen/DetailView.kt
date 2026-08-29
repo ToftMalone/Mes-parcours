@@ -4,12 +4,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +52,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,7 +69,6 @@ import com.example.ui.component.MapViewContainer
 import com.example.ui.theme.AppTextStyles
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -228,292 +220,278 @@ fun DetailView(
         ) {
             
             // 1. High-Contrast Mini Map Card with custom border
-            DetailSection(0) {
-                Card(
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                                    Color.Transparent
-                                )
-                            ),
-                            shape = RoundedCornerShape(24.dp)
-                        )
-                ) {
-                    if (points.isNotEmpty()) {
-                        MapViewContainer(
-                            points = points,
-                            modifier = Modifier.fillMaxSize(),
-                            isInteractivityEnabled = false,
-                            isImported = currentTrack.isImported,
-                            isMerged = currentTrack.isMerged,
-                            sourceColor = currentTrack.sourceColor,
-                            displayColor = currentTrack.displayColor,
-                            isCurrentTracking = isCurrentRecording,
-                            onViewportChanged = { viewModel.updateMapViewport(it) }
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Aucune coordonnée disponible",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+            Card(
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                Color.Transparent
                             )
-                        }
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+            ) {
+                if (points.isNotEmpty()) {
+                    MapViewContainer(
+                        points = points,
+                        modifier = Modifier.fillMaxSize(),
+                        isInteractivityEnabled = false,
+                        isImported = currentTrack.isImported,
+                        isMerged = currentTrack.isMerged,
+                        sourceColor = currentTrack.sourceColor,
+                        displayColor = currentTrack.displayColor,
+                        isCurrentTracking = isCurrentRecording,
+                        onViewportChanged = { viewModel.updateMapViewport(it) }
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Aucune coordonnée disponible",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
 
             // Category tag & Timestamp Row
-            DetailSection(1) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            contentColor = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(18.dp))
                         }
-                        Text(
-                            // Le type d'activité plutôt qu'un « Parcours GPS » que
-                            // portaient tous les parcours à l'identique : ils le sont
-                            // tous, le libellé n'apprenait donc rien.
-                            text = currentTrack.activityType,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
                     }
+                    Text(
+                        // Le type d'activité plutôt qu'un « Parcours GPS » que
+                        // portaient tous les parcours à l'identique : ils le sont
+                        // tous, le libellé n'apprenait donc rien.
+                        text = currentTrack.activityType,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = FormatUtils.formatDate(currentTrack.startTime),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = FormatUtils.formatDate(currentTrack.startTime),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
 
             // 2. Comprehensive Statistics Grid Card
-            DetailSection(2) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(24.dp)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+            ) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Principal values
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DetailMetric(
+                            title = "DISTANCE PARCOURUE",
+                            value = FormatUtils.formatDistance(currentTrack.totalDistance),
+                            highlightColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                ) {
-                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // Principal values
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            DetailMetric(
-                                title = "DISTANCE PARCOURUE",
-                                value = FormatUtils.formatDistance(
-                                    rememberCountUp(currentTrack.totalDistance)
-                                ),
-                                highlightColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            DetailMetric(
-                                title = "DURÉE ENREGISTRÉE",
-                                value = FormatUtils.formatDuration(
-                                    rememberCountUp(currentTrack.duration.toDouble()).toLong()
-                                ),
-                                highlightColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Spacer(
-                            modifier = Modifier
-                                .height(1.dp)
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                        DetailMetric(
+                            title = "DURÉE ENREGISTRÉE",
+                            value = FormatUtils.formatDuration(currentTrack.duration),
+                            highlightColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                    }
 
-                        // Secondary grid
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            DetailSubMetric(
-                                icon = Icons.Default.Speed,
-                                label = "Vitesse moy.",
-                                value = FormatUtils.formatSpeed(currentTrack.avgSpeed)
-                            )
-                            DetailSubMetric(
-                                icon = Icons.Default.Speed,
-                                label = "Vitesse max.",
-                                value = FormatUtils.formatSpeed(currentTrack.maxSpeed)
-                            )
-                        }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(
+                        modifier = Modifier
+                            .height(1.dp)
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            DetailSubMetric(
-                                icon = Icons.Default.TrendingUp,
-                                label = "Dénivelé positif",
-                                value = FormatUtils.formatElevation(currentTrack.elevationGain)
-                            )
-                            DetailSubMetric(
-                                icon = Icons.Default.TrendingDown,
-                                label = "Dénivelé négatif",
-                                value = FormatUtils.formatElevation(currentTrack.elevationLoss)
-                            )
-                        }
+                    // Secondary grid
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DetailSubMetric(
+                            icon = Icons.Default.Speed,
+                            label = "Vitesse moy.",
+                            value = FormatUtils.formatSpeed(currentTrack.avgSpeed)
+                        )
+                        DetailSubMetric(
+                            icon = Icons.Default.Speed,
+                            label = "Vitesse max.",
+                            value = FormatUtils.formatSpeed(currentTrack.maxSpeed)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DetailSubMetric(
+                            icon = Icons.Default.TrendingUp,
+                            label = "Dénivelé positif",
+                            value = FormatUtils.formatElevation(currentTrack.elevationGain)
+                        )
+                        DetailSubMetric(
+                            icon = Icons.Default.TrendingDown,
+                            label = "Dénivelé négatif",
+                            value = FormatUtils.formatElevation(currentTrack.elevationLoss)
+                        )
                     }
                 }
             }
 
             // 2.5 Reprendre la trace CTA Button
             if (!isCurrentRecording) {
-            DetailSection(3) {
+                Button(
+                    onClick = {
+                        if (isTracking) {
+                            Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
+                        } else {
+                            viewModel.resumeTrack(context, currentTrack.id) {
+                                Toast.makeText(context, "Reprise de la trace \"${currentTrack.name}\"", Toast.LENGTH_SHORT).show()
+                                viewModel.selectTrack(null)
+                                onBackClick()
+                                onResumeTrack?.invoke()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("resume_track_button")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
+                        Text("Reprendre la trace", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+
+            // 3. Export Data Tools Block
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Exportation & Sauvegardes",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Button(
                         onClick = {
-                            if (isTracking) {
-                                Toast.makeText(context, "Un enregistrement est déjà en cours. Veuillez l'arrêter avant de reprendre un autre parcours.", Toast.LENGTH_LONG).show()
-                            } else {
-                                viewModel.resumeTrack(context, currentTrack.id) {
-                                    Toast.makeText(context, "Reprise de la trace \"${currentTrack.name}\"", Toast.LENGTH_SHORT).show()
-                                    viewModel.selectTrack(null)
-                                    onBackClick()
-                                    onResumeTrack?.invoke()
-                                }
-                            }
+                            val safeName = currentTrack.name
+                                .replace("[\\\\/:*?\"<>|]".toRegex(), "_")
+                                .replace("\\s+".toRegex(), "_")
+                            gpxLauncher.launch("$safeName.gpx")
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ),
                         shape = CircleShape,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp)
-                            .testTag("resume_track_button")
+                            .weight(1f)
+                            .height(52.dp)
+                            .testTag("export_gpx_button")
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
-                            Text("Reprendre la trace", style = MaterialTheme.typography.titleMedium)
+                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text("Enregistrer GPX")
                         }
                     }
-            }
-            }
 
-            DetailSection(4) {
-                // 3. Export Data Tools Block
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Exportation & Sauvegardes",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Button(
+                        onClick = {
+                            val safeName = currentTrack.name
+                                .replace("[\\\\/:*?\"<>|]".toRegex(), "_")
+                                .replace("\\s+".toRegex(), "_")
+                            kmlLauncher.launch("$safeName.kml")
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .testTag("export_kml_button")
                     ) {
-                        Button(
-                            onClick = {
-                                val safeName = currentTrack.name
-                                    .replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-                                    .replace("\\s+".toRegex(), "_")
-                                gpxLauncher.launch("$safeName.gpx")
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .testTag("export_gpx_button")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Enregistrer GPX")
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                val safeName = currentTrack.name
-                                    .replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-                                    .replace("\\s+".toRegex(), "_")
-                                kmlLauncher.launch("$safeName.kml")
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .testTag("export_kml_button")
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Enregistrer KML")
-                            }
+                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text("Enregistrer KML")
                         }
                     }
                 }
@@ -552,51 +530,6 @@ fun DetailView(
             }
         )
     }
-}
-
-/**
- * Fait apparaître une section du détail en fondu-glissé, décalée selon [index].
- *
- * Même garniture que les cartes de l'historique, et pour la même raison : cet écran
- * affichait tout d'un bloc, sans que rien ne guide l'œil de la carte vers les
- * chiffres. Le décalage reste court — on ouvre un parcours pour lire ses
- * statistiques, pas pour regarder une animation.
- */
-@Composable
-private fun DetailSection(index: Int, content: @Composable () -> Unit) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(index * 55L)
-        visible = true
-    }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 6 }
-    ) {
-        content()
-    }
-}
-
-/**
- * Valeur qui monte de zéro jusqu'à [target] à l'ouverture de l'écran.
- *
- * Réservé aux deux mesures de tête (distance et durée) : six nombres défilant
- * ensemble donneraient un tableau de bord de voiture de sport, pas un carnet de
- * randonnée. Les mesures secondaires se contentent d'apparaître.
- *
- * Le décompte repart si [target] change — au retour sur un autre parcours, par
- * exemple — ce qui évite de figer le chiffre du précédent.
- */
-@Composable
-private fun rememberCountUp(target: Double): Double {
-    var started by remember(target) { mutableStateOf(false) }
-    val animated by animateFloatAsState(
-        targetValue = if (started) target.toFloat() else 0f,
-        animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
-        label = "count_up"
-    )
-    LaunchedEffect(target) { started = true }
-    return animated.toDouble()
 }
 
 @Composable

@@ -223,8 +223,6 @@ deux réglages, un bouton de confirmation.
 - **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
   aucun point ne transite par la mémoire.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
-- **Convertir en CSV** et **Convertir un CSV** — vers et depuis un format lisible
-  dans un tableur, décrits plus bas.
 
 **« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
 l'auteur (voir « Poids mort »).
@@ -271,46 +269,6 @@ morceaux les allumerait tous d'un coup sur la carte.
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
 
-### Convertir en CSV, convertir un CSV
-
-`util/CsvConverter.kt` traduit un fichier vers un autre, **sans jamais toucher
-Room** : ni les deux sens ne créent, ne lisent, ni ne modifient un parcours de
-l'historique. Ce sont de simples conversions de fichier à fichier, ce qui les
-distingue de tous les autres outils de cet écran.
-
-Le CSV porte sept colonnes fixes, toujours dans cet ordre : `latitude`, `longitude`,
-`altitude_m`, `horodatage`, `vitesse_m_s`, `nouveau_troncon`, `couleur_troncon`. À la
-lecture, seules les deux premières sont exigées — un tableau façonné à la main avec
-seulement des coordonnées reste utilisable, le reste retombe sur un repli :
-altitude et vitesse à zéro, horodatage synthétique et régulier (même principe que
-l'import KML sans `<time>`), pas de rupture de tronçon, pas de couleur.
-
-**GPX/KML → CSV** réutilise directement `Importer.importFromUri` : son `onBatch` est
-redirigé vers l'écriture CSV au lieu d'une insertion en base, `trackId = 0` n'étant
-qu'un espace réservé jamais écrit nulle part. Le fichier durci contre les entités XML
-(invariant 4) protège donc aussi ce chemin, sans rien dupliquer.
-
-**CSV → GPX/KML** lit le CSV une seule fois par format demandé (deux lectures si les
-deux formats sont cochés, plutôt qu'une écriture simultanée dans les deux) : un CSV
-façonné à la main tient en quelques milliers de lignes au grand maximum, la relecture
-ne coûte rien face à la simplicité du code qui en résulte. Le nom et l'heure du
-parcours de tête (`<metadata><time>` en GPX) sont ceux de la conversion elle-même,
-pas ceux du premier point : les découvrir demanderait de lire le fichier avant de
-pouvoir ouvrir l'écriture, ce que l'écriture en flux interdit justement d'attendre.
-Seule cette ligne d'en-tête est concernée ; chaque point porte son propre horodatage,
-exact ou synthétique selon ce que la colonne contenait.
-
-Le premier point lu ne peut jamais porter la marque de rupture, quoi que dise sa
-colonne — même raisonnement que `clearFirstPointDiscontinuity` pour le découpage : le
-tout premier point d'un parcours ne fait qu'ouvrir le tracé.
-
-Les deux sens écrivent dans Téléchargements/Mes parcours, comme la sauvegarde
-automatique : pas de sélecteur de destination, un seul bouton suffit.
-
-Fonctions pures et testables sans Robolectric — `writeRow`, `parseHeader`,
-`parseRow` — à la manière de `KmlExportTest` pour l'export : `CsvConverterTest` les
-vérifie directement, aller-retour écriture/lecture compris.
-
 ### `TrackStatsAccumulator`
 
 `util/TrackStats.kt` porte **le seul calcul de statistiques du projet**.
@@ -350,24 +308,6 @@ change de taille selon l'écran qui l'affiche — ce qui était le cas.
 
 **Ne pas réintroduire de `TextStyle` ni de `fontWeight` écrits à la main dans les
 écrans** : c'est exactement ce qui avait fait diverger les écrans entre eux.
-
-## Effet d'appui des boutons de la carte
-
-`TrackingTab.tapBurst` joue, **à l'intérieur** d'un bouton rond, une onde qui s'étend
-depuis le centre et un reflet qui le balaie en diagonale.
-
-Deux précautions le tiennent dans ses limites, et elles ne sont pas cosmétiques : ces
-boutons flottent au-dessus de la carte, où le moindre débordement dessinerait sur le
-tracé. Le `clip(CircleShape)` doit rester **avant** `tapBurst` dans la chaîne de
-modificateurs — c'est lui qui enferme le dessin dans le disque ; et `drawWithContent`
-peint par-dessus le contenu déjà rendu plutôt qu'à côté.
-
-Le déclencheur est un **compteur**, pas un booléen : deux appuis de suite doivent
-rejouer l'effet, ce qu'un drapeau repassant à la même valeur ne ferait pas.
-
-Rien n'est dessiné au repos — la progression vaut 1 tant qu'aucun appui n'a eu lieu,
-et la fonction de dessin sort immédiatement. L'effet ne coûte donc rien entre deux
-clics, ce qui compte sur un écran qui se recompose à chaque position GPS.
 
 ## Invariants à ne pas casser
 
@@ -563,8 +503,8 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 142 tests unitaires en 19 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `SplitTrackTest` (13), `CsvConverterTest` (16), `BearingTest` (10), `SolarTimesTest`
+- 126 tests unitaires en 18 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
   `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
   `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`
@@ -989,6 +929,13 @@ inadvertance :
   et `SingleTrackRow` (dont il était le seul appelant), `formatThreshold`, l'entrée
   `Tool.REMOVE_STATIONARY` et `RemoveStationaryPointsTest`. `statsRecomputeLimit` et
   `calculateStatsFromPoints` restent : `loadResumeState` s'en sert toujours.
+
+- Quatrième passe, à la demande de l'auteur après essai de la 0.15 et de la 0.16 :
+  **les deux convertisseurs CSV** (`util/CsvConverter.kt`, les deux fonctions du
+  dépôt et du ViewModel, les deux écrans de `ToolsTab`, `CsvConverterTest`), et
+  **les animations ajoutées après la 0.15** — la cascade et le comptage progressif
+  de `DetailView`, l'effet d'appui des boutons de la carte. L'échelle typographique
+  de la 0.16 reste, elle : ce n'est pas une animation.
 
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.
