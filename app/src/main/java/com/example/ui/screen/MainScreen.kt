@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import com.example.ui.theme.AppMotion
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
@@ -348,26 +347,14 @@ fun MainScreen(
         AnimatedContent(
             targetState = detailId,
             transitionSpec = {
-                // Même durée et même courbe dans les deux sens, prises du vocabulaire
-                // commun : la sortie doit être exactement l'inverse de l'entrée,
-                // sinon revenir en arrière ne donne pas l'impression de défaire.
-                val slide = tween<androidx.compose.ui.unit.IntOffset>(
-                    durationMillis = AppMotion.DurationLong,
-                    easing = AppMotion.Emphasized
-                )
-                val fade = tween<Float>(
-                    durationMillis = AppMotion.DurationLong,
-                    easing = AppMotion.Emphasized
-                )
                 if (targetState != null && initialState == null) {
-                    (slideInHorizontally(slide) { it } + fadeIn(fade)) togetherWith
-                        (slideOutHorizontally(slide) { -it / 5 } + fadeOut(fade))
+                    (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(220)) { -it / 5 } + fadeOut(tween(220)))
                 } else if (targetState == null && initialState != null) {
-                    (slideInHorizontally(slide) { -it / 5 } + fadeIn(fade)) togetherWith
-                        (slideOutHorizontally(slide) { it } + fadeOut(fade))
+                    (slideInHorizontally(tween(220)) { -it / 5 } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
                 } else {
-                    fadeIn(tween(AppMotion.DurationMedium, easing = AppMotion.Standard)) togetherWith
-                        fadeOut(tween(AppMotion.DurationShort, easing = AppMotion.Standard))
+                    fadeIn(tween(150)) togetherWith fadeOut(tween(150))
                 }
             },
             label = "detail_transition",
@@ -476,41 +463,10 @@ fun MainScreen(
                 },
                 modifier = modifier.fillMaxSize().testTag("main_screen")
             ) { innerPadding ->
-                // Fondu croisé entre les quatre onglets — le « fade through » de
-                // Material 3. C'était le dernier endroit de l'application à basculer
-                // d'un écran à l'autre sans transition, alors que c'est la navigation
-                // la plus utilisée.
-                //
-                // Sobre à dessein : **l'opacité seule**, sans glissement ni mise à
-                // l'échelle. Un glissement latéral suggérerait un ordre entre des
-                // onglets qui n'en ont pas, et surtout : l'onglet d'enregistrement
-                // porte une carte osmdroid vivante ; la mettre à l'échelle
-                // obligerait à la redessiner dans un tampon à chaque image. Une
-                // opacité se compose beaucoup plus simplement.
-                //
-                // Ce qui part s'efface vite et ce qui arrive prend son temps, en
-                // commençant juste après : sans ce décalage, les deux écrans se
-                // superposent à mi-transition et l'on ne lit ni l'un ni l'autre.
-                AnimatedContent(
-                    targetState = currentTab,
-                    transitionSpec = {
-                        fadeIn(
-                            tween(
-                                durationMillis = AppMotion.DurationLong,
-                                delayMillis = AppMotion.DurationShort,
-                                easing = AppMotion.EmphasizedDecelerate
-                            )
-                        ) togetherWith fadeOut(
-                            tween(
-                                durationMillis = AppMotion.DurationShort,
-                                easing = AppMotion.EmphasizedAccelerate
-                            )
-                        )
-                    },
-                    label = "tab_transition",
+                Box(
                     modifier = Modifier.fillMaxSize()
-                ) { tab ->
-                    when (tab) {
+                ) {
+                    when (currentTab) {
                         "enregistrer" -> {
                             TrackingTab(
                                 viewModel = viewModel,

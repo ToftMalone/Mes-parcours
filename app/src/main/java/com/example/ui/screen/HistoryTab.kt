@@ -140,6 +140,7 @@ fun HistoryTab(
                         Text(
                             text = "Vos parcours",
                             style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
@@ -650,6 +651,7 @@ fun TrackHistoryCard(
                     Text(
                         text = track.name,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp
                     )
@@ -835,6 +837,7 @@ fun StatsBadge(
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 15.sp
         )
@@ -874,6 +877,7 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
             Text(
                 text = "Historique vide",
                 style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )

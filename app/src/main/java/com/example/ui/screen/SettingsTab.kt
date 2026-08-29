@@ -1166,13 +1166,11 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.16",
+        version = "0.15",
         changes = listOf(
-            "L'interface respire mieux : titres, libellés et mesures suivent désormais une même échelle, au lieu d'être réglés écran par écran",
-            "Les chiffres ne tressautent plus pendant un enregistrement — tous les chiffres ont maintenant la même largeur",
-            "Le passage d'un onglet à l'autre se fait en fondu, au lieu de basculer d'un coup",
-            "Les boutons de la carte s'enfoncent légèrement sous le doigt, puis reviennent",
-            "Les deux outils de conversion CSV ont été retirés"
+            "Nouveau : l'outil « Convertir en CSV » transforme un GPX ou un KML en tableau, lisible dans un tableur",
+            "Nouveau : l'outil « Convertir un CSV » fait l'inverse — un tableau CSV devient un parcours GPX et/ou KML",
+            "Les deux passent par Téléchargements/Mes parcours, comme la sauvegarde automatique"
         )
     )
 )

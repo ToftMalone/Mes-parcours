@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.16` (`versionCode` 32). Elle n'est écrite qu'une fois,
+- Version courante : `0.15` (`versionCode` 31). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -223,6 +223,8 @@ deux réglages, un bouton de confirmation.
 - **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
   aucun point ne transite par la mémoire.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
+- **Convertir en CSV** et **Convertir un CSV** — vers et depuis un format lisible
+  dans un tableur, décrits plus bas.
 
 **« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
 l'auteur (voir « Poids mort »).
@@ -269,6 +271,46 @@ morceaux les allumerait tous d'un coup sur la carte.
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
 
+### Convertir en CSV, convertir un CSV
+
+`util/CsvConverter.kt` traduit un fichier vers un autre, **sans jamais toucher
+Room** : ni les deux sens ne créent, ne lisent, ni ne modifient un parcours de
+l'historique. Ce sont de simples conversions de fichier à fichier, ce qui les
+distingue de tous les autres outils de cet écran.
+
+Le CSV porte sept colonnes fixes, toujours dans cet ordre : `latitude`, `longitude`,
+`altitude_m`, `horodatage`, `vitesse_m_s`, `nouveau_troncon`, `couleur_troncon`. À la
+lecture, seules les deux premières sont exigées — un tableau façonné à la main avec
+seulement des coordonnées reste utilisable, le reste retombe sur un repli :
+altitude et vitesse à zéro, horodatage synthétique et régulier (même principe que
+l'import KML sans `<time>`), pas de rupture de tronçon, pas de couleur.
+
+**GPX/KML → CSV** réutilise directement `Importer.importFromUri` : son `onBatch` est
+redirigé vers l'écriture CSV au lieu d'une insertion en base, `trackId = 0` n'étant
+qu'un espace réservé jamais écrit nulle part. Le fichier durci contre les entités XML
+(invariant 4) protège donc aussi ce chemin, sans rien dupliquer.
+
+**CSV → GPX/KML** lit le CSV une seule fois par format demandé (deux lectures si les
+deux formats sont cochés, plutôt qu'une écriture simultanée dans les deux) : un CSV
+façonné à la main tient en quelques milliers de lignes au grand maximum, la relecture
+ne coûte rien face à la simplicité du code qui en résulte. Le nom et l'heure du
+parcours de tête (`<metadata><time>` en GPX) sont ceux de la conversion elle-même,
+pas ceux du premier point : les découvrir demanderait de lire le fichier avant de
+pouvoir ouvrir l'écriture, ce que l'écriture en flux interdit justement d'attendre.
+Seule cette ligne d'en-tête est concernée ; chaque point porte son propre horodatage,
+exact ou synthétique selon ce que la colonne contenait.
+
+Le premier point lu ne peut jamais porter la marque de rupture, quoi que dise sa
+colonne — même raisonnement que `clearFirstPointDiscontinuity` pour le découpage : le
+tout premier point d'un parcours ne fait qu'ouvrir le tracé.
+
+Les deux sens écrivent dans Téléchargements/Mes parcours, comme la sauvegarde
+automatique : pas de sélecteur de destination, un seul bouton suffit.
+
+Fonctions pures et testables sans Robolectric — `writeRow`, `parseHeader`,
+`parseRow` — à la manière de `KmlExportTest` pour l'export : `CsvConverterTest` les
+vérifie directement, aller-retour écriture/lecture compris.
+
 ### `TrackStatsAccumulator`
 
 `util/TrackStats.kt` porte **le seul calcul de statistiques du projet**.
@@ -281,76 +323,6 @@ deux voies sur les mêmes points, précisément pour verrouiller ce point.
 Le premier point reçu n'apporte ni distance ni vitesse — il n'a pas de précédent avec
 quoi les mesurer — mais il ouvre l'altitude de référence. C'est ce que faisait déjà la
 boucle d'origine en démarrant à l'indice 1.
-
-## Typographie
-
-`ui/theme/Type.kt` porte **l'échelle typographique complète**, et c'est nouveau : elle
-est longtemps restée celle de l'échafaudage — une seule taille redéfinie (`bodyLarge`),
-tout le reste laissé aux valeurs de Material.
-
-Les écrans compensaient chacun de leur côté, en posant `fontSize` et `fontWeight` à la
-main. Surtout, `FontWeight.Black` apparaissait **27 fois** : la hiérarchie se faisait à
-la graisse faute d'échelle pour la porter, d'où une interface qui parlait fort au lieu
-de parler clair, et des titres qui changeaient d'aspect d'un écran à l'autre. Ces 27
-occurrences ont toutes disparu ; les graisses se décident désormais dans `Type.kt`.
-
-**Les chiffres sont à chasse fixe** (`fontFeatureSettings = "tnum"`), sur tous les
-styles qui en portent. Sans cela un « 1 » est plus étroit qu'un « 8 » : à chaque
-seconde d'un enregistrement, la distance et la vitesse changeaient de largeur et le
-texte tressautait. C'est une correction de lisibilité autant que d'esthétique — ces
-nombres se lisent en marchant. Le réglage vient de la police système, il n'y a aucun
-fichier de police embarqué.
-
-`AppTextStyles` complète l'échelle là où Material n'a pas de case : `statLarge` et
-`statMedium` pour les mesures, `overline` pour les libellés en petites capitales. Les
-définir là plutôt qu'en `TextStyle` écrit dans chaque écran évite que la même mesure
-change de taille selon l'écran qui l'affiche — ce qui était le cas.
-
-**Ne pas réintroduire de `TextStyle` ni de `fontWeight` écrits à la main dans les
-écrans** : c'est exactement ce qui avait fait diverger les écrans entre eux.
-
-## Mouvement
-
-`ui/theme/Motion.kt` porte le vocabulaire de mouvement, repris des jetons de
-Material 3 : trois courbes (`Emphasized`, `EmphasizedDecelerate`,
-`EmphasizedAccelerate`), trois durées, et le ressort d'appui. Même raison d'être que
-`Type.kt` pour la typographie — les durées étaient écrites à la main à chaque appel,
-`tween(220)`, `tween(180)`, `tween(150)`, sans que rien ne dise pourquoi l'une plutôt
-que l'autre.
-
-**La règle de fluidité, à ne jamais enfreindre : n'animer que ce que la carte
-graphique sait faire seule** — opacité, échelle, translation, via `graphicsLayer`.
-Animer une taille, une marge ou un poids relance une mesure de mise en page à chaque
-image, et c'est la cause la plus courante de saccade. Cette distinction compte
-doublement ici : l'écran d'enregistrement se recompose deux fois par seconde.
-
-Corollaire moins évident, appliqué par `pressScale` : **la valeur animée se lit à
-l'intérieur du bloc `graphicsLayer`**, donc au moment du dessin. La lire en dehors —
-ou passer par `Modifier.scale(...)` — provoquerait une recomposition par image là où
-un simple redessin de la couche suffit.
-
-### Ce qui est animé
-
-- **Passage d'un onglet à l'autre** (`MainScreen`) — fondu croisé, *opacité seule*.
-  Pas de glissement, qui suggérerait un ordre entre des onglets qui n'en ont pas ; et
-  surtout pas de mise à l'échelle : l'onglet d'enregistrement porte une carte osmdroid
-  vivante, que la mettre à l'échelle obligerait à redessiner dans un tampon à chaque
-  image. Ce qui part s'efface vite, ce qui arrive prend son temps en commençant juste
-  après — sans ce décalage, les deux écrans se superposent à mi-transition.
-- **Appui sur un bouton flottant** (`TrackingTab.rememberFabPress` / `pressScale`) —
-  le bouton s'enfonce puis revient, par un **ressort** et non une durée fixe : le
-  retour repart de la vitesse en cours, si bien qu'un doigt relâché à mi-course ne
-  provoque aucune rupture. Complète le halo que Material dessine déjà seul. Les sept
-  boutons l'ont, et c'est voulu : un retour tactile que seuls certains boutons
-  auraient donnerait l'impression que les autres ne répondent pas.
-- **Entrée et sortie de l'écran de détail** (`MainScreen`) — glissement latéral, aligné
-  sur le vocabulaire commun. La sortie est l'exacte inverse de l'entrée, sinon revenir
-  en arrière ne donne pas l'impression de défaire.
-
-Les animations plus anciennes — jeux de boutons qui se succèdent, chiffres des
-statistiques en direct, cartes de l'historique en cascade — gardent leurs durées
-propres. Elles fonctionnent ; les aligner sur le vocabulaire est un chantier à part,
-sans effet visible, qui ne vaut pas le risque d'y toucher pour rien.
 
 ## Invariants à ne pas casser
 
@@ -546,8 +518,8 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 126 tests unitaires en 18 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
+- 142 tests unitaires en 19 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `SplitTrackTest` (13), `CsvConverterTest` (16), `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
   `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
   `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`
@@ -972,13 +944,6 @@ inadvertance :
   et `SingleTrackRow` (dont il était le seul appelant), `formatThreshold`, l'entrée
   `Tool.REMOVE_STATIONARY` et `RemoveStationaryPointsTest`. `statsRecomputeLimit` et
   `calculateStatsFromPoints` restent : `loadResumeState` s'en sert toujours.
-
-- Quatrième passe, à la demande de l'auteur après essai de la 0.15 et de la 0.16 :
-  **les deux convertisseurs CSV** (`util/CsvConverter.kt`, les deux fonctions du
-  dépôt et du ViewModel, les deux écrans de `ToolsTab`, `CsvConverterTest`), et
-  **les animations ajoutées après la 0.15** — la cascade et le comptage progressif
-  de `DetailView`, l'effet d'appui des boutons de la carte. L'échelle typographique
-  de la 0.16 reste, elle : ce n'est pas une animation.
 
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.

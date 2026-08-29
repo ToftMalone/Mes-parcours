@@ -1,9 +1,10 @@
 package com.example.ui.screen
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
@@ -66,7 +66,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.component.MapViewContainer
-import com.example.ui.theme.AppTextStyles
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 
@@ -141,6 +140,7 @@ fun DetailView(
                     Text(
                         text = track?.name ?: "Détails du parcours",
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onSurface
                     ) 
                 },
@@ -286,11 +286,9 @@ fun DetailView(
                         }
                     }
                     Text(
-                        // Le type d'activité plutôt qu'un « Parcours GPS » que
-                        // portaient tous les parcours à l'identique : ils le sont
-                        // tous, le libellé n'apprenait donc rien.
-                        text = currentTrack.activityType,
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Parcours GPS",
+                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -332,6 +330,14 @@ fun DetailView(
                     )
             ) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        text = "MÉTRIQUES EXPLORATEUR",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+
                     // Principal values
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -423,7 +429,7 @@ fun DetailView(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
-                        Text("Reprendre la trace", style = MaterialTheme.typography.titleMedium)
+                        Text("Reprendre la trace", fontWeight = FontWeight.Black, fontSize = 16.sp)
                     }
                 }
             }
@@ -436,6 +442,7 @@ fun DetailView(
                 Text(
                     text = "Exportation & Sauvegardes",
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
@@ -465,7 +472,7 @@ fun DetailView(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("Enregistrer GPX")
+                            Text("Enregistrer GPX", fontWeight = FontWeight.Black)
                         }
                     }
 
@@ -491,7 +498,7 @@ fun DetailView(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("Enregistrer KML")
+                            Text("Enregistrer KML", fontWeight = FontWeight.Black)
                         }
                     }
                 }
@@ -541,13 +548,19 @@ fun DetailMetric(
     Column {
         Text(
             text = title,
-            style = AppTextStyles.overline,
-            color = highlightColor
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = highlightColor,
+            letterSpacing = 0.5.sp
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
-            style = AppTextStyles.statLarge,
+            style = androidx.compose.ui.text.TextStyle(
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-0.5).sp
+            ),
             color = MaterialTheme.colorScheme.onSurface
         )
     }
@@ -582,13 +595,15 @@ fun DetailSubMetric(
         Column {
             Text(
                 text = label,
-                style = AppTextStyles.overline,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
