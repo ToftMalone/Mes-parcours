@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -337,23 +338,42 @@ fun MainScreen(
     // l'utilisateur venait d'écarter.
     val detailId = viewingDetailedTrackId
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Glissement + fondu entre les onglets et la vue de détail, plutôt qu'une
-        // bascule sèche : c'était le seul endroit de toute l'application sans la
-        // moindre transition. Le sens du glissement suit la navigation — la vue de
-        // détail entre par la droite comme un écran qu'on empile, en sort par la
-        // droite comme on le dépile — pour rester lisible en un coup d'œil plutôt que
-        // décoratif.
+    // Fond opaque **obligatoire** sous la transition : sans lui, on voit à travers.
+    //
+    // Le thème hérite de `Theme.DeviceDefault`, dont le fond de fenêtre est sombre.
+    // Pendant un fondu, les deux écrans sont à demi transparents en même temps, et ce
+    // fond apparaissait entre les deux — d'où le voile noir signalé à l'ouverture d'un
+    // parcours comme au retour.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Glissement entre les onglets et la vue de détail, plutôt qu'une bascule
+        // sèche. Le sens du glissement suit la navigation — la vue de détail entre par
+        // la droite comme un écran qu'on empile, en sort par la droite comme on le
+        // dépile — pour rester lisible en un coup d'œil plutôt que décoratif.
+        //
+        // **Aucun fondu sur ces deux branches, et c'est voulu.** Deux écrans opaques
+        // qui glissent l'un sur l'autre ne laissent jamais rien paraître entre eux :
+        // le calcul le montre, l'écran sortant recule d'un cinquième de largeur quand
+        // l'entrant en parcourt une entière, si bien qu'ils se recouvrent d'un bout à
+        // l'autre du mouvement. Ajouter un fondu par-dessus ne rendait pas la
+        // transition plus douce : il la rendait transparente, donc translucide sur le
+        // fond de la fenêtre.
         AnimatedContent(
             targetState = detailId,
             transitionSpec = {
                 if (targetState != null && initialState == null) {
-                    (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
-                        (slideOutHorizontally(tween(220)) { -it / 5 } + fadeOut(tween(220)))
+                    slideInHorizontally(tween(220)) { it } togetherWith
+                        slideOutHorizontally(tween(220)) { -it / 5 }
                 } else if (targetState == null && initialState != null) {
-                    (slideInHorizontally(tween(220)) { -it / 5 } + fadeIn(tween(220))) togetherWith
-                        (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
+                    slideInHorizontally(tween(220)) { -it / 5 } togetherWith
+                        slideOutHorizontally(tween(220)) { it }
                 } else {
+                    // Passage direct d'un parcours à un autre : sans glissement, il
+                    // faut bien un fondu. Le fond opaque posé ci-dessus lui sert de
+                    // toile, il ne peut donc pas laisser voir la fenêtre.
                     fadeIn(tween(150)) togetherWith fadeOut(tween(150))
                 }
             },

@@ -1166,11 +1166,11 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.15",
+        version = "0.16",
         changes = listOf(
-            "Nouveau : l'outil « Convertir en CSV » transforme un GPX ou un KML en tableau, lisible dans un tableur",
-            "Nouveau : l'outil « Convertir un CSV » fait l'inverse — un tableau CSV devient un parcours GPX et/ou KML",
-            "Les deux passent par Téléchargements/Mes parcours, comme la sauvegarde automatique"
+            "Nouveau : l'outil « Rogner un parcours » retire les premières et les dernières minutes d'un parcours. Pour l'enregistrement oublié qui a continué sur la route du retour, ou démarré depuis le parking",
+            "Le résultat est une copie : le parcours d'origine reste intact, sauf si vous demandez sa suppression",
+            "Corrigé : un voile noir apparaissait en ouvrant un parcours et en revenant à la liste"
         )
     )
 )

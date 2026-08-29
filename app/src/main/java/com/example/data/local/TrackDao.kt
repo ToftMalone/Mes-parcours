@@ -131,6 +131,22 @@ interface TrackDao {
     // par SQLite sans jamais transiter par la mémoire de l'application.
     // ------------------------------------------------------------------
 
+    /**
+     * Horodatage du premier et du dernier point d'un parcours.
+     *
+     * Le rognage s'en sert pour convertir « retirer les cinq premières minutes » en
+     * une borne de temps absolue, sans charger le moindre point : deux entiers
+     * suffisent, quelle que soit la taille du parcours.
+     *
+     * L'ordre est celui des identifiants, pas des horodatages — c'est celui du
+     * trajet, et c'est celui que suit tout le reste du projet.
+     */
+    @Query("SELECT timestamp FROM track_points WHERE trackId = :trackId ORDER BY id ASC LIMIT 1")
+    suspend fun getFirstPointTimestamp(trackId: Long): Long?
+
+    @Query("SELECT timestamp FROM track_points WHERE trackId = :trackId ORDER BY id DESC LIMIT 1")
+    suspend fun getLastPointTimestamp(trackId: Long): Long?
+
     @Query("SELECT MAX(id) FROM track_points WHERE trackId = :trackId")
     suspend fun getMaxPointId(trackId: Long): Long?
 

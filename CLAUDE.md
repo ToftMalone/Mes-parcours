@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.15` (`versionCode` 31). Elle n'est écrite qu'une fois,
+- Version courante : `0.16` (`versionCode` 32). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -223,6 +223,8 @@ deux réglages, un bouton de confirmation.
 - **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
   aucun point ne transite par la mémoire.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
+- **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
+  ci-dessous.
 - **Convertir en CSV** et **Convertir un CSV** — vers et depuis un format lisible
   dans un tableur, décrits plus bas.
 
@@ -311,6 +313,39 @@ Fonctions pures et testables sans Robolectric — `writeRow`, `parseHeader`,
 `parseRow` — à la manière de `KmlExportTest` pour l'export : `CsvConverterTest` les
 vérifie directement, aller-retour écriture/lecture compris.
 
+### Rogner un parcours
+
+`TrackRepository.trimTrack` crée une copie amputée de ses premières et dernières
+minutes. C'est le besoin le plus banal d'un traqueur GPS : l'enregistrement oublié
+qui a continué sur la route du retour, ou démarré depuis le parking.
+
+Même forme que le découpage, et pour les mêmes raisons : une seule lecture page par
+page, des bornes relevées en **identifiants de points**, les statistiques cumulées
+pendant cette même passe, puis une transaction unique où SQLite recopie la tranche
+(`copyPointRangeInto`, invariant 5).
+
+**Les bornes se comparent aux horodatages, jamais à un rang.** Sur un enregistrement
+à trous — pause, perte de signal — « retirer les cinq premières minutes » ne veut pas
+dire retirer un nombre fixe de points. `getFirstPointTimestamp` et
+`getLastPointTimestamp` donnent les deux extrémités sans charger un seul point.
+
+Trois refus, chacun avec son message :
+
+1. **Ne rien retirer** — le résultat ne serait qu'un doublon.
+2. **Retirer plus que la durée du parcours** — les deux bornes se croisent.
+3. **Ne laisser qu'un point** — ni tracé, ni distance, ni durée à en tirer. Ce
+   troisième cas n'est atteignable que sur un parcours à trous : sur des points
+   régulièrement espacés, tout rognage assez large fait d'abord se croiser les
+   bornes, et c'est le refus précédent qui se déclenche.
+
+`clearFirstPointDiscontinuity` sur le résultat, pour la même raison que le découpage :
+le point devenu premier ouvrait peut-être un tronçon, il ne fait plus qu'ouvrir le
+tracé.
+
+Le parcours d'origine n'est jamais modifié, et n'est supprimé que si l'utilisateur
+coche la case. Le résultat hérite de la provenance et de l'apparence du parent, mais
+jamais de `isSelectedForMap`.
+
 ### `TrackStatsAccumulator`
 
 `util/TrackStats.kt` porte **le seul calcul de statistiques du projet**.
@@ -323,6 +358,30 @@ deux voies sur les mêmes points, précisément pour verrouiller ce point.
 Le premier point reçu n'apporte ni distance ni vitesse — il n'a pas de précédent avec
 quoi les mesurer — mais il ouvre l'altitude de référence. C'est ce que faisait déjà la
 boucle d'origine en démarrant à l'indice 1.
+
+## Le voile noir des transitions : corrigé en 0.16
+
+Rapporté ainsi : « quand j'ouvre un parcours, l'animation d'ouverture fait un effet
+noir bizarre, et c'est pareil quand je fais retour ».
+
+**La cause.** Le `Box` qui contient l'`AnimatedContent` de `MainScreen` n'avait aucun
+fond. Or la transition superposait un glissement **et un fondu** : à mi-course, les
+deux écrans étaient à demi transparents en même temps, et l'on voyait donc au travers
+jusqu'au fond de la fenêtre — celui de `Theme.DeviceDefault`, sombre.
+
+**Le correctif**, en deux parties qui se complètent :
+
+- un **fond opaque** sur le conteneur, pour qu'il n'y ait plus rien à apercevoir
+  derrière ;
+- **le fondu retiré** des deux branches à glissement. Deux écrans opaques qui
+  glissent l'un sur l'autre ne laissent jamais rien paraître entre eux : l'écran
+  sortant recule d'un cinquième de largeur quand l'entrant en parcourt une entière,
+  si bien qu'ils se recouvrent d'un bout à l'autre du mouvement. Le fondu ne rendait
+  pas la transition plus douce, il la rendait translucide.
+
+Le fondu reste sur la troisième branche — le passage direct d'un parcours à un autre,
+sans glissement — où il est le seul mouvement possible ; le fond opaque lui sert
+désormais de toile.
 
 ## Invariants à ne pas casser
 
@@ -518,8 +577,9 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 142 tests unitaires en 19 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `SplitTrackTest` (13), `CsvConverterTest` (16), `BearingTest` (10), `SolarTimesTest`
+- 156 tests unitaires en 20 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `SplitTrackTest` (13), `CsvConverterTest` (16), `TrimTrackTest` (14),
+  `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
   `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
   `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`

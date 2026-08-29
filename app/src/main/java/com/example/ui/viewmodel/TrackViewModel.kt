@@ -521,6 +521,43 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    /**
+     * Rogne le début et/ou la fin d'un parcours, et renvoie l'identifiant créé.
+     *
+     * Sur [kotlinx.coroutines.Dispatchers.IO] comme le découpage : la lecture parcourt
+     * tous les points et n'a rien à faire sur le thread principal.
+     */
+    fun trimTrack(
+        trackId: Long,
+        dropStartMillis: Long,
+        dropEndMillis: Long,
+        newName: String,
+        deleteSource: Boolean,
+        onSuccess: (Long) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val newTrackId = repository.trimTrack(
+                    sourceTrackId = trackId,
+                    dropStartMillis = dropStartMillis,
+                    dropEndMillis = dropEndMillis,
+                    newName = newName,
+                    deleteSource = deleteSource
+                )
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(newTrackId)
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    // Même raison que pour le découpage : le message de l'exception est
+                    // déjà rédigé pour être lu tel quel.
+                    onError(e.localizedMessage ?: "Erreur de rognage")
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Export
     //

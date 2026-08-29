@@ -71,6 +71,7 @@ import kotlin.math.roundToInt
 private enum class Tool {
     MERGE,
     SPLIT,
+    TRIM,
     CSV_EXPORT,
     CSV_IMPORT
 }
@@ -95,6 +96,11 @@ fun ToolsTab(
             modifier = modifier
         )
         Tool.SPLIT -> SplitTrackTool(
+            viewModel = viewModel,
+            onBack = { openTool = null },
+            modifier = modifier
+        )
+        Tool.TRIM -> TrimTrackTool(
             viewModel = viewModel,
             onBack = { openTool = null },
             modifier = modifier
@@ -154,6 +160,14 @@ private fun ToolsMenu(
                 subtitle = "Séparer un parcours en plusieurs, par tronçon ou par longue pause",
                 onClick = { onOpenTool(Tool.SPLIT) },
                 testTag = "open_split_tool_button"
+            )
+
+            ToolMenuEntry(
+                icon = Icons.Filled.ContentCut,
+                title = "Rogner un parcours",
+                subtitle = "Retirer les premières et les dernières minutes d'un parcours",
+                onClick = { onOpenTool(Tool.TRIM) },
+                testTag = "open_trim_tool_button"
             )
 
             ToolMenuEntry(
@@ -854,6 +868,251 @@ private fun SplitTrackTool(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isSplitting) "Découpage en cours…" else "Découper le parcours",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rogner le début et la fin
+// ---------------------------------------------------------------------------
+
+/** Bornes des curseurs de rognage, en minutes, et pas du curseur. */
+private const val TRIM_MAX_MINUTES = 60f
+private const val TRIM_SLIDER_STEPS = 59 // un cran par minute
+
+private fun formatTrim(minutes: Int): String = when {
+    minutes == 0 -> "rien"
+    minutes < 60 -> "$minutes min"
+    else -> "1 h"
+}
+
+@Composable
+private fun TrimTrackTool(
+    viewModel: TrackViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val tracks by viewModel.allTracks.collectAsState()
+    val eligibleTracks = tracks.filter { !it.isRecording }
+
+    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
+    val selectedTrack = eligibleTracks.find { it.id == selectedTrackId }
+
+    var dropStartMinutes by remember { mutableStateOf(0f) }
+    var dropEndMinutes by remember { mutableStateOf(0f) }
+    var newName by remember { mutableStateOf("") }
+    var deleteSource by remember { mutableStateOf(false) }
+    var isTrimming by remember { mutableStateOf(false) }
+
+    // Le nom proposé est celui du parcours choisi, suffixé : le résultat est une
+    // copie, et deux lignes du même nom dans l'historique ne se distingueraient pas.
+    LaunchedEffect(selectedTrack?.id) {
+        val track = selectedTrack
+        if (track != null) newName = "${track.name} (rogné)"
+    }
+
+    if (eligibleTracks.isEmpty()) {
+        ToolsEmptyState(
+            onBack = onBack,
+            modifier = modifier,
+            title = "Rognage indisponible",
+            message = "Il faut au moins un parcours enregistré ou importé pour pouvoir le rogner.",
+            screenTestTag = "trim_tool",
+            backButtonTestTag = "trim_tool_back_button"
+        )
+        return
+    }
+
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .testTag("trim_tool"),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.testTag("trim_tool_back_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Retour aux outils",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Column {
+                    Text(
+                        text = "Rogner un parcours",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "Retirer le début et la fin d'un parcours",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Étape 1 : quel parcours rogner
+            ToolStepCard(
+                stepNumber = 1,
+                title = "Parcours à rogner",
+                subtitle = selectedTrack?.name ?: "Aucun parcours sélectionné"
+            ) {
+                eligibleTracks.sortedByDescending { it.startTime }.forEach { track ->
+                    SingleTrackRow(
+                        track = track,
+                        selected = track.id == selectedTrackId,
+                        onSelect = { selectedTrackId = track.id }
+                    )
+                }
+            }
+
+            // Étape 2 : combien retirer de chaque bout
+            ToolStepCard(
+                stepNumber = 2,
+                title = "Ce qu'on retire",
+                subtitle = "Le parcours d'origine n'est pas modifié"
+            ) {
+                Text(
+                    text = "Au début : ${formatTrim(dropStartMinutes.roundToInt())}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Slider(
+                    value = dropStartMinutes,
+                    onValueChange = { dropStartMinutes = it },
+                    valueRange = 0f..TRIM_MAX_MINUTES,
+                    steps = TRIM_SLIDER_STEPS,
+                    enabled = selectedTrack != null,
+                    modifier = Modifier.fillMaxWidth().testTag("trim_start_slider")
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "À la fin : ${formatTrim(dropEndMinutes.roundToInt())}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Slider(
+                    value = dropEndMinutes,
+                    onValueChange = { dropEndMinutes = it },
+                    valueRange = 0f..TRIM_MAX_MINUTES,
+                    steps = TRIM_SLIDER_STEPS,
+                    enabled = selectedTrack != null,
+                    modifier = Modifier.fillMaxWidth().testTag("trim_end_slider")
+                )
+            }
+
+            // Étape 3 : nom du résultat
+            ToolStepCard(
+                stepNumber = 3,
+                title = "Nom du parcours rogné",
+                subtitle = "Le résultat est une copie : l'original garde son nom"
+            ) {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Nom") },
+                    singleLine = true,
+                    enabled = selectedTrack != null,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("trim_name_field")
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(enabled = selectedTrack != null) { deleteSource = !deleteSource }
+                        .padding(vertical = 4.dp)
+                        .testTag("trim_delete_source_row"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = deleteSource,
+                        onCheckedChange = { deleteSource = it },
+                        enabled = selectedTrack != null
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Supprimer le parcours d'origine",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Ce qui a été rogné sera définitivement perdu",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            val hasSomethingToTrim =
+                dropStartMinutes.roundToInt() > 0 || dropEndMinutes.roundToInt() > 0
+            val canTrim = selectedTrack != null && newName.isNotBlank() &&
+                    hasSomethingToTrim && !isTrimming
+
+            Button(
+                onClick = {
+                    val trackId = selectedTrack?.id ?: return@Button
+                    isTrimming = true
+                    viewModel.trimTrack(
+                        trackId = trackId,
+                        dropStartMillis = dropStartMinutes.roundToInt() * 60_000L,
+                        dropEndMillis = dropEndMinutes.roundToInt() * 60_000L,
+                        newName = newName.trim(),
+                        deleteSource = deleteSource,
+                        onSuccess = { newTrackId ->
+                            isTrimming = false
+                            Toast.makeText(context, "Parcours rogné", Toast.LENGTH_LONG).show()
+                            selectedTrackId = null
+                            viewModel.selectTrack(newTrackId)
+                            onBack()
+                        },
+                        onError = { error ->
+                            isTrimming = false
+                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                        }
+                    )
+                },
+                enabled = canTrim,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("confirm_trim_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ContentCut,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isTrimming) "Rognage en cours…" else "Rogner le parcours",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
