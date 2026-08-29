@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.15` (`versionCode` 31). Elle n'est écrite qu'une fois,
+- Version courante : `0.16` (`versionCode` 32). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -323,6 +323,54 @@ deux voies sur les mêmes points, précisément pour verrouiller ce point.
 Le premier point reçu n'apporte ni distance ni vitesse — il n'a pas de précédent avec
 quoi les mesurer — mais il ouvre l'altitude de référence. C'est ce que faisait déjà la
 boucle d'origine en démarrant à l'indice 1.
+
+## Typographie
+
+`ui/theme/Type.kt` porte **l'échelle typographique complète**, et c'est nouveau : elle
+est longtemps restée celle de l'échafaudage — une seule taille redéfinie (`bodyLarge`),
+tout le reste laissé aux valeurs de Material.
+
+Les écrans compensaient chacun de leur côté, en posant `fontSize` et `fontWeight` à la
+main. Surtout, `FontWeight.Black` apparaissait **27 fois** : la hiérarchie se faisait à
+la graisse faute d'échelle pour la porter, d'où une interface qui parlait fort au lieu
+de parler clair, et des titres qui changeaient d'aspect d'un écran à l'autre. Ces 27
+occurrences ont toutes disparu ; les graisses se décident désormais dans `Type.kt`.
+
+**Les chiffres sont à chasse fixe** (`fontFeatureSettings = "tnum"`), sur tous les
+styles qui en portent. Sans cela un « 1 » est plus étroit qu'un « 8 » : à chaque
+seconde d'un enregistrement, la distance et la vitesse changeaient de largeur et le
+texte tressautait. C'est une correction de lisibilité autant que d'esthétique — ces
+nombres se lisent en marchant. Le réglage vient de la police système, il n'y a aucun
+fichier de police embarqué.
+
+`AppTextStyles` complète l'échelle là où Material n'a pas de case : `statLarge` et
+`statMedium` pour les mesures, `overline` pour les libellés en petites capitales. Les
+définir là plutôt qu'en `TextStyle` écrit dans chaque écran évite que la même mesure
+change de taille selon l'écran qui l'affiche — ce qui était le cas.
+
+**Ne pas réintroduire de `TextStyle` ni de `fontWeight` écrits à la main dans les
+écrans** : c'est exactement ce qui avait fait diverger les écrans entre eux.
+
+## Couleurs de l'application
+
+`AppColorPreferences` (dans `Theme.kt`) décide d'où viennent les couleurs, selon
+`pref_dynamic_colors` :
+
+- **Couleurs dynamiques** (défaut) — Material You les tire du fond d'écran. C'est ce
+  que faisait l'application depuis toujours, et le défaut est conservé : une mise à
+  jour ne doit pas changer l'apparence sans qu'on l'ait demandé.
+- **Palette de l'application** — celle de `Color.kt`, la même sur tous les téléphones.
+
+À savoir avant de retoucher `Color.kt` : sur Android 12 et suivants, **cette palette
+n'était jamais affichée** tant que le réglage n'existait pas. Régler ses couleurs ne
+se voyait que sur Android 11 et antérieur.
+
+Le réglage n'apparaît pas en deçà d'Android 12 (`isDynamicColorAvailable`) : les
+couleurs dynamiques n'y existent pas, le choix serait sans effet.
+
+La lecture est réactive (`rememberDynamicColorEnabled`), sur le modèle de
+`rememberNightModeSource` : sans l'écoute des préférences, basculer le réglage
+n'aurait d'effet qu'au prochain démarrage.
 
 ## Invariants à ne pas casser
 

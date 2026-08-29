@@ -41,8 +41,10 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -83,6 +85,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
+import com.example.ui.theme.AppColorPreferences
 import com.example.ui.theme.NightModePreferences
 import com.example.ui.theme.NightModeSource
 import com.example.util.AutoBackupPreferences
@@ -127,6 +130,11 @@ fun SettingsTab(
 
             SettingsGroupHeader(title = "Thème", icon = Icons.Default.DarkMode)
             NightModeSettingsCard()
+            // Les couleurs dynamiques n'existent qu'à partir d'Android 12 : proposer
+            // le choix ailleurs afficherait un réglage sans effet.
+            if (AppColorPreferences.isDynamicColorAvailable()) {
+                AppColorsSettingsCard()
+            }
 
             SettingsGroupHeader(title = "Tracés", icon = Icons.Default.Timeline)
             // La couleur n'est plus un réglage global : elle se choisit parcours par
@@ -546,6 +554,51 @@ private fun MapOrientationCard() {
  *
  * Le changement s'applique immédiatement : le thème observe la préférence.
  */
+/**
+ * D'où viennent les couleurs de l'application.
+ *
+ * La carte n'apparaît que sur Android 12 et suivants : en deçà, les couleurs
+ * dynamiques n'existent pas et le choix serait sans effet.
+ */
+@Composable
+fun AppColorsSettingsCard() {
+    val context = LocalContext.current
+    var dynamicEnabled by remember {
+        mutableStateOf(AppColorPreferences.isDynamicColorEnabled(context))
+    }
+
+    SettingsCard(modifier = Modifier.testTag("app_colors_settings_card")) {
+        SettingsCardTitle(
+            title = "Couleurs",
+            subtitle = "La palette de l'application, ou celle de votre fond d'écran."
+        )
+
+        SettingsChoiceList(
+            choices = listOf(
+                SettingsChoice(
+                    value = true,
+                    icon = Icons.Default.Wallpaper,
+                    title = "Suivre le fond d'écran",
+                    description = "Les couleurs s'accordent à votre thème Android (Material You)",
+                    testTag = "app_colors_option_dynamic"
+                ),
+                SettingsChoice(
+                    value = false,
+                    icon = Icons.Default.Palette,
+                    title = "Couleurs de l'application",
+                    description = "Le vert et l'indigo de « Mes parcours », les mêmes sur tous les téléphones",
+                    testTag = "app_colors_option_app"
+                )
+            ),
+            selected = dynamicEnabled,
+            onSelect = { value ->
+                dynamicEnabled = value
+                AppColorPreferences.setDynamicColorEnabled(context, value)
+            }
+        )
+    }
+}
+
 @Composable
 fun NightModeSettingsCard() {
     val context = LocalContext.current
@@ -1166,11 +1219,12 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.15",
+        version = "0.16",
         changes = listOf(
-            "Nouveau : l'outil « Convertir en CSV » transforme un GPX ou un KML en tableau, lisible dans un tableur",
-            "Nouveau : l'outil « Convertir un CSV » fait l'inverse — un tableau CSV devient un parcours GPX et/ou KML",
-            "Les deux passent par Téléchargements/Mes parcours, comme la sauvegarde automatique"
+            "L'interface respire mieux : titres, libellés et mesures suivent désormais une même échelle, au lieu d'être réglés écran par écran",
+            "Les chiffres ne tressautent plus pendant un enregistrement — tous les chiffres ont maintenant la même largeur",
+            "L'écran d'un parcours s'anime à l'ouverture, et sa distance et sa durée montent depuis zéro",
+            "Nouveau réglage « Couleurs » : garder les couleurs de votre fond d'écran, ou celles de l'application"
         )
     )
 )

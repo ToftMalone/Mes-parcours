@@ -130,7 +130,6 @@ private fun ToolsMenu(
                 Text(
                     text = "Outils",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
@@ -303,7 +302,6 @@ private fun MergeTracksTool(
                     Text(
                         text = "Fusionner des traces",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -691,7 +689,6 @@ private fun SplitTrackTool(
                     Text(
                         text = "Découper un parcours",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -907,7 +904,6 @@ private fun CsvExportTool(
                     Text(
                         text = "Convertir en CSV",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -1045,7 +1041,6 @@ private fun CsvImportTool(
                     Text(
                         text = "Convertir un CSV",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -1223,7 +1218,6 @@ private fun ToolsEmptyState(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )

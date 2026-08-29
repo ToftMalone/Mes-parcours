@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.LiveStats
 import com.example.ui.component.MapViewContainer
+import com.example.ui.theme.AppTextStyles
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 
@@ -703,17 +704,13 @@ fun LiveStatsCard(
                     ) {
                         Text(
                             text = "DISTANCE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp
+                            style = AppTextStyles.overline,
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         AnimatedStatValue(
                             text = FormatUtils.formatDistance(stats.distanceMeters),
-                            style = androidx.compose.ui.text.TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Black,
+                            style = AppTextStyles.statMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -734,17 +731,13 @@ fun LiveStatsCard(
                     ) {
                         Text(
                             text = "VITESSE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp
+                            style = AppTextStyles.overline,
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         AnimatedStatValue(
                             text = FormatUtils.formatSpeed(currentSpeed),
-                            style = androidx.compose.ui.text.TextStyle(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Black,
+                            style = AppTextStyles.statMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -765,10 +758,8 @@ fun LiveStatsCard(
                     ) {
                         Text(
                             text = "ALTITUDE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp
+                            style = AppTextStyles.overline,
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Box(
@@ -777,9 +768,7 @@ fun LiveStatsCard(
                         ) {
                             AnimatedStatValue(
                                 text = FormatUtils.formatElevationOrUnknown(currentAltitude),
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Black,
+                                style = AppTextStyles.statMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
                                 modifier = Modifier.align(Alignment.Center)
@@ -895,10 +884,8 @@ fun StandbyStatsCard(
                     ) {
                         Text(
                             text = "ALTITUDE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp
+                            style = AppTextStyles.overline,
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Box(
@@ -907,9 +894,7 @@ fun StandbyStatsCard(
                         ) {
                             Text(
                                 text = FormatUtils.formatElevationOrUnknown(currentAltitude),
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Black,
+                                style = AppTextStyles.statMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
                                 modifier = Modifier.align(Alignment.Center)
