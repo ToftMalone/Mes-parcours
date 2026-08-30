@@ -543,16 +543,20 @@ fun HistoryTab(
  * une garniture, pas un ralentissement — une appli consultée parfois d'une main en
  * plein trajet ne doit pas faire patienter pour lire ses statistiques.
  *
- * **Pas de fondu, et c'est la correction d'un défaut visible.** L'entrée combinait un
- * fondu et un glissement ; or ces cartes portent une ombre d'élévation, qui déborde
- * sous leur cadre. Dès qu'une opacité inférieure à 1 est appliquée, Android compose
- * l'élément hors écran dans un tampon **aux dimensions exactes de la carte** : tout ce
- * qui débordait — donc l'ombre — se retrouvait tranché net. D'où la bande sombre à
- * bord franc sous chaque carte pendant l'animation, là où l'on attend un dégradé
- * doux. Le glissement seul n'ouvre aucun tampon : l'ombre se dessine normalement,
- * d'un bout à l'autre du mouvement.
+ * **Aucun fondu ici, et c'est la correction d'un défaut visible.** Ces cartes portent
+ * une ombre d'élévation, qui déborde sous leur cadre. Dès qu'une opacité inférieure
+ * à 1 leur est appliquée, Android compose l'élément hors écran dans un tampon **aux
+ * dimensions exactes de la carte** : tout ce qui débordait — donc l'ombre — se
+ * retrouve tranché net. D'où une bande sombre à bord franc sous chaque carte pendant
+ * l'animation, là où l'on attend un dégradé doux.
  *
- * Ne pas réintroduire de fondu ici sans retirer l'élévation de la carte.
+ * **Il y avait deux fondus à retirer, et c'est ce qui a fait rater la première
+ * tentative** : celui de l'entrée d'`AnimatedVisibility`, et celui qu'`animateItem()`
+ * applique de lui-même — ses paramètres `fadeInSpec` et `fadeOutSpec` ne sont pas
+ * nuls par défaut, ce que son nom ne laisse pas deviner. Retirer le premier seul ne
+ * changeait rien à l'écran.
+ *
+ * Ne réintroduire aucun des deux sans retirer l'élévation de la carte.
  */
 @Composable
 private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable () -> Unit) {
@@ -564,7 +568,15 @@ private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable 
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(tween(200)) { it / 6 },
-        modifier = Modifier.animateItem()
+        // `animateItem()` applique **un fondu par défaut** en plus du déplacement :
+        // `fadeInSpec` et `fadeOutSpec` ne sont pas nuls d'origine. C'était la seconde
+        // source d'opacité, et celle qui tranchait encore l'ombre une fois le fondu
+        // d'`AnimatedVisibility` retiré.
+        //
+        // Seul le déplacement est conservé — c'est la partie utile : à la suppression
+        // d'un parcours ou au changement d'onglet, les cartes restantes glissent à
+        // leur nouvelle place au lieu de sauter.
+        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
     ) {
         content()
     }

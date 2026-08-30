@@ -395,9 +395,22 @@ inférieure à 1 est appliquée, Android compose l'élément hors écran dans un
 retrouvait tranché net. D'où une bande sombre à bord franc sous chaque carte pendant
 son apparition, là où l'on attend un dégradé doux.
 
-**Le correctif** : le fondu retiré, le glissement conservé. Un glissement seul
+**Le correctif** : les fondus retirés, le glissement conservé. Un glissement seul
 n'ouvre aucun tampon hors écran — l'ombre se dessine normalement, d'un bout à l'autre
 du mouvement.
+
+**Il y avait deux fondus, et n'en retirer qu'un n'a rien changé à l'écran.** Le
+premier était explicite, dans l'`enter` d'`AnimatedVisibility`. Le second est celui
+qu'**`animateItem()` applique de lui-même** : ses paramètres `fadeInSpec` et
+`fadeOutSpec` valent un ressort par défaut, pas `null`, ce que son nom ne laisse pas
+deviner — on l'appelle pour l'animation de placement et l'on hérite d'un fondu sans
+l'avoir demandé. Il faut donc l'appeler
+`animateItem(fadeInSpec = null, fadeOutSpec = null)`.
+
+Leçon de méthode : le mécanisme avait été correctement identifié du premier coup,
+mais une seule des deux sources traitée. Devant un symptôme qui persiste après un
+correctif juste, chercher un **second exemplaire de la même cause** avant de remettre
+le diagnostic en question.
 
 **Ne pas réintroduire de fondu sur un élément qui porte une ombre** sans lui retirer
 son élévation : c'est la même mécanique qui se refermerait. C'est le seul endroit du
