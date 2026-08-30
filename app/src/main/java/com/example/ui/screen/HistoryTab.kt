@@ -2,7 +2,6 @@ package com.example.ui.screen
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -534,8 +533,8 @@ fun HistoryTab(
 }
 
 /**
- * Fait apparaître une carte de l'historique en fondu-glissé, avec un léger décalage
- * selon [index], et anime aussi son emplacement dans la liste ([LazyItemScope.animateItem]) —
+ * Fait apparaître une carte de l'historique en glissant, avec un léger décalage selon
+ * [index], et anime aussi son emplacement dans la liste ([LazyItemScope.animateItem]) —
  * utile lors d'une suppression ou d'un changement d'onglet, où les cartes restantes
  * glissent à leur nouvelle place plutôt que de sauter.
  *
@@ -543,6 +542,17 @@ fun HistoryTab(
  * prendrait plus de temps que l'utilisateur n'en met à faire défiler jusque-là. C'est
  * une garniture, pas un ralentissement — une appli consultée parfois d'une main en
  * plein trajet ne doit pas faire patienter pour lire ses statistiques.
+ *
+ * **Pas de fondu, et c'est la correction d'un défaut visible.** L'entrée combinait un
+ * fondu et un glissement ; or ces cartes portent une ombre d'élévation, qui déborde
+ * sous leur cadre. Dès qu'une opacité inférieure à 1 est appliquée, Android compose
+ * l'élément hors écran dans un tampon **aux dimensions exactes de la carte** : tout ce
+ * qui débordait — donc l'ombre — se retrouvait tranché net. D'où la bande sombre à
+ * bord franc sous chaque carte pendant l'animation, là où l'on attend un dégradé
+ * doux. Le glissement seul n'ouvre aucun tampon : l'ombre se dessine normalement,
+ * d'un bout à l'autre du mouvement.
+ *
+ * Ne pas réintroduire de fondu ici sans retirer l'élévation de la carte.
  */
 @Composable
 private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable () -> Unit) {
@@ -553,7 +563,7 @@ private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable 
     }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 6 },
+        enter = slideInVertically(tween(200)) { it / 6 },
         modifier = Modifier.animateItem()
     ) {
         content()

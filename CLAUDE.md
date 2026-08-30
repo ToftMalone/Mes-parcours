@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.16` (`versionCode` 32). Elle n'est écrite qu'une fois,
+- Version courante : `0.17` (`versionCode` 33). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -382,6 +382,27 @@ jusqu'au fond de la fenêtre — celui de `Theme.DeviceDefault`, sombre.
 Le fondu reste sur la troisième branche — le passage direct d'un parcours à un autre,
 sans glissement — où il est le seul mouvement possible ; le fond opaque lui sert
 désormais de toile.
+
+## L'ombre tranchée des cartes de l'historique : corrigé en 0.17
+
+Rapporté ainsi : « pendant l'animation d'affichage des parcours, l'ombre en bas elle
+est dégueulasse ».
+
+**La cause.** L'entrée d'une carte combinait un fondu et un glissement. Or ces cartes
+portent une ombre d'élévation (4 dp), qui déborde sous leur cadre. Dès qu'une opacité
+inférieure à 1 est appliquée, Android compose l'élément hors écran dans un tampon
+**aux dimensions exactes de la carte** : tout ce qui débordait — donc l'ombre — s'y
+retrouvait tranché net. D'où une bande sombre à bord franc sous chaque carte pendant
+son apparition, là où l'on attend un dégradé doux.
+
+**Le correctif** : le fondu retiré, le glissement conservé. Un glissement seul
+n'ouvre aucun tampon hors écran — l'ombre se dessine normalement, d'un bout à l'autre
+du mouvement.
+
+**Ne pas réintroduire de fondu sur un élément qui porte une ombre** sans lui retirer
+son élévation : c'est la même mécanique qui se refermerait. C'est le seul endroit du
+projet où les deux se rencontraient ; les autres cartes animées en fondu sont à
+élévation nulle.
 
 ## Invariants à ne pas casser
 

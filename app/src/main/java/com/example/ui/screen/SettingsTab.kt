@@ -1166,11 +1166,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.16",
+        version = "0.17",
         changes = listOf(
-            "Nouveau : l'outil « Rogner un parcours » retire les premières et les dernières minutes d'un parcours. Pour l'enregistrement oublié qui a continué sur la route du retour, ou démarré depuis le parking",
-            "Le résultat est une copie : le parcours d'origine reste intact, sauf si vous demandez sa suppression",
-            "Corrigé : un voile noir apparaissait en ouvrant un parcours et en revenant à la liste"
+            "Corrigé : l'ombre sous les cartes de l'historique était tranchée net pendant leur apparition, au lieu de s'estomper doucement"
         )
     )
 )
