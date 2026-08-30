@@ -386,36 +386,46 @@ désormais de toile.
 ## L'ombre tranchée des cartes de l'historique : corrigé en 0.17
 
 Rapporté ainsi : « pendant l'animation d'affichage des parcours, l'ombre en bas elle
-est dégueulasse ».
+est dégueulasse », puis deux fois encore après deux correctifs qui n'y changeaient
+rien.
 
-**La cause.** L'entrée d'une carte combinait un fondu et un glissement. Or ces cartes
-portent une ombre d'élévation (4 dp), qui déborde sous leur cadre. Dès qu'une opacité
-inférieure à 1 est appliquée, Android compose l'élément hors écran dans un tampon
-**aux dimensions exactes de la carte** : tout ce qui débordait — donc l'ombre — s'y
-retrouvait tranché net. D'où une bande sombre à bord franc sous chaque carte pendant
-son apparition, là où l'on attend un dégradé doux.
+**La cause, mesurée et non devinée.** `AnimatedVisibility` **rogne son contenu à ses
+propres bornes** dès qu'une transition le déplace. L'entrée était
+`slideInVertically { it / 6 }` : le contenu descendu d'un sixième de sa hauteur était
+donc tranché net en bas, coin arrondi et ombre compris, pendant toute l'animation.
 
-**Le correctif** : les fondus retirés, le glissement conservé. Un glissement seul
-n'ouvre aucun tampon hors écran — l'ombre se dessine normalement, d'un bout à l'autre
-du mouvement.
+**Le correctif** : le glissement sort d'`AnimatedVisibility`, qui disparaît. Il est
+piloté à la main par un `Animatable` appliqué en `graphicsLayer` — lequel ne rogne
+rien, `clip` valant `false` par défaut. L'opacité y reste **binaire** (0 avant le tour
+de la carte, 1 ensuite) : à zéro rien n'est dessiné, il n'y a donc aucune ombre à
+trancher.
 
-**Il y avait deux fondus, et n'en retirer qu'un n'a rien changé à l'écran.** Le
-premier était explicite, dans l'`enter` d'`AnimatedVisibility`. Le second est celui
-qu'**`animateItem()` applique de lui-même** : ses paramètres `fadeInSpec` et
+**Comment la cause a enfin été trouvée.** L'auteur a joint un enregistrement d'écran.
+Les images en ont été extraites et la colonne de pixels traversant la carte relevée
+une par une : pendant l'animation, la carte s'arrêtait sur un bord franc avec la
+couleur du fond immédiatement en dessous — pas un pixel d'ombre — puis le dégradé
+réapparaissait d'un coup à la dernière image. Le conteneur rognait, il ne s'agissait
+pas d'un tampon hors écran.
+
+**Les deux fondus retirés avant cela l'ont été pour une autre raison, et ils le
+restent.** Une opacité *intermédiaire* fait composer l'élément hors écran dans un
+tampon **aux dimensions exactes de la carte** : ce qui débordait — donc l'ombre — s'y
+retrouve tranché. Il y en avait deux : celui de l'`enter` d'`AnimatedVisibility`, et
+celui qu'**`animateItem()` applique de lui-même** — ses paramètres `fadeInSpec` et
 `fadeOutSpec` valent un ressort par défaut, pas `null`, ce que son nom ne laisse pas
-deviner — on l'appelle pour l'animation de placement et l'on hérite d'un fondu sans
-l'avoir demandé. Il faut donc l'appeler
-`animateItem(fadeInSpec = null, fadeOutSpec = null)`.
+deviner. D'où l'appel `animateItem(fadeInSpec = null, fadeOutSpec = null)`, à garder.
 
-Leçon de méthode : le mécanisme avait été correctement identifié du premier coup,
-mais une seule des deux sources traitée. Devant un symptôme qui persiste après un
-correctif juste, chercher un **second exemplaire de la même cause** avant de remettre
-le diagnostic en question.
+**Ne réintroduire ni fondu progressif ni transition d'`AnimatedVisibility`** sur un
+élément qui porte une ombre sans lui retirer d'abord son élévation : ce sont deux
+mécaniques distinctes, et chacune suffit à trancher l'ombre.
 
-**Ne pas réintroduire de fondu sur un élément qui porte une ombre** sans lui retirer
-son élévation : c'est la même mécanique qui se refermerait. C'est le seul endroit du
-projet où les deux se rencontraient ; les autres cartes animées en fondu sont à
-élévation nulle.
+**Leçon de méthode, et c'est la deuxième fois que le projet la paie** (voir « Le zoom
+sautait à l'appui sur "localiser" »). Deux correctifs ont été poussés en affirmant
+tenir la cause, sur la seule foi d'un mécanisme plausible. Ils étaient justes en
+eux-mêmes — les fondus tranchent bien l'ombre — mais ce n'était pas ce qui se voyait à
+l'écran. Trois minutes à extraire les images de la vidéo ont donné la réponse que deux
+compilations n'avaient pas donnée. **Devant un défaut visuel, regarder les pixels
+avant de raisonner sur le mécanisme.**
 
 ## Invariants à ne pas casser
 

@@ -1,8 +1,7 @@
 package com.example.ui.screen
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -543,40 +543,48 @@ fun HistoryTab(
  * une garniture, pas un ralentissement — une appli consultée parfois d'une main en
  * plein trajet ne doit pas faire patienter pour lire ses statistiques.
  *
- * **Aucun fondu ici, et c'est la correction d'un défaut visible.** Ces cartes portent
- * une ombre d'élévation, qui déborde sous leur cadre. Dès qu'une opacité inférieure
- * à 1 leur est appliquée, Android compose l'élément hors écran dans un tampon **aux
- * dimensions exactes de la carte** : tout ce qui débordait — donc l'ombre — se
- * retrouve tranché net. D'où une bande sombre à bord franc sous chaque carte pendant
- * l'animation, là où l'on attend un dégradé doux.
+ * **Le glissement est piloté à la main, et surtout pas confié à `AnimatedVisibility`**,
+ * qui **rogne son contenu à ses propres bornes** dès qu'une transition le déplace. Un
+ * contenu descendu d'un sixième de sa hauteur s'y trouve donc tranché net en bas —
+ * coin arrondi et ombre compris. Mesuré image par image sur l'enregistrement d'écran
+ * de l'auteur : pendant toute l'animation la carte s'arrêtait sur un bord franc avec
+ * le fond juste en dessous, pas un pixel d'ombre, puis l'ombre réapparaissait d'un
+ * coup à la dernière image. C'est exactement le défaut rapporté.
  *
- * **Il y avait deux fondus à retirer, et c'est ce qui a fait rater la première
- * tentative** : celui de l'entrée d'`AnimatedVisibility`, et celui qu'`animateItem()`
- * applique de lui-même — ses paramètres `fadeInSpec` et `fadeOutSpec` ne sont pas
- * nuls par défaut, ce que son nom ne laisse pas deviner. Retirer le premier seul ne
- * changeait rien à l'écran.
+ * Un `graphicsLayer` ne rogne rien (`clip` vaut `false` par défaut) : l'ombre se
+ * dessine entière d'un bout à l'autre du mouvement.
  *
- * Ne réintroduire aucun des deux sans retirer l'élévation de la carte.
+ * **Aucun fondu progressif ici non plus, et pour une raison distincte.** Ces cartes
+ * portent une ombre d'élévation, qui déborde sous leur cadre. Dès qu'une opacité
+ * *intermédiaire* leur est appliquée, Android compose l'élément hors écran dans un
+ * tampon **aux dimensions exactes de la carte** : tout ce qui débordait — donc
+ * l'ombre — se retrouve tranché. Le fondu qu'`animateItem()` applique de lui-même est
+ * coupé pour cette raison (`fadeInSpec` et `fadeOutSpec` ne sont pas nuls par défaut,
+ * ce que son nom ne laisse pas deviner). Seule l'opacité **binaire** ci-dessous est
+ * permise : à zéro, rien n'est dessiné, il n'y a donc pas d'ombre à trancher.
+ *
+ * Ne réintroduire ni fondu progressif ni transition d'`AnimatedVisibility` sans
+ * retirer d'abord l'élévation de la carte.
  */
 @Composable
 private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable () -> Unit) {
+    // 1 = carte encore décalée vers le bas, 0 = en place.
+    val slide = remember { Animatable(1f) }
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(minOf(index, 12) * 18L)
         visible = true
+        slide.animateTo(0f, tween(200))
     }
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(tween(200)) { it / 6 },
-        // `animateItem()` applique **un fondu par défaut** en plus du déplacement :
-        // `fadeInSpec` et `fadeOutSpec` ne sont pas nuls d'origine. C'était la seconde
-        // source d'opacité, et celle qui tranchait encore l'ombre une fois le fondu
-        // d'`AnimatedVisibility` retiré.
-        //
-        // Seul le déplacement est conservé — c'est la partie utile : à la suppression
-        // d'un parcours ou au changement d'onglet, les cartes restantes glissent à
-        // leur nouvelle place au lieu de sauter.
-        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+    Box(
+        modifier = Modifier
+            .animateItem(fadeInSpec = null, fadeOutSpec = null)
+            .graphicsLayer {
+                translationY = slide.value * size.height / 6f
+                // Tout ou rien : la carte n'est pas dessinée avant son tour. Une
+                // valeur intermédiaire trancherait son ombre (voir ci-dessus).
+                alpha = if (visible) 1f else 0f
+            }
     ) {
         content()
     }
