@@ -225,8 +225,8 @@ deux réglages, un bouton de confirmation.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
 - **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
   ci-dessous.
-- **Convertir en CSV** et **Convertir un CSV** — vers et depuis un format lisible
-  dans un tableur, décrits plus bas.
+- **Conversion CSV** — vers et depuis un format lisible dans un tableur, décrit
+  plus bas.
 
 **« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
 l'auteur (voir « Poids mort »).
@@ -273,12 +273,21 @@ morceaux les allumerait tous d'un coup sur la carte.
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
 
-### Convertir en CSV, convertir un CSV
+### Conversion CSV
 
 `util/CsvConverter.kt` traduit un fichier vers un autre, **sans jamais toucher
 Room** : ni les deux sens ne créent, ne lisent, ni ne modifient un parcours de
 l'historique. Ce sont de simples conversions de fichier à fichier, ce qui les
 distingue de tous les autres outils de cet écran.
+
+**Un seul outil dans l'interface depuis la 0.18**, pour les deux sens. Les deux
+étaient au départ deux entrées séparées du menu (« Convertir en CSV » /
+« Convertir un CSV ») ; elles ont fusionné en une seule, « Conversion CSV », qui ne
+demande qu'un fichier et déduit le sens à partir de lui —
+`CsvConverter.isCsvFile` tranche sur l'extension, avec un repli sur le contenu
+(même principe que la détection de KML sans extension de `Importer`) pour un
+fichier renommé. Un CSV en entrée affiche les cases GPX/KML à cocher ; un GPX/KML
+n'en a pas besoin, sa seule sortie possible étant le CSV.
 
 Le CSV porte sept colonnes fixes, toujours dans cet ordre : `latitude`, `longitude`,
 `altitude_m`, `horodatage`, `vitesse_m_s`, `nouveau_troncon`, `couleur_troncon`. À la

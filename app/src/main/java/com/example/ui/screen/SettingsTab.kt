@@ -1166,9 +1166,9 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.17",
+        version = "0.18",
         changes = listOf(
-            "Corrigé : l'ombre sous les cartes de l'historique était tranchée net pendant leur apparition, au lieu de s'estomper doucement"
+            "Les deux convertisseurs CSV n'en font plus qu'un : « Conversion CSV » détecte le sens à partir du fichier choisi"
         )
     )
 )

@@ -227,6 +227,31 @@ object CsvConverter {
     internal fun baseFileName(context: Context, uri: Uri): String =
         displayName(context, uri).substringBeforeLast('.')
 
+    /**
+     * Le fichier choisi est-il un CSV (à convertir vers GPX/KML) plutôt qu'un GPX/KML
+     * (à convertir vers CSV) ?
+     *
+     * Sert à n'imposer qu'un seul bouton « Choisir un fichier » dans l'outil de
+     * conversion : le sens se déduit du fichier plutôt que de se choisir à part.
+     * L'extension tranche la plupart des cas ; à défaut, on regarde le début du
+     * fichier, comme le fait déjà `Importer` pour reconnaître un KML sans extension.
+     */
+    fun isCsvFile(context: Context, uri: Uri): Boolean {
+        val extension = displayName(context, uri).substringAfterLast('.', "").lowercase()
+        if (extension == "csv") return true
+        if (extension == "gpx" || extension == "kml") return false
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val bytes = ByteArray(256)
+                val read = stream.read(bytes)
+                val head = if (read > 0) String(bytes, 0, read) else ""
+                !head.contains("<gpx", ignoreCase = true) && !head.contains("<kml", ignoreCase = true)
+            } ?: true
+        } catch (e: Exception) {
+            true
+        }
+    }
+
     private fun displayName(context: Context, uri: Uri): String {
         var name = "Converti"
         try {
