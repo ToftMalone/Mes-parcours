@@ -36,6 +36,7 @@ moshiKotlinCodegen = "1.15.2"
 datastorePreferences = "1.1.7"
 robolectric = "4.16.1"
 roborazzi = "1.59.0"
+workRuntimeKtx = "2.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -84,6 +85,7 @@ roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", versi
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version = "6.1.18" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

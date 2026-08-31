@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.data.repository.TrackRepository
 import com.example.util.OnboardingPreferences
 import com.example.util.OsmConfig
+import com.example.util.update.UpdateCheckWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,6 +14,11 @@ class TrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         OsmConfig.init(this)
+
+        // Programme la vérification quotidienne de mise à jour — voir
+        // UpdateCheckWorker pour le choix d'une tâche de fond plutôt que d'une
+        // surveillance continue. Sans effet si elle est déjà programmée.
+        UpdateCheckWorker.schedule(this)
 
         // Marque l'écran d'accueil comme déjà vu sur une installation déjà en usage
         // avant son introduction — voir OnboardingPreferences.backfillIfAlreadyUsed.

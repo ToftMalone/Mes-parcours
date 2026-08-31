@@ -1020,9 +1020,12 @@ inadvertance :
 
 - Dépendances déclarées et jamais appelées, vestiges d'une sauvegarde Drive
   abandonnée : `retrofit`, `converter-moshi`, `moshi-kotlin` (+ son processeur KSP),
-  `okhttp`, `logging-interceptor`, `work-runtime-ktx`, `credentials`,
-  `credentials-play-services-auth`, `googleid`. Elles voyageaient dans chaque APK
-  installé sans qu'une ligne de code les touche.
+  `okhttp`, `logging-interceptor`, `credentials`, `credentials-play-services-auth`,
+  `googleid`. Elles voyageaient dans chaque APK installé sans qu'une ligne de code
+  les touche.
+  `work-runtime-ktx` avait subi le même sort, pour la même raison — elle est revenue
+  depuis avec `UpdateCheckWorker` (voir « Notification en tâche de fond »), un
+  appelant réel cette fois.
 - Code mort : `Exporter.exportToGPX` / `exportToKML` (variantes en mémoire, que les
   writers incrémentaux remplacent), `MediaStoreExporter.saveToLocalDownloads`,
   `TrackRepository.insertPoints`, `getPointsForTrackFlow`,
@@ -1169,6 +1172,35 @@ bouton qui rouvre le même bandeau. `MainScreen` conserve la mise à jour détec
 `updateReopenTrigger` incrémenté par ce bouton ; `UpdatePrompt` le lit pour rouvrir
 son dialogue sur la mise à jour déjà connue, sans reconsulter le réseau ni redémarrer
 l'application.
+
+### Notification en tâche de fond
+
+`UpdatePrompt` ne consulte le réseau qu'à l'ouverture de l'application : une mise à
+jour publiée pendant qu'elle reste fermée plusieurs jours ne se voyait qu'au
+lancement suivant, s'il y en avait un. `util/update/UpdateCheckWorker` comble ce
+manque par une notification, sans en payer le prix en batterie.
+
+- **Une fois par jour, jamais plus**, via une tâche `WorkManager` périodique
+  (`PeriodicWorkRequestBuilder`), programmée par `TrackApplication.onCreate` et
+  reprise à chaque démarrage sans effet si elle l'est déjà
+  (`ExistingPeriodicWorkPolicy.KEEP` — la remplacer à chaque lancement reviendrait,
+  sur une application ouverte plusieurs fois par jour, à ne jamais laisser le premier
+  délai s'écouler). WorkManager bat lui-même ce rappel dans une fenêtre large et le
+  regroupe avec les tâches d'autres applications : c'est ce qui le distingue d'un
+  minuteur maison, et ce qui répond au principal souci d'une vérification
+  périodique — vider la batterie.
+  `Constraints.setRequiresBatteryNotLow(true)` renonce même à ce battement quotidien
+  quand l'appareil est déjà en réserve.
+- **Une seule notification par version.** `UpdateCheckPreferences` retient le
+  `versionCode` déjà notifié ; sans cette mémoire, la même mise à jour ignorée
+  serait re-signalée chaque jour tant qu'elle reste la plus récente publiée.
+- Réutilise directement `UpdateChecker.fetchLatest` et `UpdateManifest` :
+  aucune règle de sécurité ou de validation dupliquée, la même adresse, la même
+  empreinte obligatoire, la même contrainte d'hôte GitHub.
+- WorkManager avait été retiré du projet (voir « Poids mort ») faute d'appelant ; il
+  est revenu pour cet unique usage, dont c'est exactement le rôle : une tâche
+  périodique qui survit au redémarrage de l'application et respecte les contraintes
+  système plutôt que de les contourner.
 
 ## Publier une version
 

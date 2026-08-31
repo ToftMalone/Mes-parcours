@@ -102,10 +102,15 @@ ksp {
 // Les dépendances mises en commentaire ont été écartées sans être supprimées : les
 // remettre ne coûte alors qu'un décommentage.
 //
-// Retrofit, OkHttp, Moshi, WorkManager et les bibliothèques d'identifiants Google
-// ont en revanche été retirées pour de bon : vestiges d'une sauvegarde vers Drive
-// abandonnée, aucune ligne de code ne les appelait, et elles voyageaient malgré
-// tout dans chaque APK installé.
+// Retrofit, OkHttp, Moshi et les bibliothèques d'identifiants Google ont en revanche
+// été retirées pour de bon : vestiges d'une sauvegarde vers Drive abandonnée, aucune
+// ligne de code ne les appelait, et elles voyageaient malgré tout dans chaque APK
+// installé.
+//
+// WorkManager avait subi le même sort, pour la même raison — puis est revenue avec
+// la vérification quotidienne des mises à jour (UpdateCheckWorker), qui a besoin
+// d'une tâche périodique survivant au redémarrage de l'application et respectueuse
+// de la batterie, exactement ce que WorkManager sait faire.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   // implementation(libs.accompanist.permissions)
@@ -133,6 +138,7 @@ dependencies {
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.play.services.location)
   implementation(libs.osmdroid.android)
+  implementation(libs.androidx.work.runtime.ktx)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
