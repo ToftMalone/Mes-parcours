@@ -10,16 +10,18 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `0.17` (`versionCode` 33). Elle n'est écrite qu'une fois,
+- Version courante : `1.0` (`versionCode` 34). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
-  - Jusqu'à la `1.0-thierry` **exclue** : une seule entrée, celle de la version
+  - Jusqu'à la `1.0` **exclue** : une seule entrée, celle de la version
     courante, dont on remplace le contenu à chaque version. Les versions de
     développement se succèdent trop vite pour qu'un historique serve.
-  - À partir de la `1.0-thierry` : **ajouter** une entrée en tête au lieu de
+  - À partir de la `1.0` : **ajouter** une entrée en tête au lieu de
     remplacer. L'affichage sait déjà présenter plusieurs versions, séparateurs et
-    pastille « actuelle » compris — il n'y aura rien d'autre à faire ce jour-là.
+    pastille « actuelle » compris — vérifié en publiant la 1.0 elle-même, qui reste
+    pour l'instant l'entrée unique : la bascule en ajout ne se voit qu'à la
+    prochaine version.
   - La mention « actuelle » se déduit de `BuildConfig.VERSION_NAME` et ne s'affiche
     qu'à partir de deux entrées ; elle n'est jamais à déplacer à la main.
 - Le projet est né d'un échafaudage Google AI Studio, entièrement retiré depuis
@@ -661,9 +663,12 @@ inverser, et l'assombrir la rendrait illisible.
 ### En attente d'une action de l'auteur
 
 - Rien ne bloque plus la chaîne de publication.
-- **La 1.0 est en attente de retours d'usage sur la 0.15**, essayée un mois avant
-  toute décision. Le découpage et les deux convertisseurs CSV (ajoutés en 0.14 et
-  0.15) ont déjà été confirmés fonctionnels sur le terrain par l'auteur.
+- **La 1.0 est publiée**, sans attendre le mois de retours d'usage initialement
+  prévu sur la 0.15 : l'auteur a tranché. Le découpage et les deux convertisseurs
+  CSV (ajoutés en 0.14 et 0.15) avaient déjà été confirmés fonctionnels sur le
+  terrain ; les versions suivantes (rognage, écran de bienvenue, notification de
+  mise à jour en tâche de fond) partent directement en 1.0, sans un tour
+  supplémentaire en version de développement.
 
 ### Audit du 0.11.2
 

@@ -1153,20 +1153,20 @@ private class Release(val version: String, val changes: List<String>)
 /**
  * Journal des nouveautés, de la version la plus récente à la plus ancienne.
  *
- * **Avant la 1.0-thierry** : la liste ne contient que la version courante. À chaque
+ * **Avant la 1.0** : la liste ne contient que la version courante. À chaque
  * nouvelle version, on remplace son contenu — les versions de développement se
  * succèdent trop vite pour qu'un historique ait de l'intérêt.
  *
- * **À partir de la 1.0-thierry** : on ajoute une entrée en tête au lieu de remplacer,
- * et l'historique commence à s'accumuler. L'affichage gère déjà plusieurs versions,
- * il n'y a rien d'autre à changer ce jour-là.
+ * **À partir de la 1.0** : on ajoute une entrée en tête au lieu de remplacer, et
+ * l'historique commence à s'accumuler à la version suivante. L'affichage gère déjà
+ * plusieurs versions ; rien d'autre à changer le jour où une deuxième entrée arrive.
  *
  * La version courante est repérée par comparaison avec `BuildConfig.VERSION_NAME` :
  * elle n'est jamais à désigner à la main.
  */
 private val RELEASES = listOf(
     Release(
-        version = "0.18",
+        version = "1.0",
         changes = listOf(
             "Les deux convertisseurs CSV n'en font plus qu'un : « Conversion CSV » détecte le sens à partir du fichier choisi",
             "Nouvel écran de bienvenue au premier lancement, qui explique l'application et les autorisations avant de les demander",
