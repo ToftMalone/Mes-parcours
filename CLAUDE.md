@@ -1077,6 +1077,40 @@ inadvertance :
 - Les entrées de `libs.versions.toml` correspondant aux dépendances retirées sont
   restées : inertes à la compilation, elles documentent ce qui a existé.
 
+## Écran de bienvenue
+
+`ui/screen/WelcomeScreen.kt`, montré une seule fois, au tout premier lancement :
+brève présentation de l'application, puis les autorisations demandées (localisation,
+notifications à partir d'Android 13), chacune expliquée en une phrase avant d'être
+sollicitée. La permission de localisation « tout le temps » n'y est pas demandée :
+`MainScreen` l'enchaîne juste après, avec le dialogue de justification qui existait
+déjà avant cet écran.
+
+`util/OnboardingPreferences` porte l'unique préférence qui décide de l'afficher
+(`pref_onboarding_completed`). Elle se pose à l'appui sur « Commencer », que la
+permission demandée à ce moment-là soit accordée ou refusée — le choix de
+l'utilisateur suffit à clore l'accueil, il pourra toujours l'accorder plus tard
+depuis l'onglet Enregistrer.
+
+**Reprise obligatoire, comme pour les couleurs par parcours** (voir
+`TrackRepository.backfillDisplayColors`) : sans elle, un utilisateur qui a déjà
+répondu aux demandes d'autorisation et enregistré des parcours verrait apparaître cet
+écran une fois de trop, à la mise à jour qui l'introduit.
+`OnboardingPreferences.backfillIfAlreadyUsed`, appelée par `TrackApplication` avant
+tout accès à la base, se fie à deux indices : la permission de localisation déjà
+accordée, ou le fichier de base déjà présent sur le disque. Ce second indice doit
+être vérifié **avant** d'ouvrir la base — l'ouvrir la crée si elle n'existait pas
+encore, ce qui fausserait la détection.
+
+`MainScreen` distingue, à l'aide d'une valeur figée à la composition
+(`onboardingWasAlreadyCompletedAtStart`), un utilisateur qui avait déjà passé
+l'accueil lors d'un lancement précédent — pour qui la redemande automatique de
+permission au démarrage continue de valoir, comme avant l'ajout de cet écran — d'un
+utilisateur qui vient tout juste de le refermer. Sans cette distinction, refuser la
+permission dans l'écran de bienvenue déclenchait aussitôt une seconde demande
+identique, sans explication cette fois : le même effet keyé sur l'état mutable se
+redéclenchait dès que celui-ci passait à vrai.
+
 ## Mise à jour de l'application
 
 L'application se met à jour depuis **GitHub Releases**, sans magasin d'applications.

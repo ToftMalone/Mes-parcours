@@ -76,6 +76,20 @@ fun MainScreen(
     val context = LocalContext.current
     val isTracking by viewModel.isTracking.collectAsState()
 
+    // Écran de bienvenue : une seule fois, au tout premier lancement — voir
+    // OnboardingPreferences. Tant qu'il n'est pas passé, rien de ce qui suit (suivi
+    // GPS, recherche de mise à jour) ne doit démarrer : c'est le rôle du retour
+    // anticipé plus bas.
+    var onboardingCompleted by remember {
+        mutableStateOf(com.example.util.OnboardingPreferences.isCompleted(context))
+    }
+
+    // Distingue « déjà passé avant ce lancement » de « vient de se terminer à
+    // l'instant » : sans cette photo prise une fois pour toutes, la redemande
+    // automatique ci-dessous se redéclencherait juste après la propre demande de
+    // l'écran de bienvenue, dès que l'utilisateur y refuserait la permission.
+    val onboardingWasAlreadyCompletedAtStart = remember { onboardingCompleted }
+
     // Mise à jour détectée par UpdatePrompt : conservée ici pour afficher un badge
     // persistant dans les réglages une fois le bandeau ignoré, et pour pouvoir le
     // rouvrir depuis là sans redémarrer l'application.
@@ -121,9 +135,25 @@ fun MainScreen(
                 showBackgroundRationaleDialog = true
             }
         }
+
+        // C'est cette réponse — accordée ou non — qui referme l'écran de bienvenue :
+        // le choix de l'utilisateur est fait, il peut voir l'application. Il pourra
+        // toujours accorder la permission plus tard depuis l'onglet Enregistrer.
+        if (!onboardingCompleted) {
+            com.example.util.OnboardingPreferences.setCompleted(context)
+            onboardingCompleted = true
+        }
     }
 
+    // Redemande automatiquement au lancement tant que la permission manque, comme
+    // avant l'ajout de l'accueil — mais seulement pour un utilisateur qui l'avait
+    // déjà passé lors d'un lancement précédent. Pour un premier lancement, c'est
+    // WelcomeScreen qui déclenche la demande, sur un appui explicite et expliqué :
+    // redemander ici aussitôt l'accueil refermé redemanderait une seconde fois,
+    // sans explication, la permission que l'utilisateur vient tout juste de refuser.
     LaunchedEffect(Unit) {
+        if (!onboardingWasAlreadyCompletedAtStart) return@LaunchedEffect
+
         val permissionsToRequest = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
@@ -137,6 +167,23 @@ fun MainScreen(
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundPermission) {
             showBackgroundRationaleDialog = true
         }
+    }
+
+    if (!onboardingCompleted) {
+        WelcomeScreen(
+            onRequestPermissions = {
+                val permissionsToRequest = mutableListOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                launcher.launch(permissionsToRequest.toTypedArray())
+            },
+            modifier = modifier
+        )
+        return
     }
 
     // Chaîne d'altitude utilisée hors enregistrement — pendant un enregistrement,

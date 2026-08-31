@@ -2,6 +2,7 @@ package com.example
 
 import android.app.Application
 import com.example.data.repository.TrackRepository
+import com.example.util.OnboardingPreferences
 import com.example.util.OsmConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +13,14 @@ class TrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         OsmConfig.init(this)
+
+        // Marque l'écran d'accueil comme déjà vu sur une installation déjà en usage
+        // avant son introduction — voir OnboardingPreferences.backfillIfAlreadyUsed.
+        // Avant tout accès à la base : l'ouvrir la créerait, et fausserait le résultat.
+        OnboardingPreferences.backfillIfAlreadyUsed(
+            context = this,
+            hasExistingDatabase = getDatabasePath("my_tracks_db").exists()
+        )
 
         // Reprise des couleurs, une seule fois, au premier lancement après le passage
         // aux couleurs par parcours : chaque parcours déjà en base reçoit explicitement

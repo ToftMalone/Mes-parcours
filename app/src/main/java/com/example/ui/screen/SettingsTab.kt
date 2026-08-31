@@ -1168,7 +1168,8 @@ private val RELEASES = listOf(
     Release(
         version = "0.18",
         changes = listOf(
-            "Les deux convertisseurs CSV n'en font plus qu'un : « Conversion CSV » détecte le sens à partir du fichier choisi"
+            "Les deux convertisseurs CSV n'en font plus qu'un : « Conversion CSV » détecte le sens à partir du fichier choisi",
+            "Nouvel écran de bienvenue au premier lancement, qui explique l'application et les autorisations avant de les demander"
         )
     )
 )
