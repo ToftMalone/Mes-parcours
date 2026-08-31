@@ -1180,20 +1180,24 @@ jour publiée pendant qu'elle reste fermée plusieurs jours ne se voyait qu'au
 lancement suivant, s'il y en avait un. `util/update/UpdateCheckWorker` comble ce
 manque par une notification, sans en payer le prix en batterie.
 
-- **Une fois par jour, jamais plus**, via une tâche `WorkManager` périodique
-  (`PeriodicWorkRequestBuilder`), programmée par `TrackApplication.onCreate` et
-  reprise à chaque démarrage sans effet si elle l'est déjà
-  (`ExistingPeriodicWorkPolicy.KEEP` — la remplacer à chaque lancement reviendrait,
-  sur une application ouverte plusieurs fois par jour, à ne jamais laisser le premier
-  délai s'écouler). WorkManager bat lui-même ce rappel dans une fenêtre large et le
-  regroupe avec les tâches d'autres applications : c'est ce qui le distingue d'un
-  minuteur maison, et ce qui répond au principal souci d'une vérification
-  périodique — vider la batterie.
-  `Constraints.setRequiresBatteryNotLow(true)` renonce même à ce battement quotidien
-  quand l'appareil est déjà en réserve.
+- **Toutes les trois heures** (`UpdateCheckWorker.CHECK_INTERVAL_HOURS`), via une
+  tâche `WorkManager` périodique (`PeriodicWorkRequestBuilder`), programmée par
+  `TrackApplication.onCreate` et reprise à chaque démarrage sans effet si elle l'est
+  déjà (`ExistingPeriodicWorkPolicy.KEEP` — la remplacer à chaque lancement
+  reviendrait, sur une application ouverte plusieurs fois par jour, à ne jamais
+  laisser le premier délai s'écouler). WorkManager bat lui-même ce rappel dans une
+  fenêtre large et le regroupe avec les tâches d'autres applications : c'est ce qui
+  le distingue d'un minuteur maison, et ce qui répond au principal souci d'une
+  vérification périodique — vider la batterie.
+  `Constraints.setRequiresBatteryNotLow(true)` renonce même à ce battement quand
+  l'appareil est déjà en réserve.
+  Revers de `KEEP` : changer cette cadence entre deux versions ne la modifie pas
+  toute seule pour une installation qui l'avait déjà programmée avec l'ancienne —
+  la tâche existante n'est jamais remplacée. Sans conséquence tant que l'application
+  n'a pas encore été publiée avec une cadence antérieure.
 - **Une seule notification par version.** `UpdateCheckPreferences` retient le
   `versionCode` déjà notifié ; sans cette mémoire, la même mise à jour ignorée
-  serait re-signalée chaque jour tant qu'elle reste la plus récente publiée.
+  serait re-signalée à chaque passage tant qu'elle reste la plus récente publiée.
 - Réutilise directement `UpdateChecker.fetchLatest` et `UpdateManifest` :
   aucune règle de sécurité ou de validation dupliquée, la même adresse, la même
   empreinte obligatoire, la même contrainte d'hôte GitHub.

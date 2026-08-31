@@ -27,12 +27,12 @@ import java.util.concurrent.TimeUnit
  * l'application reste fermée plusieurs jours ne se voyait qu'au prochain
  * lancement — s'il y en avait un.
  *
- * **Une fois par jour, jamais plus.** Programmée via WorkManager plutôt qu'un
- * minuteur maison : le système bat le rappel dans une fenêtre large et regroupe les
- * tâches de plusieurs applications pour limiter les réveils du processeur, l'inverse
- * d'une vérification continue qui viderait la batterie.
- * `setRequiresBatteryNotLow(true)` renonce même à ce battement quotidien quand
- * l'appareil est déjà en réserve de batterie.
+ * **Toutes les [CHECK_INTERVAL_HOURS] heures, jamais en continu.** Programmée via
+ * WorkManager plutôt qu'un minuteur maison : le système bat le rappel dans une
+ * fenêtre large et regroupe les tâches de plusieurs applications pour limiter les
+ * réveils du processeur, l'inverse d'une vérification continue qui viderait la
+ * batterie. `setRequiresBatteryNotLow(true)` renonce même à ce battement quand
+ * l'appareil est déjà en réserve.
  */
 class UpdateCheckWorker(
     context: Context,
@@ -99,16 +99,33 @@ class UpdateCheckWorker(
         private const val WORK_NAME = "update_check"
 
         /**
-         * Programme la vérification quotidienne. Sans effet si elle l'est déjà :
+         * Cadence de vérification. WorkManager refuse en dessous de 15 minutes
+         * (`PeriodicWorkRequest.MIN_PERIODIC_INTERVAL_MILLIS`) ; largement au-dessus
+         * ici, la marge sert à laisser le système regrouper cette tâche avec
+         * d'autres plutôt qu'à réveiller le processeur pile à l'heure.
+         */
+        private const val CHECK_INTERVAL_HOURS = 3L
+
+        /**
+         * Programme la vérification périodique. Sans effet si elle l'est déjà :
          * [ExistingPeriodicWorkPolicy.KEEP] conserve la tâche existante plutôt que de
          * repartir de zéro à chaque démarrage de l'application — la remplacer à
          * chaque lancement reviendrait, sur une application ouverte plusieurs fois
          * par jour, à ne jamais laisser le premier délai s'écouler.
+         *
+         * Revers de KEEP : un changement de [CHECK_INTERVAL_HOURS] entre deux
+         * versions ne s'appliquera pas tout seul aux installations qui l'avaient
+         * déjà programmée avec l'ancienne cadence — la tâche existante n'est jamais
+         * remplacée. Sans conséquence tant que l'application n'a pas encore été
+         * publiée avec la cadence précédente ; à surveiller si ce délai est retouché
+         * après une publication.
          */
         fun schedule(context: Context) {
             if (!UpdateConfig.isConfigured) return
 
-            val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(1, TimeUnit.DAYS)
+            val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
+                CHECK_INTERVAL_HOURS, TimeUnit.HOURS
+            )
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
