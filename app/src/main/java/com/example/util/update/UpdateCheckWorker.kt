@@ -119,26 +119,34 @@ class UpdateCheckWorker(
          * remplacée. Sans conséquence tant que l'application n'a pas encore été
          * publiée avec la cadence précédente ; à surveiller si ce délai est retouché
          * après une publication.
+         *
+         * `WorkManager.getInstance` suppose son propre initialiseur déjà passé —
+         * automatique dans une vraie application, absent dans les tests Robolectric,
+         * qui instancient `TrackApplication` (donc appellent cette fonction) sans lui.
+         * Cet échec-là ne doit pas plus empêcher l'application de démarrer qu'un
+         * échec de la reprise des couleurs ou de l'accueil.
          */
         fun schedule(context: Context) {
             if (!UpdateConfig.isConfigured) return
 
-            val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
-                CHECK_INTERVAL_HOURS, TimeUnit.HOURS
-            )
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .setRequiresBatteryNotLow(true)
-                        .build()
+            runCatching {
+                val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
+                    CHECK_INTERVAL_HOURS, TimeUnit.HOURS
                 )
-                .build()
+                    .setConstraints(
+                        Constraints.Builder()
+                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .setRequiresBatteryNotLow(true)
+                            .build()
+                    )
+                    .build()
 
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request
-            )
+                WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                    WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    request
+                )
+            }
         }
     }
 }

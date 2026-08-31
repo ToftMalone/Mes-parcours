@@ -1210,6 +1210,14 @@ manque par une notification, sans en payer le prix en batterie.
   est revenu pour cet unique usage, dont c'est exactement le rôle : une tâche
   périodique qui survit au redémarrage de l'application et respecte les contraintes
   système plutôt que de les contourner.
+- **`UpdateCheckWorker.schedule` est protégé par `runCatching`.** `TrackApplication`
+  l'appelle à chaque démarrage, y compris dans les tests Robolectric — qui
+  instancient cette même application sans passer par l'initialiseur automatique de
+  WorkManager. Sans cette protection, `WorkManager.getInstance` y levait une
+  `IllegalStateException` qui faisait échouer, d'un coup, les 70 tests qui
+  démarrent l'application (tout ce qui utilise `RobolectricTestRunner`, même des
+  calculs purs sans rapport avec les mises à jour) — trouvé à la compilation de la
+  première version publiée avec cette tâche.
 
 ## Publier une version
 
