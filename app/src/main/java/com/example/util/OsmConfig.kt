@@ -37,7 +37,7 @@ object OsmConfig {
             // compte-gouttes. De même, le cache mémoire par défaut (9 tuiles au-delà de
             // l'écran) redemandait des tuiles à peine quittées au moindre zoom ou
             // recentrage.
-            config.tileDownloadThreads = 6.toShort()
+            config.tileDownloadThreads = 10.toShort()
             config.cacheMapTileCount = 24.toShort()
 
             // 4. Explicitly set valid app-private cache paths AFTER config.load()
