@@ -30,7 +30,17 @@ object OsmConfig {
             config.userAgentValue =
                 "MesParcours/${BuildConfig.VERSION_NAME} (${appContext.packageName})"
 
-            // 3. Explicitly set valid app-private cache paths AFTER config.load()
+            // 3. Le défaut d'osmdroid (2 téléchargements de tuiles en parallèle) suffisait
+            // à peine en Mapnik, dont les tuiles vectorielles sont petites ; en vue
+            // satellite, les tuiles JPEG de Google pèsent bien plus lourd et le même
+            // écran plein (souvent 20-40 tuiles) se remplissait alors visiblement au
+            // compte-gouttes. De même, le cache mémoire par défaut (9 tuiles au-delà de
+            // l'écran) redemandait des tuiles à peine quittées au moindre zoom ou
+            // recentrage.
+            config.tileDownloadThreads = 6.toShort()
+            config.cacheMapTileCount = 24.toShort()
+
+            // 4. Explicitly set valid app-private cache paths AFTER config.load()
             val cacheDir = appContext.externalCacheDir ?: appContext.cacheDir
             val osmdroidBasePath = File(cacheDir, "osmdroid")
             val osmdroidTileCache = File(osmdroidBasePath, "tiles")
@@ -45,7 +55,7 @@ object OsmConfig {
             config.osmdroidBasePath = osmdroidBasePath
             config.osmdroidTileCache = osmdroidTileCache
 
-            // 4. Persist updated configuration paths into SharedPreferences
+            // 5. Persist updated configuration paths into SharedPreferences
             config.save(appContext, prefs)
 
             isInitialized = true
