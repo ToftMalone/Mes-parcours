@@ -1166,6 +1166,13 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
+        version = "1.1",
+        changes = listOf(
+            "Chargement de la carte nettement plus rapide, en vue satellite surtout",
+            "L'outil de conversion CSV a été retiré"
+        )
+    ),
+    Release(
         version = "1.0",
         changes = listOf(
             "Les deux convertisseurs CSV n'en font plus qu'un : « Conversion CSV » détecte le sens à partir du fichier choisi",

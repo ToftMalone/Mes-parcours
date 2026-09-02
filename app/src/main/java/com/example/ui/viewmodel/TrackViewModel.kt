@@ -474,53 +474,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
-    // ------------------------------------------------------------------
-    // Conversion CSV : ces deux outils ne touchent jamais l'historique, seulement
-    // des fichiers.
-    // ------------------------------------------------------------------
-
-    fun convertGpxKmlToCsv(
-        context: Context,
-        uri: android.net.Uri,
-        onSuccess: (com.example.util.CsvConverter.GpxKmlToCsvResult) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val result = repository.convertGpxKmlToCsv(context, uri)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onSuccess(result)
-                }
-            } catch (e: Exception) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError(e.localizedMessage ?: "Erreur de conversion")
-                }
-            }
-        }
-    }
-
-    fun convertCsvToGpxKml(
-        context: Context,
-        uri: android.net.Uri,
-        wantGpx: Boolean,
-        wantKml: Boolean,
-        onSuccess: (com.example.util.CsvConverter.CsvToTrackResult) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val result = repository.convertCsvToGpxKml(context, uri, wantGpx, wantKml)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onSuccess(result)
-                }
-            } catch (e: Exception) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError(e.localizedMessage ?: "Erreur de conversion")
-                }
-            }
-        }
-    }
-
     /**
      * Rogne le début et/ou la fin d'un parcours, et renvoie l'identifiant créé.
      *

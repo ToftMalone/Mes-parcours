@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `1.0` (`versionCode` 34). Elle n'est écrite qu'une fois,
+- Version courante : `1.1` (`versionCode` 35). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -227,11 +227,10 @@ deux réglages, un bouton de confirmation.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
 - **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
   ci-dessous.
-- **Conversion CSV** — vers et depuis un format lisible dans un tableur, décrit
-  plus bas.
 
 **« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
-l'auteur (voir « Poids mort »).
+l'auteur (voir « Poids mort »). **La conversion CSV** a suivi le même sort en 1.1
+(voir « Poids mort »).
 
 ### Découper un parcours
 
@@ -274,55 +273,6 @@ morceaux les allumerait tous d'un coup sur la carte.
 
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
-
-### Conversion CSV
-
-`util/CsvConverter.kt` traduit un fichier vers un autre, **sans jamais toucher
-Room** : ni les deux sens ne créent, ne lisent, ni ne modifient un parcours de
-l'historique. Ce sont de simples conversions de fichier à fichier, ce qui les
-distingue de tous les autres outils de cet écran.
-
-**Un seul outil dans l'interface depuis la 0.18**, pour les deux sens. Les deux
-étaient au départ deux entrées séparées du menu (« Convertir en CSV » /
-« Convertir un CSV ») ; elles ont fusionné en une seule, « Conversion CSV », qui ne
-demande qu'un fichier et déduit le sens à partir de lui —
-`CsvConverter.isCsvFile` tranche sur l'extension, avec un repli sur le contenu
-(même principe que la détection de KML sans extension de `Importer`) pour un
-fichier renommé. Un CSV en entrée affiche les cases GPX/KML à cocher ; un GPX/KML
-n'en a pas besoin, sa seule sortie possible étant le CSV.
-
-Le CSV porte sept colonnes fixes, toujours dans cet ordre : `latitude`, `longitude`,
-`altitude_m`, `horodatage`, `vitesse_m_s`, `nouveau_troncon`, `couleur_troncon`. À la
-lecture, seules les deux premières sont exigées — un tableau façonné à la main avec
-seulement des coordonnées reste utilisable, le reste retombe sur un repli :
-altitude et vitesse à zéro, horodatage synthétique et régulier (même principe que
-l'import KML sans `<time>`), pas de rupture de tronçon, pas de couleur.
-
-**GPX/KML → CSV** réutilise directement `Importer.importFromUri` : son `onBatch` est
-redirigé vers l'écriture CSV au lieu d'une insertion en base, `trackId = 0` n'étant
-qu'un espace réservé jamais écrit nulle part. Le fichier durci contre les entités XML
-(invariant 4) protège donc aussi ce chemin, sans rien dupliquer.
-
-**CSV → GPX/KML** lit le CSV une seule fois par format demandé (deux lectures si les
-deux formats sont cochés, plutôt qu'une écriture simultanée dans les deux) : un CSV
-façonné à la main tient en quelques milliers de lignes au grand maximum, la relecture
-ne coûte rien face à la simplicité du code qui en résulte. Le nom et l'heure du
-parcours de tête (`<metadata><time>` en GPX) sont ceux de la conversion elle-même,
-pas ceux du premier point : les découvrir demanderait de lire le fichier avant de
-pouvoir ouvrir l'écriture, ce que l'écriture en flux interdit justement d'attendre.
-Seule cette ligne d'en-tête est concernée ; chaque point porte son propre horodatage,
-exact ou synthétique selon ce que la colonne contenait.
-
-Le premier point lu ne peut jamais porter la marque de rupture, quoi que dise sa
-colonne — même raisonnement que `clearFirstPointDiscontinuity` pour le découpage : le
-tout premier point d'un parcours ne fait qu'ouvrir le tracé.
-
-Les deux sens écrivent dans Téléchargements/Mes parcours, comme la sauvegarde
-automatique : pas de sélecteur de destination, un seul bouton suffit.
-
-Fonctions pures et testables sans Robolectric — `writeRow`, `parseHeader`,
-`parseRow` — à la manière de `KmlExportTest` pour l'export : `CsvConverterTest` les
-vérifie directement, aller-retour écriture/lecture compris.
 
 ### Rogner un parcours
 
@@ -632,8 +582,8 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 156 tests unitaires en 20 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `SplitTrackTest` (13), `CsvConverterTest` (16), `TrimTrackTest` (14),
+- 140 tests unitaires en 19 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
+  `SplitTrackTest` (13), `TrimTrackTest` (14),
   `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
   `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
@@ -1065,6 +1015,16 @@ inadvertance :
   et `SingleTrackRow` (dont il était le seul appelant), `formatThreshold`, l'entrée
   `Tool.REMOVE_STATIONARY` et `RemoveStationaryPointsTest`. `statsRecomputeLimit` et
   `calculateStatsFromPoints` restent : `loadResumeState` s'en sert toujours.
+
+- Quatrième passe, en 1.1, à la demande de l'auteur : **la conversion CSV**, les
+  deux sens. Sont partis avec elle `util/CsvConverter.kt` et `CsvConverterTest`,
+  `TrackRepository.convertGpxKmlToCsv` / `convertCsvToGpxKml`,
+  `TrackViewModel.convertGpxKmlToCsv` / `convertCsvToGpxKml`, le composable
+  `CsvConversionTool` et le `FormatCheckboxRow` propre à `ToolsTab.kt` (dont il
+  était le seul appelant — celui de `SettingsTab.kt` est une brique distincte,
+  jamais concernée), et l'entrée `Tool.CSV_CONVERT`. `MediaStoreExporter
+  .saveToLocalDownloadsStreaming` reste : la sauvegarde automatique s'en sert
+  toujours.
 
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.

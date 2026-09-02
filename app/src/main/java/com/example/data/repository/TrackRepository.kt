@@ -8,7 +8,6 @@ import com.example.data.model.MapViewport
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.model.TrackPointMeta
-import com.example.util.CsvConverter
 import com.example.util.Importer
 import com.example.util.Exporter
 import com.example.util.MediaStoreExporter
@@ -842,98 +841,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
             newTrackId
         }
-    }
-
-    // ------------------------------------------------------------------
-    // Conversion CSV : ni l'une ni l'autre ne touche Room. Ce sont de simples
-    // traductions d'un fichier vers un autre, jamais chargées entières en mémoire.
-    // ------------------------------------------------------------------
-
-    /**
-     * Convertit un GPX/KML en CSV et l'enregistre dans Téléchargements/Mes parcours,
-     * comme la sauvegarde automatique. Lève une exception si la lecture échoue —
-     * fichier ni GPX ni KML, ou vide.
-     */
-    suspend fun convertGpxKmlToCsv(context: Context, uri: android.net.Uri): CsvConverter.GpxKmlToCsvResult =
-        withContext(Dispatchers.IO) {
-            val baseName = CsvConverter.baseFileName(context, uri)
-            var result: CsvConverter.GpxKmlToCsvResult? = null
-
-            val ok = MediaStoreExporter.saveToLocalDownloadsStreaming(
-                context = context,
-                fileName = "$baseName.csv",
-                mimeType = "text/csv"
-            ) { out ->
-                result = CsvConverter.convertGpxKmlToCsv(context, uri, out)
-            }
-
-            result ?: throw IllegalArgumentException(
-                if (!ok) "Impossible d'écrire le fichier CSV."
-                else "Impossible de lire ce fichier. Vérifiez qu'il s'agit bien d'un GPX ou d'un KML."
-            )
-        }
-
-    /**
-     * Convertit un CSV en GPX et/ou KML, chacun enregistré dans
-     * Téléchargements/Mes parcours. Lit le CSV une fois par format demandé plutôt
-     * que d'ouvrir les deux écritures à la fois : un CSV façonné à la main tient en
-     * quelques milliers de lignes au grand maximum, la relecture ne coûte rien face
-     * à la simplicité d'écrire un seul format à la fois.
-     */
-    suspend fun convertCsvToGpxKml(
-        context: Context,
-        uri: android.net.Uri,
-        wantGpx: Boolean,
-        wantKml: Boolean
-    ): CsvConverter.CsvToTrackResult = withContext(Dispatchers.IO) {
-        if (!wantGpx && !wantKml) {
-            throw IllegalArgumentException("Choisissez au moins un format de sortie.")
-        }
-
-        val baseName = CsvConverter.baseFileName(context, uri)
-        // Horodatage de la conversion, jamais celui des points : jusqu'à ce que le
-        // CSV soit lu, on ignore encore quand le parcours a réellement commencé.
-        val placeholderTrack = Track(
-            name = baseName,
-            activityType = "Randonnée",
-            startTime = System.currentTimeMillis()
-        )
-
-        var result: CsvConverter.CsvToTrackResult? = null
-
-        if (wantGpx) {
-            val ok = MediaStoreExporter.saveToLocalDownloadsStreaming(
-                context = context,
-                fileName = "$baseName.gpx",
-                mimeType = "application/gpx+xml"
-            ) { out ->
-                val writer = Exporter.GpxWriter(out)
-                writer.start(placeholderTrack)
-                result = CsvConverter.readCsvFromUri(context, uri) { point -> writer.add(point) }
-                writer.finish()
-            }
-            if (!ok || result == null) {
-                throw IllegalArgumentException("Impossible de lire ce CSV. Vérifiez qu'il porte au moins les colonnes latitude et longitude.")
-            }
-        }
-
-        if (wantKml) {
-            val ok = MediaStoreExporter.saveToLocalDownloadsStreaming(
-                context = context,
-                fileName = "$baseName.kml",
-                mimeType = "application/vnd.google-earth.kml+xml"
-            ) { out ->
-                val writer = Exporter.KmlWriter(out)
-                writer.start(placeholderTrack)
-                result = CsvConverter.readCsvFromUri(context, uri) { point -> writer.add(point) }
-                writer.finish()
-            }
-            if (!ok || result == null) {
-                throw IllegalArgumentException("Impossible de lire ce CSV. Vérifiez qu'il porte au moins les colonnes latitude et longitude.")
-            }
-        }
-
-        result!!
     }
 
     fun getSelectedImportedTracksFlow(): Flow<List<Track>> {
