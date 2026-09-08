@@ -1175,9 +1175,7 @@ private val RELEASES = listOf(
     Release(
         version = "1.0",
         changes = listOf(
-            "Les deux convertisseurs CSV n'en font plus qu'un : « Conversion CSV » détecte le sens à partir du fichier choisi",
-            "Nouvel écran de bienvenue au premier lancement, qui explique l'application et les autorisations avant de les demander",
-            "Une notification signale désormais une nouvelle version disponible, même sans ouvrir l'application (vérifiée toutes les 3 heures, sans vider la batterie)"
+            "Première version stable"
         )
     )
 )
