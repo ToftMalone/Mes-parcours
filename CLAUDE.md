@@ -704,6 +704,60 @@ que de les interpoler dans un shell.
 Reste aussi la vue satellite servie par Google, déjà arbitrée dans l'audit du 0.11.2 :
 c'est le seul endroit où la promesse « rien ne quitte l'appareil » est prise en défaut.
 
+### Audit de sécurité de la 1.1
+
+Seconde relecture orientée sécurité, à la demande de l'auteur. **Rien de grave :** le
+durcissement d'avant la 1.0 tient, et l'essentiel de ce qui suit relève du garde-fou
+plutôt que de la faille. Quatre points corrigés.
+
+**Une supposition vérifiée plutôt que reconduite.** Le commentaire de `newSaxParser`
+affirmait que le chemin GPX n'a rien à durcir, kXML2 ignorant la déclaration de type
+de document. C'est exact, et la source d'AOSP le confirme : `readEntityDeclaration`
+ne range une entité dans `documentEntities` que si `FEATURE_PROCESS_DOCDECL` est
+actif — faux par défaut, jamais activé ici — et les entités externes sont mappées sur
+la chaîne vide. Ni « billion laughs » ni XXE par le GPX. **Ne pas activer ce drapeau**,
+c'est lui seul qui tient la garantie.
+
+**Corrigés :**
+
+1. **`parseGPX` accumulait le texte sans borne.** `textBuffer.append(parser.text)`
+   n'avait aucun plafond et n'était vidé qu'au `START_TAG` suivant : un `<desc>` de
+   plusieurs dizaines de mégaoctets était recopié entier. Le chemin KML, lui, borne
+   chacun de ses tampons — c'était une asymétrie, pas un choix. Désormais tronqué à
+   [MAX_GPX_TEXT_LENGTH], et lu par `getTextCharacters` plutôt que `parser.text`, qui
+   fabriquait d'abord une copie complète. **Le tampon interne de kXML2 reste le
+   plancher** : il accumule le nœud de texte quoi qu'on fasse, et seul un passage du
+   GPX en SAX — comme le KML — le supprimerait. Le correctif divise la dépense par
+   trois environ, il ne la borne pas.
+2. **`MediaStoreExporter` n'assainissait pas le nom de fichier.** La branche Android 9
+   et antérieur faisait `File(targetDir, fileName)` sans rien vérifier : un séparateur
+   de chemin dans le nom sortait du dossier visé. Non exploitable en l'état — le seul
+   appelant restant compose son nom à partir d'une date — mais le garde-fou qu'assurait
+   `safeFileName` avait disparu avec le partage, et la conversion CSV, qui dérivait ce
+   nom du fichier choisi, venait d'être retirée. `sanitizeFileName` le tient maintenant
+   au seul endroit qui ouvre le fichier.
+3. **Les APK de mise à jour partaient dans la sauvegarde.** Ni `backup_rules.xml` ni
+   `data_extraction_rules.xml` n'excluaient le domaine `file`, et `clearDownloads`
+   n'était appelé qu'à la découverte d'une version plus récente : une vingtaine de Mio
+   restaient sur le disque entre deux publications, et dans la sauvegarde avec le
+   reste. Pas un problème de confidentialité — un APK est public et retéléchargeable —
+   mais de quoi épuiser le quota de sauvegarde et la faire échouer en silence. Le
+   dossier est exclu des deux voies, et le ménage se fait à chaque lancement, sur
+   `Dispatchers.IO` (il se faisait jusque-là sur le thread principal).
+4. **Interpolation shell dans les workflows.** `${{ }}` est remplacé avant que le
+   shell ne voie la ligne : `debug-apk.yml` et l'étape de publication de `release.yml`
+   composaient ainsi des commandes à partir du `versionName`. Exploiter cela demande
+   déjà un accès en écriture au dépôt, mais c'était la seule entorse à la règle que le
+   reste des workflows applique. Toutes ces valeurs passent désormais par
+   l'environnement.
+
+**Relevés sans suite, faute d'enjeu réel :** `isMinifyEnabled = false` en release (pas
+d'obfuscation, choix assumé) ; la base Room non chiffrée au repos, protégée par le bac
+à sable et le chiffrement de l'appareil — SQLCipher n'aurait de sens que contre une
+extraction physique sur appareil déverrouillé ; et le `versionName` du manifeste de
+mise à jour, affiché sans borne de longueur, qui ne devient trompeur que si le compte
+GitHub lui-même est compromis — cas où la clé de signature reste, elle, hors d'atteinte.
+
 ### Le mode focus zoomait tout seul : corrigé en 0.12.0
 
 Rapporté ainsi : « quand je mets le mode focus parfois ça zoom ou dézoom tout seul ».

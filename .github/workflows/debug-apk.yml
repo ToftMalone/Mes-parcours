@@ -65,7 +65,15 @@ jobs:
         # version : sur un téléphone qui en accumule plusieurs, c'est illisible.
         # Renommer le fichier lui-même, et pas seulement l'artefact : c'est le nom
         # du fichier qui survit à la décompression, donc celui qu'on verra.
-        run: cp app/build/outputs/apk/debug/app-debug.apk "mes-parcours-${{ steps.version.outputs.nom }}-debug.apk"
+        #
+        # La version passe par l'environnement plutôt que d'être interpolée dans la
+        # commande : `${{ }}` est remplacé avant que le shell ne voie la ligne, si
+        # bien qu'une version contenant un caractère de shell s'exécuterait au lieu
+        # d'être un nom de fichier. Il faut déjà pouvoir écrire dans le dépôt pour
+        # en arriver là, mais c'est la règle que le reste des workflows applique.
+        env:
+          VERSION: ${{ steps.version.outputs.nom }}
+        run: cp app/build/outputs/apk/debug/app-debug.apk "mes-parcours-${VERSION}-debug.apk"
 
       - name: Joindre l'APK de debug
         uses: actions/upload-artifact@v4
@@ -113,7 +121,9 @@ jobs:
 
       - name: Renommer l'APK de release
         if: steps.signature.outputs.disponible == 'oui'
-        run: cp app/build/outputs/apk/release/app-release.apk "mes-parcours-${{ steps.version.outputs.nom }}-release.apk"
+        env:
+          VERSION: ${{ steps.version.outputs.nom }}
+        run: cp app/build/outputs/apk/release/app-release.apk "mes-parcours-${VERSION}-release.apk"
 
       - name: Joindre l'APK de release
         if: steps.signature.outputs.disponible == 'oui'

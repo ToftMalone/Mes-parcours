@@ -21,12 +21,40 @@ object MediaStoreExporter {
      */
     private const val SUBFOLDER = "Mes parcours"
 
+    /** Nom de repli, si le nom demandé ne laisse rien d'exploitable une fois nettoyé. */
+    private const val FALLBACK_NAME = "parcours"
+
+    /**
+     * Neutralise un nom de fichier avant de l'écrire.
+     *
+     * Le seul appelant actuel compose ce nom à partir d'une date, donc sans surprise
+     * possible. Mais la fonction est publique et invite à lui passer un nom venu
+     * d'ailleurs — un nom de parcours, par exemple, qui peut avoir été lu dans un
+     * fichier importé. Sans ce nettoyage, la branche Android 9 et antérieur écrivait
+     * `File(targetDir, fileName)` sans rien vérifier : un nom portant un séparateur
+     * de chemin sortait alors du dossier visé. Le garde-fou qu'assurait
+     * `safeFileName` a disparu avec la fonction de partage ; il vaut mieux le tenir
+     * ici, au seul endroit qui ouvre le fichier, que dans chaque appelant.
+     *
+     * Sont remplacés les séparateurs et les caractères interdits par les systèmes de
+     * fichiers usuels, ainsi que les caractères de contrôle. Une fois les séparateurs
+     * partis, `..` ne désigne plus rien d'atteignable.
+     */
+    private fun sanitizeFileName(fileName: String): String {
+        val cleaned = fileName
+            .replace(Regex("""[\\/:*?"<>|]"""), "_")
+            .replace(Regex("[\\u0000-\\u001F\\u007F]"), "_")
+            .trim()
+        return if (cleaned.isEmpty() || cleaned.all { it == '.' }) FALLBACK_NAME else cleaned
+    }
+
     /** Ouvre le flux de destination dans Téléchargements/[SUBFOLDER]. */
     private fun openOutput(context: Context, fileName: String, mimeType: String): OutputStream? {
+        val safeName = sanitizeFileName(fileName)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val resolver = context.contentResolver
             val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                 put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$SUBFOLDER")
             }
@@ -40,7 +68,7 @@ object MediaStoreExporter {
             if (!targetDir.exists()) {
                 targetDir.mkdirs()
             }
-            FileOutputStream(File(targetDir, fileName))
+            FileOutputStream(File(targetDir, safeName))
         }
     }
 

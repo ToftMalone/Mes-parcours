@@ -8,6 +8,12 @@
    `pref_last_lng` y conservent la dernière position de carte affichée, réécrite à
    chaque déplacement. Exclure la base sans exclure les préférences laissait partir
    le point le plus parlant de tous.
+
+   Les APK de mise à jour (`files/updates`) sont exclus des deux voies, pour une
+   raison qui n'est pas la confidentialité — ils sont publics et retéléchargeables —
+   mais le poids : une vingtaine de Mio, de quoi épuiser le quota de sauvegarde et
+   la faire échouer en silence, pour un fichier que l'application sait reprendre
+   depuis GitHub.
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -15,9 +21,11 @@
         <exclude domain="database" path="my_tracks_db-wal" />
         <exclude domain="database" path="my_tracks_db-shm" />
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="updates" />
         <exclude domain="external" path="." />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="file" path="updates" />
         <exclude domain="external" path="." />
     </device-transfer>
 </data-extraction-rules>

@@ -10,11 +10,18 @@
    de principe : `pref_last_lat` / `pref_last_lng` y conservent la dernière position
    de carte affichée, réécrite à chaque déplacement. Sans cette exclusion, exclure la
    base ne servait à rien — le point le plus parlant de tous partait quand même.
+
+   Les APK de mise à jour (`files/updates`) sont exclus pour une raison différente :
+   non pas ce qu'ils révèlent — ils sont publics et retéléchargeables — mais leur
+   poids. Une vingtaine de Mio partaient dans la sauvegarde, de quoi en épuiser le
+   quota et la faire échouer en silence, pour un fichier que l'application sait
+   reprendre depuis GitHub.
 -->
 <full-backup-content>
     <exclude domain="database" path="my_tracks_db" />
     <exclude domain="database" path="my_tracks_db-wal" />
     <exclude domain="database" path="my_tracks_db-shm" />
     <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="updates" />
     <exclude domain="external" path="." />
 </full-backup-content>

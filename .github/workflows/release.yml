@@ -148,6 +148,13 @@ jobs:
       - name: Créer la publication
         env:
           GH_TOKEN: ${{ github.token }}
+          # Comme les notes plus haut, ces trois valeurs passent par l'environnement
+          # plutôt que d'être interpolées dans la commande : `${{ }}` est remplacé
+          # avant que le shell ne voie la ligne, si bien qu'un caractère de shell
+          # dans le versionName s'exécuterait au lieu d'être un nom.
+          TAG: ${{ steps.prepare.outputs.tag }}
+          APK: ${{ steps.prepare.outputs.apk }}
+          VERSION_NAME: ${{ steps.prepare.outputs.versionName }}
         run: |
           set -euo pipefail
           # update.json doit porter exactement ce nom : l'application le cherche à
@@ -156,9 +163,9 @@ jobs:
           # --target n'a d'effet que si le tag n'existe pas encore : gh le crée alors
           # sur ce commit. Sur un déclenchement par tag, le tag existe déjà et
           # l'option est sans effet.
-          gh release create "${{ steps.prepare.outputs.tag }}" \
-            "${{ steps.prepare.outputs.apk }}" \
+          gh release create "${TAG}" \
+            "${APK}" \
             update.json \
             --target "${GITHUB_SHA}" \
-            --title "Mes parcours ${{ steps.prepare.outputs.versionName }}" \
+            --title "Mes parcours ${VERSION_NAME}" \
             --notes-file notes.md

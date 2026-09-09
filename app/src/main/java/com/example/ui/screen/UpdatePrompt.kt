@@ -38,8 +38,10 @@ import com.example.util.update.UpdateChecker
 import com.example.util.update.UpdateConfig
 import com.example.util.update.UpdateDownloader
 import com.example.util.update.isNewerThan
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Étapes de la proposition de mise à jour. */
@@ -87,10 +89,21 @@ fun UpdatePrompt(
     var knownUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
 
     LaunchedEffect(Unit) {
+        // Le ménage d'abord, et à chaque lancement plutôt qu'à la seule découverte
+        // d'une version plus récente : un APK déjà téléchargé ne resservira jamais —
+        // `download` réécrit systématiquement le fichier — et n'a donc aucune raison
+        // de survivre au lancement suivant, que l'installation ait abouti ou que
+        // l'utilisateur y ait renoncé. Le faire seulement quand une nouveauté se
+        // présentait laissait une vingtaine de Mio sur le disque entre deux
+        // publications, sauvegardés avec le reste jusqu'à ce que `backup_rules.xml`
+        // les en écarte.
+        //
+        // Sur Dispatchers.IO : c'est un parcours de répertoire et des suppressions,
+        // rien qui ait sa place sur le thread principal.
+        withContext(Dispatchers.IO) { UpdateDownloader.clearDownloads(context) }
+
         val update = UpdateChecker.fetchLatest() ?: return@LaunchedEffect
         if (update.isNewerThan(BuildConfig.VERSION_CODE)) {
-            // Les APK d'une version précédente ne servent plus à rien.
-            UpdateDownloader.clearDownloads(context)
             knownUpdate = update
             state = UpdateState.Available(update)
             onUpdateAvailable(update)

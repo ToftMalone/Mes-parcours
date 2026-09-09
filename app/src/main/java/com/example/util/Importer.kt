@@ -20,6 +20,18 @@ private const val BATCH_SIZE = 1000
 private const val MAX_NAME_LENGTH = 512
 
 /**
+ * Longueur maximale retenue pour le texte d'un élément GPX.
+ *
+ * Le nom est le plus long des champs qu'on garde ; les autres — `ele`, `time`,
+ * `speed`, `type` — tiennent en quelques dizaines de caractères. Au-delà, le texte
+ * est tronqué plutôt qu'accumulé : sans cette borne, un `<desc>` de plusieurs
+ * dizaines de mégaoctets était recopié entier dans le tampon, et le chemin GPX
+ * n'avait alors aucune des protections que le chemin KML se donne (voir
+ * [MAX_COLOR_LENGTH] et [MAX_STYLE_ID_LENGTH]).
+ */
+private const val MAX_GPX_TEXT_LENGTH = MAX_NAME_LENGTH
+
+/**
  * Longueur maximale retenue pour une couleur lue dans le fichier. Une couleur KML
  * fait huit caractères ; la marge absorbe les espaces, et la borne évite qu'un
  * fichier malformé fasse enfler le tampon.
@@ -177,7 +189,18 @@ object Importer {
                     }
                 }
                 XmlPullParser.TEXT -> {
-                    textBuffer.append(parser.text)
+                    // `getTextCharacters` rend le tampon interne de l'analyseur tel
+                    // quel, là où `parser.text` en fabrique d'abord une copie
+                    // complète : sur un élément démesuré, cette copie seule pesait
+                    // déjà deux octets par caractère avant même d'être tronquée.
+                    val room = MAX_GPX_TEXT_LENGTH - textBuffer.length
+                    if (room > 0) {
+                        val bounds = IntArray(2)
+                        val chars = parser.getTextCharacters(bounds)
+                        if (chars != null && bounds[1] > 0) {
+                            textBuffer.append(chars, bounds[0], minOf(bounds[1], room))
+                        }
+                    }
                 }
                 XmlPullParser.END_TAG -> {
                     val text = textBuffer.toString().trim()
@@ -276,6 +299,14 @@ object Importer {
      *
      * Le GPX, lui, passe par [Xml.newPullParser] : kXML2 ignore par défaut la
      * déclaration de type de document, il n'y a donc rien à désactiver de ce côté.
+     *
+     * Vérifié sur la source d'AOSP plutôt que supposé, lors de l'audit de la 1.1 :
+     * `KXmlParser.readEntityDeclaration` ne range une entité dans `documentEntities`
+     * que si `FEATURE_PROCESS_DOCDECL` est actif — il est faux par défaut et rien
+     * ici ne l'active — si bien qu'aucune entité déclarée dans un GPX n'est jamais
+     * développée, et que « billion laughs » n'a pas de prise. Les entités externes,
+     * elles, sont mappées sur la chaîne vide : pas de lecture de fichier local ni de
+     * requête réseau par ce chemin non plus.
      */
     private fun newSaxParser() = SAXParserFactory.newInstance()
         .apply {
