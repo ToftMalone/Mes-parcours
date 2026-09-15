@@ -51,7 +51,21 @@ jobs:
           java-version: '21'
 
       - name: Préparer le SDK Android
-        uses: android-actions/setup-android@v3
+        # Le runner porte déjà un SDK Android complet, cmdline-tools et sdkmanager
+        # compris ; il ne manquait que l'acceptation des licences.
+        # android-actions/setup-android@v3 s'en chargeait, jusqu'à ce qu'elle échoue
+        # du jour au lendemain : elle tente d'abord d'installer le paquet historique
+        # « tools », que Google a retiré de son dépôt — plus aucune version ne
+        # l'installe donc plus, quel que soit le projet. On accepte les licences
+        # nous-mêmes, sans dépendre de l'action pour un geste aussi simple.
+        #
+        # `|| true` n'est pas là par prudence de principe : `yes | sdkmanager`
+        # ferme son entrée avant que `yes` ait fini d'écrire, ce qui la fait
+        # sortir en erreur (SIGPIPE) alors que sdkmanager, lui, a bien accepté les
+        # licences. Le shell des étapes GitHub Actions active `pipefail`, qui
+        # ferait donc échouer l'étape sur un succès. Un vrai échec d'acceptation
+        # se verrait de toute façon à la compilation qui suit.
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
       - name: Installer la plateforme visée
         run: |
