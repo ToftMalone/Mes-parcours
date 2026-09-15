@@ -638,6 +638,8 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   1 Hz, la marche lente (moins de 3,6 km/h) est structurellement sous-comptée.
 - `FLAG_KEEP_SCREEN_ON` est posé sans condition dans `MainActivity` : l'écran ne
   s'éteint jamais tant que l'application est ouverte, même hors enregistrement.
+  **Voulu, pas un défaut** — confirmé par l'auteur lors de la relecture batterie de
+  la 1.2 : ne pas le limiter à l'enregistrement est un choix assumé, pas un oubli.
 - L'export vers Téléchargements est inopérant sur Android 9 et antérieur :
   `MediaStoreExporter` emprunte alors le stockage public sans que
   `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
@@ -757,6 +759,49 @@ d'obfuscation, choix assumé) ; la base Room non chiffrée au repos, protégée 
 extraction physique sur appareil déverrouillé ; et le `versionName` du manifeste de
 mise à jour, affiché sans borne de longueur, qui ne devient trompeur que si le compte
 GitHub lui-même est compromis — cas où la clé de signature reste, elle, hors d'atteinte.
+
+### Audit batterie de la 1.2
+
+Relecture ciblée consommation, à la demande de l'auteur. Deux points corrigés, un
+écarté sciemment.
+
+**Corrigés :**
+
+1. **Une animation infinie tournait pour rien dans `MapViewContainer`.**
+   `TrackHiddenPulse` (`pulseAlpha`) animait en boucle tant que la carte était
+   composée — donc l'essentiel du temps où l'application est ouverte — pour une
+   valeur qui n'était **lue nulle part**, ni dans ce fichier ni ailleurs. Une
+   horloge d'animation active empêche le CPU de se reposer entre deux frames ; ici,
+   pour rien. Supprimée avec ses imports devenus orphelins
+   (`rememberInfiniteTransition`, `animateFloat`, `infiniteRepeatable`, `tween` non
+   qualifié, `RepeatMode`, `LinearEasing`) — `Spring`/`spring` restent, utilisés par
+   ailleurs dans le fichier.
+2. **La notification d'enregistrement se réécrivait environ une fois par seconde**,
+   y compris écran éteint. Le dédoublonnage par texte identique (voir « Notification
+   en tâche de fond ») évitait déjà les doublons stricts, mais la durée affichée
+   change chaque seconde : l'essentiel des appels à `notify()` passait quand même.
+   `TrackingService.updateStatsNotification` consulte désormais
+   `PowerManager.isInteractive` : écran allumé, comportement inchangé (dédoublonné
+   par contenu) ; écran éteint, au plus un appel par minute
+   (`SCREEN_OFF_NOTIFY_INTERVAL_MS`). Le retour à l'écran allumé republie
+   **immédiatement**, sans attendre la fin de la fenêtre — vérifié par simulation
+   (voir plus bas). `lastNotificationText` n'est délibérément pas mis à jour dans la
+   branche bloquée : la comparaison de texte, bon marché, continue de s'exécuter à
+   chaque tick ; seul l'appel à `notify()`, le coûteux, est retenu.
+
+**Écarté, sciemment :** `FLAG_KEEP_SCREEN_ON` posé sans condition dans
+`MainActivity` (relevé par l'audit du 0.11.2). Confirmé par l'auteur : voulu, pas un
+défaut — voir la note ajoutée directement dans cette section.
+
+**Non vérifiable en session web** : les deux correctifs touchent respectivement
+Compose (`MapViewContainer`) et un service Android (`TrackingService`), aucun des
+deux testable par les suites unitaires existantes ni compilable sans SDK Android
+disponible ici (voir « Commandes »). La logique de cadence de la notification a été
+vérifiée séparément par une simulation Java indépendante d'Android (écran allumé :
+comportement inchangé ; écran éteint dix minutes : au plus une poignée d'appels ;
+retour à l'écran allumé : republication immédiate) — la transcription elle-même, pas
+une preuve de compilation. Un APK debug reste la seule vérification qui vaille avant
+publication.
 
 ### Le mode focus zoomait tout seul : corrigé en 0.12.0
 

@@ -9,12 +9,6 @@ import android.graphics.Paint
 import android.preference.PreferenceManager
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.draw.clipToBounds
@@ -376,17 +370,6 @@ fun MapViewContainer(
     // Decouple zoom gesture updates from Jetpack Compose recomposition cycles
     var isZoomedOutTooMuch by remember { mutableStateOf(false) }
     var isExpanded by remember { mutableStateOf(false) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "TrackHiddenPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "TrackHiddenAlpha"
-    )
 
     val mapView = rememberMapViewWithLifecycle(
         initialCenterLat = initialCenterLat,

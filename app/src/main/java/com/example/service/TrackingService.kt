@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.example.BuildConfig
 import com.example.MainActivity
@@ -63,6 +64,10 @@ class TrackingService : Service() {
         getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
+    private val powerManager: PowerManager by lazy {
+        getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
+
     /**
      * Dernier texte réellement affiché, pour ne pas republier deux fois le même.
      *
@@ -73,6 +78,14 @@ class TrackingService : Service() {
      */
     @Volatile
     private var lastNotificationText: String? = null
+
+    /**
+     * Horloge monotone de la dernière notification effectivement republiée, pour
+     * borner la cadence quand l'écran est éteint (voir [updateStatsNotification]).
+     * Volatile pour la même raison que [lastNotificationText].
+     */
+    @Volatile
+    private var lastNotifiedAtElapsedRealtime = 0L
 
     // Track state variables
     @Volatile
@@ -262,6 +275,7 @@ class TrackingService : Service() {
         isServiceStopping = false
         isPaused = false
         lastNotificationText = null
+        lastNotifiedAtElapsedRealtime = 0L
 
         // Toute la préparation passe par pointScope, le thread unique qui traite aussi
         // les points GPS. Elle se faisait auparavant sur serviceScope alors que les
@@ -644,8 +658,26 @@ class TrackingService : Service() {
         // Sur une sortie de quatre heures, cela faisait une quinzaine de milliers
         // d'allers-retours inutiles.
         if (notificationString == lastNotificationText) return
-        lastNotificationText = notificationString
 
+        // Écran éteint : personne ne peut voir cette notification à l'instant où elle
+        // change, la republier à chaque seconde ne fait que consommer pour rien — le
+        // défaut relevé à la demande de l'auteur. Un battement par minute suffit à la
+        // garder à peu près à jour (pour un réveil de l'écran, un aperçu depuis le
+        // volet de notifications), sans reproduire le coût observé en continu.
+        //
+        // `lastNotificationText` n'est délibérément pas mis à jour dans cette
+        // branche : le texte continue de différer à chaque appel tant qu'il change
+        // réellement (secondes qui défilent), ce qui refait passer ce test bon marché
+        // à chaque tick — seul l'appel à notify(), le coûteux, reste retenu.
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!powerManager.isInteractive &&
+            now - lastNotifiedAtElapsedRealtime < SCREEN_OFF_NOTIFY_INTERVAL_MS
+        ) {
+            return
+        }
+
+        lastNotificationText = notificationString
+        lastNotifiedAtElapsedRealtime = now
         notificationManager.notify(NOTIFICATION_ID, buildNotification(notificationString))
     }
 
@@ -790,7 +822,13 @@ class TrackingService : Service() {
     companion object {
         private const val CHANNEL_ID = "my_tracks_gps_tracking_channel"
         private const val NOTIFICATION_ID = 88231
-        
+
+        /**
+         * Cadence minimale de republication de la notification quand l'écran est
+         * éteint. Voir [updateStatsNotification].
+         */
+        private const val SCREEN_OFF_NOTIFY_INTERVAL_MS = 60_000L
+
         const val ACTION_START = "com.example.service.action.START"
         const val ACTION_STOP = "com.example.service.action.STOP"
         const val ACTION_PAUSE = "com.example.service.action.PAUSE"
