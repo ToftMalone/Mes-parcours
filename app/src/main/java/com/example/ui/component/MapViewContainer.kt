@@ -293,8 +293,20 @@ private class MapState(
     /** Couleur d'origine du parcours affiché en plein écran, s'il en a une. */
     var sourceColor: Int? = null,
     /** Couleur choisie par l'utilisateur pour le parcours affiché en plein écran. */
-    var displayColor: Int? = null
+    var displayColor: Int? = null,
+    /**
+     * Icône du point bleu de position, construite une seule fois puis réutilisée.
+     *
+     * `drawMarkers` s'exécute à chaque point GPS reçu pendant un enregistrement —
+     * environ une fois par seconde, sur toute sa durée. Rien dans cette icône ne
+     * dépend de l'état courant : la refabriquer (bitmap, canvas, trois cercles)
+     * à chaque appel n'était que du travail jeté, pour un résultat identique.
+     */
+    var blueDotIcon: android.graphics.drawable.Drawable? = null
 )
+
+private fun blueDotIcon(context: Context, state: MapState): android.graphics.drawable.Drawable =
+    state.blueDotIcon ?: createBlueDotIcon(context).also { state.blueDotIcon = it }
 
 private fun createBlueDotIcon(context: Context): android.graphics.drawable.Drawable {
     val density = context.resources.displayMetrics.density
@@ -1138,7 +1150,7 @@ private fun drawMarkers(map: MapView, state: MapState) {
             title = if (state.isCurrentTracking) "Position Actuelle" else "Arrivée"
             if (state.isCurrentTracking) {
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                icon = createBlueDotIcon(map.context)
+                icon = blueDotIcon(map.context, state)
             } else {
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 icon = map.resources.getDrawable(
@@ -1154,7 +1166,7 @@ private fun drawMarkers(map: MapView, state: MapState) {
             position = currentPoint
             title = "Ma Position"
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            icon = createBlueDotIcon(map.context)
+            icon = blueDotIcon(map.context, state)
         }
         map.overlays.add(currentMarker)
     }
@@ -1302,7 +1314,9 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
         map.overlays.addAll(cachedPointsPolylines)
     }
 
-    // 3. Draw markers (extremely cheap, always draw fresh)
+    // 3. Draw markers. Les objets Marker sont refaits à chaque appel (légers),
+    // mais leur icône de position — coûteuse à dessiner — est mise en cache
+    // dans MapState par blueDotIcon() : voir sa raison d'être plus haut.
     drawMarkers(map, state)
 }
 

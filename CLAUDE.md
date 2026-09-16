@@ -803,6 +803,44 @@ retour à l'écran allumé : republication immédiate) — la transcription elle
 une preuve de compilation. Un APK debug reste la seule vérification qui vaille avant
 publication.
 
+### Rapidité et batterie de la 1.3 : le point bleu refabriqué à chaque point GPS
+
+Relecture ciblée « rapidité et batterie », à la demande de l'auteur. Un point corrigé,
+un second identifié mais laissé pour une prochaine passe.
+
+**Corrigé :** `createBlueDotIcon` (bitmap, canvas, trois cercles dessinés) était
+appelée à chaque exécution de `drawMarkers` — donc environ une fois par seconde
+pendant tout un enregistrement, puisqu'un nouveau point GPS invalide le cache des
+polylignes qui déclenche `rebuildMapOverlays`. Rien dans cette icône ne dépend de
+l'état courant : le résultat est strictement identique d'un appel à l'autre. Mise en
+cache dans `MapState` (`blueDotIcon`, construite au premier besoin puis réutilisée),
+comme le sont déjà les polylignes.
+
+**Identifié, non corrigé — la piste la plus payante des deux.** `state.points`
+(alimenté par `TrackViewModel.livePoints`, voir « Arbitré, avant la 1.0 » :
+`_livePoints.value = _livePoints.value + point`, sans borne pendant un
+enregistrement) change de référence à chaque point GPS. Comme `cachedPointsPolylines`
+est invalidé dès que `state.points != points`, **le tracé en cours est intégralement
+recalculé et recopié dans un `Polyline` neuf à chaque seconde** :
+`buildSegmentsFromPoints` repasse sur la totalité des points depuis le début, et
+`setPoints()` recopie tout. Le coût par appel grandit avec la durée déjà écoulée de
+l'enregistrement — quadratique sur une sortie entière, comme le coût déjà accepté
+pour `_livePoints` lui-même, mais ici dans la couche carte plutôt que dans le
+repository, et donc potentiellement visible à l'écran (à-coups) sur une trace déjà
+longue, pas seulement coûteux en batterie.
+
+Corriger cela sans toucher à `_livePoints` (choix de l'auteur, non remis en cause) :
+étendre le `Polyline` du tronçon en cours avec le seul point nouveau plutôt que de
+reconstruire tous les segments à partir de zéro. Plus délicat que la mise en cache de
+l'icône — il faut traiter correctement le cas où le nouveau point ouvre un tronçon
+(`isDiscontinuous`), qui doit démarrer un `Polyline` séparé plutôt que prolonger
+l'existant. Laissé pour une prochaine passe, à la demande explicite de l'auteur de ne
+traiter que l'icône pour l'instant.
+
+**Non vérifiable en session web**, pour la même raison que l'audit batterie ci-dessus :
+Compose, aucun SDK Android disponible ici. Un APK debug reste la vérification qui
+vaille avant publication.
+
 ### Le mode focus zoomait tout seul : corrigé en 0.12.0
 
 Rapporté ainsi : « quand je mets le mode focus parfois ça zoom ou dézoom tout seul ».
