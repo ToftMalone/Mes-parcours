@@ -80,6 +80,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.LiveStats
 import com.example.ui.component.MapViewContainer
+import com.example.ui.theme.AmberAccent
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 
@@ -311,8 +313,12 @@ fun TrackingTab(
 
                             // Pause / Resume FAB : icône et couleur animées, plutôt
                             // qu'un changement sec à chaque appui.
+                            // Ambre dans les deux états : seule l'icône distingue
+                            // désormais pause et reprise. animateColorAsState reste en
+                            // place pour amortir un futur retour à une distinction par
+                            // couleur, sans rien changer à l'animation elle-même.
                             val pauseResumeColor by animateColorAsState(
-                                targetValue = if (isPaused) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                targetValue = AmberAccent,
                                 animationSpec = tween(220),
                                 label = "pause_resume_color"
                             )
@@ -627,8 +633,8 @@ fun LiveStatsCard(
 
     val animatedContainerColor by androidx.compose.animation.animateColorAsState(
         targetValue = when {
-            showLostAlert -> Color(0xFFEA580C)
-            showFoundAlert -> Color(0xFF10B981)
+            showLostAlert -> MaterialTheme.colorScheme.error
+            showFoundAlert -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
         },
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 400),
@@ -655,9 +661,7 @@ fun LiveStatsCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                    colors = listOf(animatedBorderColor, Color.Transparent)
-                ),
+                color = animatedBorderColor,
                 shape = RoundedCornerShape(20.dp)
             )
     ) {
@@ -714,6 +718,7 @@ fun LiveStatsCard(
                             style = androidx.compose.ui.text.TextStyle(
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Black,
+                                fontFamily = JetBrainsMonoFontFamily,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -745,6 +750,7 @@ fun LiveStatsCard(
                             style = androidx.compose.ui.text.TextStyle(
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Black,
+                                fontFamily = JetBrainsMonoFontFamily,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -780,6 +786,7 @@ fun LiveStatsCard(
                                 style = androidx.compose.ui.text.TextStyle(
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Black,
+                                    fontFamily = JetBrainsMonoFontFamily,
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
                                 modifier = Modifier.align(Alignment.Center)
@@ -787,7 +794,7 @@ fun LiveStatsCard(
 
                             // Integrated GPS connection status dot to the right of altitude
                             val isSignalFound = delayedGpsStatus == "Signal trouvé"
-                            val dotColor = if (isSignalFound) Color(0xFF10B981) else Color(0xFFEF4444)
+                            val dotColor = if (isSignalFound) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                             val dotAlpha = if (isSignalFound) 1.0f else pulseAlpha
 
                             Box(
@@ -819,8 +826,8 @@ fun StandbyStatsCard(
 
     val animatedContainerColor by androidx.compose.animation.animateColorAsState(
         targetValue = when {
-            showLostAlert -> Color(0xFFEA580C)
-            showFoundAlert -> Color(0xFF10B981)
+            showLostAlert -> MaterialTheme.colorScheme.error
+            showFoundAlert -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
         },
         animationSpec = tween(durationMillis = 400),
@@ -847,9 +854,7 @@ fun StandbyStatsCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                    colors = listOf(animatedBorderColor, Color.Transparent)
-                ),
+                color = animatedBorderColor,
                 shape = RoundedCornerShape(20.dp)
             )
     ) {
@@ -910,6 +915,7 @@ fun StandbyStatsCard(
                                 style = androidx.compose.ui.text.TextStyle(
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Black,
+                                    fontFamily = JetBrainsMonoFontFamily,
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
                                 modifier = Modifier.align(Alignment.Center)
@@ -917,7 +923,7 @@ fun StandbyStatsCard(
 
                             // Integrated GPS connection status dot to the right of altitude
                             val isSignalFound = delayedGpsStatus == "Signal trouvé"
-                            val dotColor = if (isSignalFound) Color(0xFF10B981) else Color(0xFFEF4444)
+                            val dotColor = if (isSignalFound) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                             val dotAlpha = if (isSignalFound) 1.0f else pulseAlpha
 
                             Box(

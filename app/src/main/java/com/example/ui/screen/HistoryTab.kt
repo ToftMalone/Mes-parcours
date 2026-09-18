@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Track
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
@@ -622,19 +623,14 @@ fun TrackHistoryCard(
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+        shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        trackColor.copy(alpha = 0.35f),
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp)
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(20.dp)
             )
             .clickable(onClick = onClick)
             .testTag("track_card_${track.id}")
@@ -690,7 +686,8 @@ fun TrackHistoryCard(
                         text = FormatUtils.formatDate(track.startTime),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = JetBrainsMonoFontFamily
                     )
                 }
             }
@@ -869,7 +866,8 @@ fun StatsBadge(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 15.sp
+            fontSize = 15.sp,
+            fontFamily = JetBrainsMonoFontFamily
         )
     }
 }
