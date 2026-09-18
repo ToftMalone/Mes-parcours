@@ -76,13 +76,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
-import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.NightModePreferences
 import com.example.ui.theme.NightModeSource
 import com.example.util.AutoBackupPreferences
@@ -246,12 +246,12 @@ fun SettingsGroupHeader(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelLarge.copy(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
+                letterSpacing = 0.3.sp
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -341,8 +341,7 @@ private fun <T> SettingsChoiceList(
 
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
             ),
             border = BorderStroke(
                 width = 1.dp,
@@ -994,7 +993,8 @@ private fun AboutCard() {
             Text(
                 text = "Mes parcours",
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.SansSerif
                 ),
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
@@ -1021,7 +1021,7 @@ private fun AboutCard() {
                     text = "v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontFamily = JetBrainsMonoFontFamily
+                        fontFamily = FontFamily.Monospace
                     ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
@@ -1038,6 +1038,7 @@ private fun AboutCard() {
                 text = "Une application de suivi GPS et de cartographie moderne pour enregistrer, " +
                         "analyser, fusionner et exporter vos parcours au format GPX, en toute sécurité.",
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                fontFamily = FontFamily.SansSerif,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -1104,6 +1105,7 @@ private fun AboutCard() {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Open Source",
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -1120,6 +1122,7 @@ private fun AboutCard() {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Fait par ToftMalone",
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -1138,7 +1141,7 @@ private fun AboutCard() {
                 text = "Mes parcours • 2026",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                fontFamily = JetBrainsMonoFontFamily
+                fontFamily = FontFamily.Monospace
             )
         }
     }

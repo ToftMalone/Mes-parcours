@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -65,7 +66,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.component.MapViewContainer
-import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 
@@ -222,15 +222,20 @@ fun DetailView(
             // 1. High-Contrast Mini Map Card with custom border
             Card(
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(260.dp)
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(24.dp))
                     .border(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(20.dp)
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = RoundedCornerShape(24.dp)
                     )
             ) {
                 if (points.isNotEmpty()) {
@@ -302,21 +307,25 @@ fun DetailView(
                         text = FormatUtils.formatDate(currentTrack.startTime),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = JetBrainsMonoFontFamily
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
 
             // 2. Comprehensive Statistics Grid Card
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
+                            )
+                        ),
                         shape = RoundedCornerShape(24.dp)
                     )
             ) {
@@ -475,8 +484,8 @@ fun DetailView(
                             kmlLauncher.launch("$safeName.kml")
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         ),
                         shape = CircleShape,
                         modifier = Modifier
@@ -550,8 +559,7 @@ fun DetailMetric(
             style = androidx.compose.ui.text.TextStyle(
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = (-0.5).sp,
-                fontFamily = JetBrainsMonoFontFamily
+                letterSpacing = (-0.5).sp
             ),
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -596,8 +604,7 @@ fun DetailSubMetric(
                 text = value,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontFamily = JetBrainsMonoFontFamily
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }

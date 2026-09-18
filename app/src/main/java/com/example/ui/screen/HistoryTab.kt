@@ -40,6 +40,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,7 +65,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Track
-import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
@@ -175,38 +176,51 @@ fun HistoryTab(
             }
 
             item {
-                // Les 3 onglets par catégorie, en chips pilule plutôt qu'en onglets
-                // soulignés : actif = fond vert et texte sombre, inactif = surface
-                // discrète. Même état, mêmes libellés, même logique de sélection —
-                // seul l'habillage change.
-                //
-                // Les onglets ne portent plus l'appui long qui ouvrait la couleur de
-                // la catégorie : la couleur appartient désormais au parcours, et se
-                // choisit sur sa carte. Ce geste caché était de toute façon
-                // indevinable, et sa zone sensible se limitait aux lettres du
-                // libellé — l'élargir avait fait disparaître l'onglet « Importés »
-                // (voir l'historique de ce fichier).
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    divider = {},
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                 ) {
-                    HistoryFilterChip(
-                        label = "Enregistrés (${recordedTracks.size})",
+                    // Les onglets ne portent plus l'appui long qui ouvrait la couleur de
+                    // la catégorie : la couleur appartient désormais au parcours, et se
+                    // choisit sur sa carte. Ce geste caché était de toute façon
+                    // indevinable, et sa zone sensible se limitait aux lettres du
+                    // libellé — l'élargir avait fait disparaître l'onglet « Importés »
+                    // (voir l'historique de ce fichier).
+                    Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        modifier = Modifier.weight(1f)
+                        text = {
+                            Text(
+                                text = "Enregistrés (${recordedTracks.size})",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
                     )
-                    HistoryFilterChip(
-                        label = "Importés (${importedTracks.size})",
+                    Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        modifier = Modifier.weight(1f)
+                        text = {
+                            Text(
+                                text = "Importés (${importedTracks.size})",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
                     )
-                    HistoryFilterChip(
-                        label = "Fusionnés (${mergedTracks.size})",
+                    Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        modifier = Modifier.weight(1f)
+                        text = {
+                            Text(
+                                text = "Fusionnés (${mergedTracks.size})",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
                     )
                 }
             }
@@ -590,36 +604,6 @@ private fun trackDisplayColor(track: Track): Int =
         isMerged = track.isMerged
     )
 
-/** Chip pilule d'un des 3 filtres par catégorie : actif = fond vert, texte sombre. */
-@Composable
-private fun HistoryFilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(
-                if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-    }
-}
-
 @Composable
 fun TrackHistoryCard(
     track: Track,
@@ -638,14 +622,19 @@ fun TrackHistoryCard(
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(16.dp)
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        trackColor.copy(alpha = 0.35f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                    )
+                ),
+                shape = RoundedCornerShape(24.dp)
             )
             .clickable(onClick = onClick)
             .testTag("track_card_${track.id}")
@@ -701,8 +690,7 @@ fun TrackHistoryCard(
                         text = FormatUtils.formatDate(track.startTime),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = JetBrainsMonoFontFamily
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -881,8 +869,7 @@ fun StatsBadge(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 15.sp,
-            fontFamily = JetBrainsMonoFontFamily
+            fontSize = 15.sp
         )
     }
 }

@@ -34,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -463,18 +462,6 @@ fun MainScreen(
                                     )
                                     .testTag("bottom_nav_bar")
                             ) {
-                        // Onglet actif = vert, inactif = gris chaud — même valeurs que le
-                        // reste de la palette, appliquées ici car les couleurs par défaut
-                        // de NavigationBarItem dérivent de `secondary` (l'indigo réservé à
-                        // l'overlay de tracés), pas de `primary`.
-                        val navItemColors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                        )
-
                         NavigationBarItem(
                             selected = currentTab == "enregistrer",
                             onClick = { currentTab = "enregistrer" },
@@ -485,7 +472,6 @@ fun MainScreen(
                                 )
                             },
                             label = { Text("Enregistrer") },
-                            colors = navItemColors,
                             modifier = Modifier.testTag("tab_button_tracking")
                         )
 
@@ -499,7 +485,6 @@ fun MainScreen(
                                 )
                             },
                             label = { Text("Historique") },
-                            colors = navItemColors,
                             modifier = Modifier.testTag("tab_button_history")
                         )
 
@@ -513,14 +498,12 @@ fun MainScreen(
                                 )
                             },
                             label = { Text("Outils") },
-                            colors = navItemColors,
                             modifier = Modifier.testTag("tab_button_tools")
                         )
 
                         NavigationBarItem(
                             selected = currentTab == "parametres",
                             onClick = { currentTab = "parametres" },
-                            colors = navItemColors,
                             icon = {
                                 BadgedBox(
                                     badge = {
