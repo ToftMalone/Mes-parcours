@@ -40,8 +40,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -177,51 +175,38 @@ fun HistoryTab(
             }
 
             item {
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    divider = {},
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                // Les 3 onglets par catégorie, en chips pilule plutôt qu'en onglets
+                // soulignés : actif = fond vert et texte sombre, inactif = surface
+                // discrète. Même état, mêmes libellés, même logique de sélection —
+                // seul l'habillage change.
+                //
+                // Les onglets ne portent plus l'appui long qui ouvrait la couleur de
+                // la catégorie : la couleur appartient désormais au parcours, et se
+                // choisit sur sa carte. Ce geste caché était de toute façon
+                // indevinable, et sa zone sensible se limitait aux lettres du
+                // libellé — l'élargir avait fait disparaître l'onglet « Importés »
+                // (voir l'historique de ce fichier).
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Les onglets ne portent plus l'appui long qui ouvrait la couleur de
-                    // la catégorie : la couleur appartient désormais au parcours, et se
-                    // choisit sur sa carte. Ce geste caché était de toute façon
-                    // indevinable, et sa zone sensible se limitait aux lettres du
-                    // libellé — l'élargir avait fait disparaître l'onglet « Importés »
-                    // (voir l'historique de ce fichier).
-                    Tab(
+                    HistoryFilterChip(
+                        label = "Enregistrés (${recordedTracks.size})",
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = {
-                            Text(
-                                text = "Enregistrés (${recordedTracks.size})",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                        }
+                        modifier = Modifier.weight(1f)
                     )
-                    Tab(
+                    HistoryFilterChip(
+                        label = "Importés (${importedTracks.size})",
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = {
-                            Text(
-                                text = "Importés (${importedTracks.size})",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                        }
+                        modifier = Modifier.weight(1f)
                     )
-                    Tab(
+                    HistoryFilterChip(
+                        label = "Fusionnés (${mergedTracks.size})",
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = {
-                            Text(
-                                text = "Fusionnés (${mergedTracks.size})",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                        }
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -605,6 +590,36 @@ private fun trackDisplayColor(track: Track): Int =
         isMerged = track.isMerged
     )
 
+/** Chip pilule d'un des 3 filtres par catégorie : actif = fond vert, texte sombre. */
+@Composable
+private fun HistoryFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
 @Composable
 fun TrackHistoryCard(
     track: Track,
@@ -624,13 +639,13 @@ fun TrackHistoryCard(
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick)
             .testTag("track_card_${track.id}")

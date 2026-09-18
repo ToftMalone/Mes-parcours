@@ -246,12 +246,12 @@ fun SettingsGroupHeader(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.3.sp
+                letterSpacing = 1.2.sp
             ),
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -341,7 +341,8 @@ private fun <T> SettingsChoiceList(
 
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
+                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
             ),
             border = BorderStroke(
                 width = 1.dp,
