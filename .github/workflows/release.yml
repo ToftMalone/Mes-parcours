@@ -18,6 +18,20 @@ name: Publier une version
 #    session distante peut pousser du code et se voir refuser un tag. Sans elle, il
 #    faudrait un poste de développement sous la main pour publier quoi que ce soit.
 
+# Actions épinglées par identifiant de commit, jamais par étiquette (`@v4`).
+#
+# Une étiquette se déplace : son auteur — ou quiconque dérobe son compte — peut la
+# faire pointer demain sur un autre code, qui s'exécuterait ici sans que rien ne
+# change dans ce fichier. C'est ce qui est arrivé en 2025 à tj-actions/changed-files.
+# L'enjeu est la clé de signature : setup-gradle injecte son propre code dans Gradle,
+# celui-là même qui signe l'APK avec le mot de passe du trousseau. Qui tient la clé
+# peut publier une mise à jour que l'application installerait comme légitime.
+#
+# La version lisible est en commentaire à droite de chaque identifiant. Pour monter
+# de version, relever le commit de la nouvelle étiquette
+# (`git ls-remote https://github.com/<action>.git 'refs/tags/<version>^{}'`, ou sans
+# `^{}` pour une étiquette légère) et remplacer identifiant et commentaire ensemble.
+
 on:
   push:
     tags:
@@ -39,13 +53,13 @@ jobs:
 
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Le message du tag sert de notes de version : il faut l'historique.
           fetch-depth: 0
 
       - name: Installer le JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '21'
@@ -73,7 +87,7 @@ jobs:
           sdkmanager --install "platforms;android-36.1" || true
 
       - name: Préparer Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       - name: Lancer les tests
         # Une version ne doit jamais être publiée si la suite de tests échoue.

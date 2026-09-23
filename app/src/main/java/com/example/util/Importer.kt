@@ -41,6 +41,17 @@ private const val MAX_COLOR_LENGTH = 32
 /** Longueur maximale retenue pour un identifiant de style ou une clé de `<Pair>`. */
 private const val MAX_STYLE_ID_LENGTH = 256
 
+/**
+ * Longueur maximale d'un point de `<coordinates>` (« lon,lat[,alt] »), en caractères.
+ *
+ * Un point réel en fait quelques dizaines, même à quinze décimales. Sans cette borne,
+ * le jeton grandissait jusqu'au prochain blanc : un bloc de plusieurs centaines de
+ * mégaoctets sans un seul espace était accumulé entier, deux octets par caractère,
+ * jusqu'à saturer la mémoire — l'asymétrie qu'avait déjà corrigée [MAX_GPX_TEXT_LENGTH]
+ * côté GPX, restée ouverte ici (audit de la 1.3). Au-delà, le jeton est ignoré.
+ */
+internal const val MAX_COORDINATE_TOKEN_LENGTH = 128
+
 /** Nom d'élément KML sans préfixe de namespace, en minuscules. */
 private fun kmlTagOf(localName: String?, qName: String?): String {
     val raw = if (!localName.isNullOrEmpty()) localName else qName ?: return ""
@@ -834,15 +845,24 @@ private class KmlHandler(
  * jamais matérialiser le bloc entier. Tolère les espaces autour des virgules, comme
  * le faisait la normalisation par expression régulière précédente.
  */
-private class CoordinateTokenizer(
+internal class CoordinateTokenizer(
     private val onPoint: (lon: Double, lat: Double, ele: Double) -> Unit
 ) {
     private val token = StringBuilder(64)
     private var sawSpace = false
 
+    /**
+     * Le jeton en cours a dépassé [MAX_COORDINATE_TOKEN_LENGTH] : ses caractères
+     * suivants ne sont plus retenus, et il sera écarté au lieu d'être émis. Un point
+     * tronqué ne vaut rien — « 2.35,48.8 » coupé en « 2.35,4 » placerait le point
+     * ailleurs sans que rien ne le signale.
+     */
+    private var overflowed = false
+
     fun reset() {
         token.setLength(0)
         sawSpace = false
+        overflowed = false
     }
 
     fun feed(ch: CharArray, start: Int, length: Int) {
@@ -860,7 +880,11 @@ private class CoordinateTokenizer(
                         emit()
                     }
                 }
-                token.append(c)
+                if (token.length < MAX_COORDINATE_TOKEN_LENGTH) {
+                    token.append(c)
+                } else {
+                    overflowed = true
+                }
             }
             i++
         }
@@ -873,6 +897,11 @@ private class CoordinateTokenizer(
 
     private fun emit() {
         if (token.isEmpty()) return
+        if (overflowed) {
+            token.setLength(0)
+            overflowed = false
+            return
+        }
 
         var comma1 = -1
         var comma2 = -1

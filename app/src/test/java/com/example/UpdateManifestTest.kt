@@ -117,6 +117,49 @@ class UpdateManifestTest {
     }
 
     @Test
+    fun `un apk d un autre depot github est rejete`() {
+        // N'importe qui peut publier un APK sur github.com : l'hôte ne suffit pas,
+        // seules les publications de ce dépôt-ci sont acceptées.
+        val ailleurs = listOf(
+            "https://github.com/quelquun/autre/releases/download/v1/app.apk",
+            "https://github.com/ToftMalone/autre/releases/download/v1/app.apk",
+            "https://github.com/ToftMalone/Mes-parcours/raw/main/app.apk",
+            "https://github.com/ToftMalone/Mes-parcours-faux/releases/download/v1/app.apk"
+        )
+        for (url in ailleurs) {
+            assertNull("doit être rejeté : $url", UpdateManifest.parse(manifest(apkUrl = url)))
+        }
+    }
+
+    @Test
+    fun `le prefixe du depot ne peut pas etre contourne`() {
+        // Chacune commence par le bon préfixe, ou le semble, mais désigne une fois
+        // résolue autre chose qu'une publication de ce dépôt.
+        val contournements = listOf(
+            "https://github.com/ToftMalone/Mes-parcours/releases/download/../../../autre/depot/releases/download/v1/app.apk",
+            "https://github.com/ToftMalone/Mes-parcours/releases/download/./../../x/app.apk",
+            "https://github.com/ToftMalone/Mes-parcours/releases/download/%2e%2e/%2e%2e/x/app.apk",
+            "https://github.com/ToftMalone%2FMes-parcours/releases/download/v1/app.apk",
+            "https://quelquun@github.com/ToftMalone/Mes-parcours/releases/download/v1/app.apk",
+            "https://github.com:8443/ToftMalone/Mes-parcours/releases/download/v1/app.apk"
+        )
+        for (url in contournements) {
+            assertNull("doit être rejeté : $url", UpdateManifest.parse(manifest(apkUrl = url)))
+        }
+    }
+
+    @Test
+    fun `l adresse produite par release yml est acceptee`() {
+        // La forme exacte qu'écrit le workflow de publication : la contrainte ne doit
+        // jamais la refuser, sans quoi plus aucune mise à jour ne serait proposée.
+        val url = "https://github.com/ToftMalone/Mes-parcours/releases/download/v1.4/mes-parcours-1.4.apk"
+        assertEquals(url, UpdateManifest.parse(manifest(apkUrl = url))?.apkUrl)
+        // Port explicite 443 et casse différente du compte : même destination.
+        val variante = "https://github.com:443/toftmalone/mes-parcours/releases/download/v1.4/mes-parcours-1.4.apk"
+        assertEquals(variante, UpdateManifest.parse(manifest(apkUrl = variante))?.apkUrl)
+    }
+
+    @Test
     fun `un json malforme ne fait pas echouer l application`() {
         assertNull(UpdateManifest.parse(""))
         assertNull(UpdateManifest.parse("pas du json"))

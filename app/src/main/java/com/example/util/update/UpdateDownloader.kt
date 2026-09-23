@@ -2,11 +2,14 @@ package com.example.util.update
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import androidx.core.content.pm.PackageInfoCompat
+import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -135,6 +138,13 @@ object UpdateDownloader {
                 partial.delete()
                 return@withContext null
             }
+
+            // Après le renommage, pas avant : l'analyseur d'archives d'Android n'a
+            // à lire qu'un fichier portant l'extension attendue.
+            if (!isExpectedApk(context, target, update)) {
+                target.delete()
+                return@withContext null
+            }
             onProgress(1f)
             target
         } catch (e: Exception) {
@@ -143,6 +153,49 @@ object UpdateDownloader {
         } finally {
             connection?.disconnect()
         }
+    }
+
+    /**
+     * L'APK téléchargé est-il bien une mise à jour de **cette** application, dans la
+     * version annoncée ?
+     *
+     * L'empreinte SHA-256 ne répond pas à cette question : elle vient du même
+     * `update.json` que l'adresse de l'APK, et quiconque peut remplacer l'un peut
+     * remplacer l'autre. Elle écarte un fichier abîmé en route, pas un fichier
+     * substitué.
+     *
+     * Ce qui protège vraiment, c'est la signature : Android refuse une mise à jour
+     * signée d'une autre clé — **mais seulement pour un même nom de paquet**. Un APK
+     * au nom différent s'installerait comme une seconde application, présentée à un
+     * utilisateur qui croit mettre à jour celle-ci. D'où ce contrôle-ci, qui ramène
+     * tout fichier accepté dans le cas où Android vérifie lui-même la signature.
+     *
+     * Le certificat n'est volontairement pas comparé ici : une fois le nom de paquet
+     * garanti, ce serait refaire le contrôle d'Android, avec le risque — invérifiable
+     * sans appareil — qu'une version d'Android ne rende pas la signature d'une
+     * archive non installée et fasse refuser à tort toutes les mises à jour.
+     *
+     * Le numéro de version doit aussi correspondre à celui du manifeste : un APK
+     * différent de celui annoncé n'a aucune raison légitime d'être servi.
+     *
+     * Le nom attendu est celui de la release ([BuildConfig.UPDATE_PACKAGE_NAME]), et
+     * non `context.packageName`, qui porte le suffixe `.debug` dans un APK de debug.
+     */
+    private fun isExpectedApk(context: Context, apk: File, update: AvailableUpdate): Boolean {
+        val pm = context.packageManager
+        val info = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageArchiveInfo(apk.path, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageArchiveInfo(apk.path, 0)
+            }
+        } catch (e: Exception) {
+            null
+        } ?: return false
+
+        return info.packageName == BuildConfig.UPDATE_PACKAGE_NAME &&
+            PackageInfoCompat.getLongVersionCode(info) == update.versionCode.toLong()
     }
 
     /**

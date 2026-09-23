@@ -582,8 +582,8 @@ inverser, et l'assombrir la rendrait illisible.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 140 tests unitaires en 19 suites : `Iso8601Test` (16), `UpdateManifestTest` (13),
-  `SplitTrackTest` (13), `TrimTrackTest` (14),
+- 149 tests unitaires en 20 suites : `Iso8601Test` (16), `UpdateManifestTest` (16),
+  `SplitTrackTest` (13), `TrimTrackTest` (14), `CoordinateTokenizerTest` (6),
   `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
   `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
@@ -759,6 +759,74 @@ d'obfuscation, choix assumé) ; la base Room non chiffrée au repos, protégée 
 extraction physique sur appareil déverrouillé ; et le `versionName` du manifeste de
 mise à jour, affiché sans borne de longueur, qui ne devient trompeur que si le compte
 GitHub lui-même est compromis — cas où la clé de signature reste, elle, hors d'atteinte.
+
+### Audit de sécurité de la 1.3
+
+Troisième relecture orientée sécurité, à la demande de l'auteur : code de
+l'application, workflows, historique git complet. **Rien de grave**, le durcissement
+des deux audits précédents tient. Trois points corrigés, un laissé de côté par l'auteur, deux
+relevés pour mémoire.
+
+**Vérifié sain** : aucun secret dans l'historique git (aucun trousseau n'y a jamais
+été versionné, `GEMINI_API_KEY` n'y a jamais porté de valeur réelle) ; requêtes Room
+toutes statiques ou paramétrées ; seuls le lanceur et `BootReceiver` exportés, aucun
+lien profond ; tout le trafic en HTTPS.
+
+**Corrigés :**
+
+1. **Les actions des workflows étaient désignées par étiquette** (`@v4`). Une
+   étiquette se déplace : son auteur, ou qui lui vole son compte, peut la faire
+   pointer sur un autre code — c'est arrivé en 2025 à `tj-actions/changed-files`.
+   L'enjeu est la clé de signature : `setup-gradle` injecte son propre code dans le
+   Gradle qui signe l'APK avec le mot de passe du trousseau, et qui détient la clé
+   peut publier une mise à jour que l'application installera comme légitime. Toutes
+   les actions sont désormais épinglées par identifiant de commit, la version lisible
+   en commentaire ; les commits retenus sont ceux sur lesquels pointaient les
+   étiquettes `v4` au moment du changement, le comportement est donc inchangé. La
+   marche à suivre pour monter de version est en tête de chaque workflow. **Ne pas
+   revenir à une étiquette.**
+2. **L'APK de mise à jour pouvait venir de n'importe quel dépôt GitHub, et n'importe
+   quel paquet était présenté à l'installateur.** Deux manques qui se cumulaient.
+   `isTrustedApkUrl` ne regardait que l'hôte, or n'importe qui peut publier un APK
+   sur `github.com` ; il contraint maintenant le chemin au préfixe des publications
+   de ce dépôt. Et l'empreinte SHA-256, qui vient du même `update.json` que
+   l'adresse, écarte un fichier abîmé mais pas un fichier substitué : ce qui protège,
+   c'est la signature, qu'Android n'oppose qu'**à un même nom de paquet**. Un APK au
+   nom différent s'installait comme une seconde application, validée de confiance par
+   un utilisateur en pleine mise à jour. `UpdateDownloader.isExpectedApk` exige donc
+   le nom de paquet de la release (`BuildConfig.UPDATE_PACKAGE_NAME`, qui reste
+   celui de la release dans le build de debug) et le `versionCode` annoncé.
+   Le certificat n'est volontairement **pas** comparé par l'application : une fois le
+   nom de paquet garanti, Android le fait lui-même, et le refaire exposait au risque
+   — invérifiable sans appareil — qu'une version d'Android ne rende pas la signature
+   d'une archive non installée, ce qui ferait refuser toutes les mises à jour.
+   Ces contrôles ne protègent que les versions qui les portent : la 1.3 déjà
+   installée accepte encore l'ancienne règle jusqu'à sa mise à jour.
+3. **Le découpeur des `<coordinates>` KML accumulait sans borne.** Le jeton en cours
+   grandissait jusqu'au prochain blanc : un bloc de plusieurs centaines de
+   mégaoctets sans espace saturait la mémoire, dès la première lecture (celle qui
+   relève les styles). C'était l'asymétrie qu'avait corrigée l'audit de la 1.1 pour
+   le texte GPX, restée ouverte ici. Le jeton est plafonné
+   (`MAX_COORDINATE_TOKEN_LENGTH`, 128 caractères, là où un point réel en fait
+   quelques dizaines) et, s'il déborde, **écarté plutôt que tronqué** : un point
+   coupé serait lu comme un autre point, ailleurs. `CoordinateTokenizerTest` verrouille
+   les deux côtés de la borne. Le plancher restant est celui d'Expat, qui garde en
+   mémoire une balise ouvrante entière avec ses attributs — comme kXML2 pour le GPX.
+
+**Non retenu par l'auteur pour l'instant :** l'import accepte `NaN`, `Infinity` et des coordonnées hors
+plage — `toDoubleOrNull` de Kotlin reconnaît ces deux mots, vérifié. Une latitude
+`NaN` fait échouer l'import (SQLite l'écrit `NULL` dans une colonne `NOT NULL`) ;
+`Infinity` ou une latitude de 1000 passent, et donnent des statistiques absurdes, voire
+une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import.
+
+**Relevés pour mémoire :**
+
+- L'APK de debug versé sur `main` est public et débogable : avec le débogage USB
+  activé, `run-as` lit sa base. À réserver aux essais ; la release pour l'usage
+  quotidien.
+- `gradle-wrapper.properties` ne porte pas de `distributionSha256Sum` : la
+  distribution Gradle est téléchargée en HTTPS mais sans vérification d'empreinte
+  (`setup-gradle` valide le JAR du wrapper, pas la distribution).
 
 ### Audit batterie de la 1.2
 
@@ -1243,6 +1311,10 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
   La vérification porte sur **l'hôte analysé**, jamais sur le texte de l'adresse :
   `https://github.com.exemple.test/` commence bien par « https://github.com » sans
   être GitHub. `UpdateManifest.parse` rejette le reste.
+  **Le chemin est contraint aussi**, depuis l'audit de sécurité de la 1.3 : seules les
+  pièces jointes des publications de ce dépôt (`/ToftMalone/Mes-parcours/releases/download/`)
+  sont acceptées, sans encodage ni segment `..` qui permettrait de sortir du préfixe
+  une fois l'adresse résolue par le serveur.
 - Tant que `UpdateConfig.GITHUB_OWNER` ou `GITHUB_REPO` est vide, **aucune requête
   n'est émise** et l'application se comporte comme avant.
 - Un échec de recherche est silencieux : ne pas joindre GitHub ne concerne pas
@@ -1264,6 +1336,11 @@ récente, ce qui évite l'API GitHub, ses quotas et son jeton.
   l'installateur par le FileProvider. Le stockage externe restait modifiable par une
   autre application entre la vérification de l'empreinte et l'appui sur « Installer » :
   voir « Audit de sécurité d'avant la 1.0 », point 2.
+- **L'APK doit porter le nom de paquet de la release et le `versionCode` annoncé**,
+  vérifiés après téléchargement (`UpdateDownloader.isExpectedApk`) ; sinon il est
+  supprimé sans être présenté. C'est ce qui rend la signature opposable : Android
+  refuse une autre clé pour un même nom de paquet, mais installerait un nom différent
+  comme une seconde application. Voir « Audit de sécurité de la 1.3 », point 2.
 - L'installation silencieuse est impossible pour une application ordinaire : le
   système affiche toujours son écran de confirmation.
 

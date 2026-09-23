@@ -33,6 +33,12 @@ android {
     versionCode = 37
     versionName = "1.3"
 
+    // Nom de paquet que doit porter un APK de mise à jour avant d'être présenté à
+    // l'installateur (voir UpdateDownloader.isExpectedApk). Celui de la release, y
+    // compris dans le build de debug : c'est toujours la release que l'on publie, et
+    // `context.packageName` y vaudrait le nom suffixé `.debug`.
+    buildConfigField("String", "UPDATE_PACKAGE_NAME", "\"$applicationId\"")
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 

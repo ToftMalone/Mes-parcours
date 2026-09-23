@@ -37,6 +37,13 @@ object UpdateConfig {
         }
 
     val isConfigured: Boolean get() = manifestUrl != null
+
+    /**
+     * Seul chemin d'où un APK peut être téléchargé : les pièces jointes des
+     * publications de **ce** dépôt. Voir `isTrustedApkUrl`.
+     */
+    val releaseDownloadPathPrefix: String
+        get() = "/$GITHUB_OWNER/$GITHUB_REPO/releases/download/"
 }
 
 /** Une version publiée, telle que décrite par le fichier de mise à jour. */
@@ -136,15 +143,34 @@ private fun String.isValidSha256(): Boolean =
  * La comparaison porte sur l'hôte analysé, jamais sur le texte de l'adresse :
  * `https://github.com.exemple.test/` commence bien par « https://github.com » sans
  * être GitHub pour autant.
+ *
+ * **L'hôte ne suffit pas, le chemin est contraint aussi** (audit de la 1.3) : n'importe
+ * qui peut publier un APK sur `github.com`, dans son propre dépôt. Seules les pièces
+ * jointes des publications de ce dépôt-ci ([UpdateConfig.releaseDownloadPathPrefix])
+ * sont acceptées. Pour que ce préfixe ne puisse pas être contourné, le chemin brut ne
+ * doit porter ni encodage (`%2e%2e`, `%2f`) ni segment `.` ou `..` — sans quoi
+ * `/ToftMalone/Mes-parcours/releases/download/../../../autre/…` commencerait bien par
+ * le bon préfixe pour désigner, une fois résolu par le serveur, un tout autre dépôt.
+ * Pour la même raison, ni identifiants dans l'adresse ni port inhabituel.
  */
 private fun String.isTrustedApkUrl(): Boolean {
     if (!startsWith("https://")) return false
-    val host = try {
-        URI(this).host
+    val uri = try {
+        URI(this)
     } catch (e: Exception) {
         null
     } ?: return false
-    return host.equals("github.com", ignoreCase = true)
+
+    val host = uri.host ?: return false
+    if (!host.equals("github.com", ignoreCase = true)) return false
+    if (uri.rawUserInfo != null) return false
+    if (uri.port != -1 && uri.port != 443) return false
+
+    val path = uri.rawPath ?: return false
+    if ('%' in path) return false
+    if (path.split('/').any { it == "." || it == ".." }) return false
+    // GitHub ne distingue pas la casse du compte ni du dépôt.
+    return path.startsWith(UpdateConfig.releaseDownloadPathPrefix, ignoreCase = true)
 }
 
 /**
