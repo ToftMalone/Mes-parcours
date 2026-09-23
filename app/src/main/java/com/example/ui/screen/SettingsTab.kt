@@ -1166,6 +1166,12 @@ private class Release(val version: String, val changes: List<String>)
  */
 private val RELEASES = listOf(
     Release(
+        version = "1.3.1",
+        changes = listOf(
+            "Correction de plusieurs failles de sécurité"
+        )
+    ),
+    Release(
         version = "1.3",
         changes = listOf(
             "Réduction de la consommation de batterie"
