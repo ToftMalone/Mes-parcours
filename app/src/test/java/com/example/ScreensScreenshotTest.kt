@@ -28,6 +28,7 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -75,6 +76,7 @@ class ScreensScreenshotTest {
 
     @After
     fun tearDown() {
+        preloadJobs.forEach { it.cancel() }
         db.close()
     }
 
@@ -131,13 +133,27 @@ class ScreensScreenshotTest {
     }
 
     /**
-     * Attend que la liste des parcours soit chargée. Room la lit en arrière-plan :
-     * « Démarrer » touché avant son arrivée voit un historique vide et lance
-     * directement l'enregistrement au lieu d'ouvrir le choix.
+     * Charge la liste des parcours avant de composer l'écran. Room la lit en
+     * arrière-plan et la rend par le fil principal : sur l'écran Enregistrer, à côté
+     * de la carte osmdroid, ce retour n'était pas toujours traité pendant l'attente
+     * de Compose, et « Démarrer » touché trop tôt voyait un historique vide — il
+     * lançait alors l'enregistrement au lieu d'ouvrir le choix. On s'abonne donc
+     * soi-même et l'on fait tourner le fil principal jusqu'à l'arrivée des parcours.
      */
-    private fun waitForTracks() {
-        compose.waitUntil(timeoutMillis = 10_000) { viewModel.allTracks.value.isNotEmpty() }
+    private fun preloadTracks() {
+        val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            viewModel.allTracks.collect {}
+        }
+        val deadline = System.currentTimeMillis() + 10_000
+        while (viewModel.allTracks.value.isEmpty() && System.currentTimeMillis() < deadline) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(20)
+        }
+        check(viewModel.allTracks.value.isNotEmpty()) { "Parcours non chargés" }
+        preloadJobs += job
     }
+
+    private val preloadJobs = mutableListOf<kotlinx.coroutines.Job>()
 
     private fun shoot(name: String, dark: Boolean) {
         compose.waitForIdle()
@@ -338,7 +354,7 @@ class ScreensScreenshotTest {
     @Test fun enregistrer_sombre() { recording(true); waitForTag("live_stats_panel"); shoot("enregistrer", true) }
 
     @Test fun enregistrer_choix() {
-        seed(); recording(false); waitForTag("action_fab"); waitForTracks()
+        seed(); preloadTracks(); recording(false); waitForTag("action_fab")
         compose.onNodeWithTag("action_fab").performClick()
         waitForTag("start_new_track_fab")
         shoot("enregistrer_choix", false)
@@ -355,7 +371,7 @@ class ScreensScreenshotTest {
     }
 
     @Test fun enregistrer_reprise() {
-        seed(); recording(false); waitForTag("action_fab"); waitForTracks()
+        seed(); preloadTracks(); recording(false); waitForTag("action_fab")
         compose.onNodeWithTag("action_fab").performClick()
         waitForTag("resume_existing_track_fab")
         compose.onNodeWithTag("resume_existing_track_fab").performClick()
