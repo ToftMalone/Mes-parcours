@@ -8,8 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +32,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.ui.component.MainNavigationBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ShareLocation
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
+import com.example.ui.component.AppMessageHost
+import com.example.ui.component.AppMessenger
+import com.example.ui.component.LocalAppMessenger
+import com.example.ui.component.MpDialog
+import com.example.ui.component.ShapeBadge
 import com.example.ui.viewmodel.TrackViewModel
 import android.Manifest
 import android.content.pm.PackageManager
@@ -371,6 +378,11 @@ fun MainScreen(
     // Pendant un fondu, les deux écrans sont à demi transparents en même temps, et ce
     // fond apparaissait entre les deux — d'où le voile noir signalé à l'ouverture d'un
     // parcours comme au retour.
+    // Messages brefs en bas d'écran (import réussi, export, erreurs…), partagés par
+    // tous les écrans : voir AppMessageHost.
+    val messenger = remember { AppMessenger() }
+
+    CompositionLocalProvider(LocalAppMessenger provides messenger) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -424,7 +436,8 @@ fun MainScreen(
                         MainNavigationBar(
                             currentTab = currentTab,
                             onTabSelected = { currentTab = it },
-                            showUpdateBadge = availableUpdate != null
+                            showUpdateBadge = availableUpdate != null,
+                            isRecording = isTracking
                         )
                     },
                 modifier = modifier.fillMaxSize().testTag("main_screen")
@@ -460,9 +473,13 @@ fun MainScreen(
                         "historique" -> {
                             HistoryTab(
                                 viewModel = viewModel,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(innerPadding),
+                                modifier = Modifier.fillMaxSize(),
+                                // La liste défile sous la barre flottante : l'écran
+                                // gère lui-même ses marges plutôt que de s'arrêter net
+                                // au-dessus d'elle.
+                                contentPadding = innerPadding,
+                                onOpenRecording = { currentTab = "enregistrer" },
+                                onOpenTools = { currentTab = "outils" },
                                 onNavigateToDetails = { id ->
                                     viewingDetailedTrackId = id
                                 },
@@ -511,41 +528,42 @@ fun MainScreen(
         )
 
         if (showBackgroundRationaleDialog && detailId == null) {
-            androidx.compose.material3.AlertDialog(
+            MpDialog(
                 onDismissRequest = { showBackgroundRationaleDialog = false },
-                title = {
-                    Text(
-                        text = "Localisation 'Tout le temps' requise",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                icon = {
+                    ShapeBadge(
+                        icon = Icons.Rounded.ShareLocation,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 },
-                text = {
-                    Text(
-                        text = "Pour enregistrer vos déplacements et activités de manière continue, même lorsque l'application est en arrière-plan ou que votre écran est éteint, « Mes parcours » a besoin de l'autorisation 'Autoriser tout le temps'.",
-                        fontSize = 14.sp
-                    )
-                },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = {
-                            showBackgroundRationaleDialog = false
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                            }
-                        }
-                    ) {
-                        Text("Autoriser tout le temps", fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = { showBackgroundRationaleDialog = false }
-                    ) {
-                        Text("Plus tard")
+                title = "Enregistrer écran éteint",
+                body = "Pour que l'enregistrement continue quand l'écran est éteint ou que " +
+                    "vous changez d'app, choisissez « Autoriser tout le temps » dans les " +
+                    "réglages de localisation.",
+                dismissLabel = "Plus tard",
+                confirmLabel = "Autoriser",
+                onConfirm = {
+                    showBackgroundRationaleDialog = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                     }
                 }
             )
         }
+
+        // Au-dessus de la barre de navigation sur les onglets ; au-dessus du bouton
+        // d'import dans l'historique, qu'il ne doit pas masquer ; près du bas dans la
+        // vue de détail, qui n'a pas de barre.
+        AppMessageHost(
+            messenger = messenger,
+            bottomPadding = when {
+                detailId != null -> 24.dp
+                currentTab == "historique" -> 168.dp
+                else -> 96.dp
+            },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
     }
 }

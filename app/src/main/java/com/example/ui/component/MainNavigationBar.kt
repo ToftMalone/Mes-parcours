@@ -6,6 +6,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,8 +28,6 @@ import androidx.compose.material.icons.rounded.Handyman
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -43,6 +43,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.ui.theme.LocalRecordingColor
 
 /** Un onglet de la barre : sa clé de navigation (voir `MainScreen`), et son apparence. */
 private data class NavDestination(
@@ -82,42 +84,46 @@ fun MainNavigationBar(
     currentTab: String,
     onTabSelected: (String) -> Unit,
     showUpdateBadge: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRecording: Boolean = false
 ) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         // « Niveau 3 » de la maquette : panneau de statistiques et navigation,
         // flottants au-dessus de la carte.
-        shadowElevation = 6.dp,
+        shadowElevation = 8.dp,
         modifier = modifier
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp)
             .fillMaxWidth()
-            .height(64.dp)
+            .height(68.dp)
             .testTag("bottom_nav_bar")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             DESTINATIONS.forEach { destination ->
+                val selected = currentTab == destination.route
                 NavItem(
                     destination = destination,
-                    selected = currentTab == destination.route,
-                    showBadge = showUpdateBadge && destination.route == "parametres",
+                    selected = selected,
+                    // La pastille de mise à jour ne se montre que tant qu'on n'est pas
+                    // sur l'onglet : une fois dessus, la carte en tête la remplace.
+                    showBadge = showUpdateBadge && destination.route == "parametres" && !selected,
+                    // Enregistrement en cours vu depuis un autre onglet : un point de
+                    // la couleur d'enregistrement le rappelle.
+                    showRecordingDot = isRecording && destination.route == "enregistrer" && !selected,
                     onClick = { onTabSelected(destination.route) },
-                    // L'onglet actif peut céder de la place : sur un écran étroit
-                    // ou avec un texte agrandi, son libellé se coupe plutôt que de
-                    // pousser le dernier onglet hors de la barre.
-                    modifier = if (currentTab == destination.route) {
-                        Modifier.weight(1f, fill = false)
-                    } else {
-                        Modifier
-                    }
+                    // L'onglet actif prend la largeur de son libellé (environ 144 dp
+                    // pour « Paramètres », comme dans la maquette) ; les onglets réduits
+                    // se partagent le reste, ce qui remplit la barre quelle que soit la
+                    // largeur de l'écran.
+                    modifier = if (selected) Modifier else Modifier.weight(1f)
                 )
             }
         }
@@ -129,6 +135,7 @@ private fun NavItem(
     destination: NavDestination,
     selected: Boolean,
     showBadge: Boolean,
+    showRecordingDot: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -143,28 +150,21 @@ private fun NavItem(
         animationSpec = tween(200),
         label = "nav_item_content"
     )
+    val dotRing = MaterialTheme.colorScheme.surfaceContainerHigh
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            .height(48.dp)
+            .height(56.dp)
             .clip(CircleShape)
             .background(containerColor)
             .selectable(selected = selected, onClick = onClick, role = Role.Tab)
             .animateContentSize(spring(dampingRatio = 0.6f, stiffness = 800f))
-            .padding(horizontal = if (selected) 16.dp else 12.dp)
+            .padding(horizontal = if (selected) 18.dp else 0.dp)
             .testTag(destination.testTag)
     ) {
-        BadgedBox(
-            badge = {
-                if (showBadge) {
-                    Badge(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("settings_update_badge")
-                    )
-                }
-            }
-        ) {
+        Box {
             Icon(
                 imageVector = if (selected) destination.selectedIcon else destination.icon,
                 // Onglet réduit à son icône : c'est elle qui porte le nom, pour
@@ -173,12 +173,31 @@ private fun NavItem(
                 tint = contentColor,
                 modifier = Modifier.size(24.dp)
             )
+            val dotColor = when {
+                showBadge -> MaterialTheme.colorScheme.error
+                showRecordingDot -> LocalRecordingColor.current
+                else -> null
+            }
+            if (dotColor != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 5.dp, y = (-3).dp)
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(dotRing)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(dotColor)
+                        .then(if (showBadge) Modifier.testTag("settings_update_badge") else Modifier)
+                )
+            }
         }
         if (selected) {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = destination.label,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Clip

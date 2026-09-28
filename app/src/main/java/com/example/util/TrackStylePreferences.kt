@@ -52,18 +52,25 @@ object TrackStylePreferences {
     const val MIN_THICKNESS_DP = 0.5f
     const val MAX_THICKNESS_DP = 15f
 
-    /** Palette proposée pour colorer un parcours. */
+    /**
+     * Palette proposée pour colorer un parcours : celle de la refonte, assez saturée
+     * pour rester lisible sur les fonds Standard et Satellite, en clair comme en
+     * sombre. Changer les couleurs proposées ne touche aucun parcours existant : leur
+     * couleur est enregistrée dans `Track.displayColor`, pas désignée par sa place
+     * dans cette liste. L'ancienne palette comptait un noir, invisible sur la carte
+     * sombre ; la nouvelle n'en a pas.
+     */
     val COLOR_PALETTE = listOf(
-        0xFF8B5CF6.toInt(), // Violet
-        0xFF39FF14.toInt(), // Vert fluo
-        0xFFD32F2F.toInt(), // Rouge
-        0xFFFF9800.toInt(), // Orange
-        0xFF2196F3.toInt(), // Bleu
-        0xFF00BCD4.toInt(), // Cyan
-        0xFFE91E63.toInt(), // Rose
-        0xFFFFEB3B.toInt(), // Jaune
-        0xFF795548.toInt(), // Brun
-        0xFF000000.toInt()  // Noir
+        0xFFE8505B.toInt(), // Rouge
+        0xFFFF7043.toInt(), // Orange
+        0xFFF2A516.toInt(), // Ambre
+        0xFF7CB342.toInt(), // Vert
+        0xFF13A38A.toInt(), // Émeraude
+        0xFF2F7DE1.toInt(), // Bleu
+        0xFF5C6BC0.toInt(), // Indigo
+        0xFF8E5BE8.toInt(), // Violet
+        0xFFE0569B.toInt(), // Rose
+        0xFF795548.toInt()  // Brun
     )
 
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)

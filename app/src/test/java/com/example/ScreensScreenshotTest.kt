@@ -1,0 +1,174 @@
+package com.example
+
+import android.content.Context
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.example.data.local.AppDatabase
+import com.example.data.model.Track
+import com.example.data.model.TrackPoint
+import com.example.data.repository.TrackRepository
+import com.example.ui.screen.HistoryTab
+import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.viewmodel.TrackViewModel
+import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/**
+ * Captures des écrans de la refonte, peuplés comme la maquette : de quoi comparer le
+ * rendu réel de Compose à la maquette sans téléphone sous la main.
+ *
+ * Même principe que `DesignSystemScreenshotTest` : l'intégration continue enregistre
+ * les images (`-Proborazzi.test.record=true`) et les joint à son exécution. Rien n'est
+ * comparé à une référence ; un test n'échoue que sur une exception.
+ *
+ * `captureScreenRoboImage` photographie toutes les fenêtres, feuilles et dialogues
+ * compris — `onRoot()` ne verrait que l'écran sous eux.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [34])
+class ScreensScreenshotTest {
+
+    @get:Rule val compose = createComposeRule()
+
+    private lateinit var db: AppDatabase
+    private lateinit var viewModel: TrackViewModel
+
+    /** Barre d'état et barre de navigation flottante, telles que MainScreen les réserve. */
+    private val tabPadding = PaddingValues(top = 32.dp, bottom = 88.dp)
+
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        viewModel = TrackViewModel(TrackRepository.createForTesting(db), context)
+    }
+
+    @After
+    fun tearDown() {
+        db.close()
+    }
+
+    /** Les parcours de la maquette, à peu de chose près. */
+    private fun seed() = runBlocking {
+        val day = 86_400_000L
+        val base = 1_790_500_000_000L // fin septembre 2026
+        fun t(
+            name: String, daysAgo: Int, km: Double, minutes: Long, dplus: Double, color: Long,
+            visible: Boolean, imported: Boolean = false, merged: Boolean = false, source: Long? = null
+        ) = Track(
+            name = name,
+            startTime = base - daysAgo * day,
+            endTime = base - daysAgo * day + minutes * 60_000,
+            totalDistance = km * 1000,
+            duration = minutes * 60,
+            elevationGain = dplus,
+            elevationLoss = dplus,
+            avgSpeed = km * 1000 / (minutes * 60),
+            maxSpeed = 2.7,
+            isImported = imported,
+            isMerged = merged,
+            isSelectedForMap = visible,
+            sourceColor = source?.toInt(),
+            displayColor = if (source != null) null else color.toInt()
+        )
+        val tracks = listOf(
+            t("Boucle du lac de Vassivière", 0, 18.4, 252, 386.0, 0xFFE8505B, true),
+            t("Montée au col de la Croix", 8, 32.7, 125, 912.0, 0xFF2F7DE1, true),
+            t("Balade des bords de Loire", 11, 6.1, 84, 42.0, 0xFFF2A516, false),
+            t("Trajet Lyon → Annecy", 16, 142.0, 111, 1204.0, 0xFF8E5BE8, false),
+            t("Tour du Mont-Blanc · étape 3", 25, 21.9, 460, 1480.0, 0xFF13A38A, false, imported = true),
+            t("Sentier des douaniers", 30, 12.3, 210, 310.0, 0, true, imported = true, source = 0xFFFF7043),
+            t("GR 34 · Perros-Guirec", 44, 9.8, 175, 188.0, 0xFFE0569B, false, imported = true)
+        )
+        for (track in tracks) {
+            val id = db.trackDao.insertTrack(track)
+            db.trackDao.insertTrackPoints((0 until 60).map { i ->
+                TrackPoint(
+                    trackId = id,
+                    latitude = 45.76 + i * 0.0006,
+                    longitude = 1.86 + kotlin.math.sin(i / 6.0) * 0.004,
+                    altitude = 650.0 + kotlin.math.sin(i / 9.0) * 60,
+                    timestamp = track.startTime + i * 60_000L
+                )
+            })
+        }
+    }
+
+    private fun waitForTag(tag: String) {
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun shoot(name: String, dark: Boolean) {
+        compose.waitForIdle()
+        captureScreenRoboImage("src/test/screenshots/refonte/${name}_${if (dark) "sombre" else "clair"}.png")
+    }
+
+    private fun history(dark: Boolean) {
+        compose.setContent {
+            MyApplicationTheme(darkTheme = dark) {
+                HistoryTab(
+                    viewModel = viewModel,
+                    onNavigateToDetails = {},
+                    contentPadding = tabPadding,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+
+    @Test fun historique_clair() { seed(); history(false); waitForTag("history_list"); shoot("historique", false) }
+    @Test fun historique_sombre() { seed(); history(true); waitForTag("history_list"); shoot("historique", true) }
+
+    @Test fun historique_vide() {
+        history(false)
+        waitForTag("history_empty_recorded")
+        shoot("historique_vide", false)
+    }
+
+    @Test fun historique_actions() {
+        seed(); history(false); waitForTag("history_list")
+        compose.onNodeWithTag("track_actions_1").performClick()
+        waitForTag("action_toggle_map")
+        shoot("historique_actions", false)
+    }
+
+    @Test fun historique_couleur_google_earth() {
+        seed(); history(false); waitForTag("history_list")
+        compose.onNodeWithTag("history_category_Importés").performClick()
+        waitForTag("track_color_button_6")
+        compose.onNodeWithTag("track_color_button_6").performClick()
+        waitForTag("color_swatch_from_file")
+        shoot("historique_couleur", false)
+    }
+
+    @Test fun historique_suppression() {
+        seed(); history(false); waitForTag("history_list")
+        compose.onNodeWithTag("track_actions_3").performClick()
+        waitForTag("delete_track_button_3")
+        compose.onNodeWithTag("delete_track_button_3").performClick()
+        waitForTag("dialog_delete_confirm_button")
+        shoot("historique_suppression", false)
+    }
+}

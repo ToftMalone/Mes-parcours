@@ -83,15 +83,3 @@ val DarkSurfaceContainerHighest = Color(0xFF303633)
  */
 val RecordingLight = Color(0xFFE4572E)
 val RecordingDark = Color(0xFFFF8A65)
-
-/**
- * Couleurs de tracé proposées par la maquette, assez saturées pour rester lisibles
- * sur les fonds Standard, Satellite, clair et sombre. Pas encore branchées sur la
- * palette de `TrackStylePreferences` : en changer touche l'apparence des parcours
- * existants, ce qui se décide avec l'écran Historique, pas avec le thème.
- */
-val MaquetteTrackPalette = listOf(
-    Color(0xFFE8505B), Color(0xFFFF7043), Color(0xFFF2A516), Color(0xFF7CB342),
-    Color(0xFF13A38A), Color(0xFF2F7DE1), Color(0xFF5C6BC0), Color(0xFF8E5BE8),
-    Color(0xFFE0569B), Color(0xFF795548)
-)
