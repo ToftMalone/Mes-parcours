@@ -126,8 +126,17 @@ fun MyApplicationTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
-            shapes = MesParcoursShapes,
-            content = content
-        )
+            shapes = MesParcoursShapes
+        ) {
+            // Couleur de texte et d'icône par défaut. MaterialTheme ne la pose pas :
+            // seuls Surface et Scaffold le font. Sans elle, un texte sans couleur
+            // explicite posé sur un simple `Modifier.background` — la fiche détail,
+            // hors du Scaffold, ou les réglages en capture — sortait noir en thème
+            // sombre, donc illisible.
+            CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides colorScheme.onBackground,
+                content = content
+            )
+        }
     }
 }

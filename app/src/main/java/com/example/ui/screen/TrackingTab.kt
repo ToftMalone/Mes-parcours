@@ -50,9 +50,9 @@ import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Polyline
+import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.RadioButtonChecked
-import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.CropSquare
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -152,7 +152,9 @@ fun TrackingTab(
     val currentAltitude by viewModel.currentAltitude.collectAsState()
     val isAppInForeground by viewModel.isAppInForeground.collectAsState()
 
-    var delayedGpsStatus by remember { mutableStateOf("Recherche de signal...") }
+    // Part de l'état courant : sinon chaque arrivée sur l'onglet, signal déjà
+    // acquis, annonçait « Signal GPS trouvé » comme s'il venait de revenir.
+    var delayedGpsStatus by remember { mutableStateOf(gpsStatus) }
     var activeAlertState by remember { mutableStateOf<AlertState?>(null) }
 
     LaunchedEffect(isAppInForeground) {
@@ -745,7 +747,7 @@ private fun StopButton(expanded: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .testTag("stop_fab")
     ) {
-        Icon(Icons.Rounded.Stop, contentDescription = "Arrêter", tint = colors.onErrorContainer, modifier = Modifier.size(32.dp))
+        Icon(Icons.Rounded.CropSquare, contentDescription = "Arrêter", tint = colors.onErrorContainer, modifier = Modifier.size(32.dp))
         if (expanded) {
             Text("Arrêter", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.onErrorContainer, maxLines = 1)
         }
@@ -794,7 +796,7 @@ private fun StartChoicePanel(
         )
         if (canResumeExisting) {
             ChoiceRow(
-                icon = Icons.Rounded.Polyline,
+                icon = Icons.Rounded.Route,
                 title = "Reprendre une trace",
                 subtitle = "Continuer un parcours existant",
                 container = colors.secondaryContainer,

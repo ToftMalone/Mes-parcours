@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -275,14 +276,14 @@ class ScreensScreenshotTest {
 
     @Test fun parametres_nouveautes() {
         settings(false, sampleUpdate); waitForTag("settings_screen_root")
-        compose.onNodeWithTag("version_badge").performClick()
+        compose.onNodeWithTag("version_badge").performScrollTo().performClick()
         waitForTag("release_notes_dialog")
         shoot("parametres_nouveautes", false)
     }
 
     @Test fun parametres_a_propos() {
         settings(false); waitForTag("settings_screen_root")
-        compose.onNodeWithTag("open_about_button").performClick()
+        compose.onNodeWithTag("open_about_button").performScrollTo().performClick()
         waitForTag("about_page")
         shoot("parametres_a_propos", false)
     }

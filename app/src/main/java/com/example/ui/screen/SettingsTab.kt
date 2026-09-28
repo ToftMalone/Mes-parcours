@@ -468,9 +468,10 @@ private fun MapStyleThumb(
     val radius by animateDpAsState(if (selected) 28.dp else 18.dp, label = "thumb_radius")
     val ring by animateColorAsState(if (selected) colors.primary else Color.Transparent, label = "thumb_ring")
     val check by animateFloatAsState(if (selected) 1f else 0f, label = "thumb_check")
+    // Pas de rognage sur la colonne entière : ses coins arrondis mordaient sur les
+    // légendes sous la vignette.
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(radius))
             .clickable(onClick = onClick)
             .testTag(testTag)
     ) {

@@ -37,7 +37,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.IosShare
-import androidx.compose.material.icons.rounded.Polyline
+import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.WrongLocation
@@ -307,7 +307,7 @@ fun DetailView(
                 if (!isCurrentRecording) {
                     BottomAction(
                         text = "Reprendre la trace",
-                        icon = Icons.Rounded.Polyline,
+                        icon = Icons.Rounded.Route,
                         container = MaterialTheme.colorScheme.primary,
                         content = MaterialTheme.colorScheme.onPrimary,
                         onClick = {
@@ -315,7 +315,7 @@ fun DetailView(
                                 showRefused = true
                             } else {
                                 viewModel.resumeTrack(context, currentTrack.id) {
-                                    messenger.show("Reprise de « ${currentTrack.name} »", Icons.Rounded.Polyline)
+                                    messenger.show("Reprise de « ${currentTrack.name} »", Icons.Rounded.Route)
                                     viewModel.selectTrack(null)
                                     onBackClick()
                                     onResumeTrack?.invoke()
