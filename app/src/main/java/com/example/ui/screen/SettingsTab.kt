@@ -1042,12 +1042,7 @@ private val RELEASES = listOf(
         version = "2.0",
         date = "2026-09-28",
         changes = listOf(
-            "Nouvelle interface, entièrement redessinée : couleurs, polices et formes",
-            "Fiche d'un parcours : profil d'altitude, export GPX ou KML dans une feuille",
-            "Outils refaits : fusionner, découper et rogner ont chacun leur écran",
-            "Écran de bienvenue en trois pages",
-            "Réglages : aperçu des fonds de carte, journal des nouveautés daté, page À propos",
-            "Mise à jour : téléchargement qui se poursuit feuille fermée"
+            "Refonte de l'interface"
         )
     ),
     Release(

@@ -93,6 +93,17 @@ jobs:
         # Une version ne doit jamais être publiée si la suite de tests échoue.
         run: ./gradlew --no-daemon testDebugUnitTest
 
+      - name: Joindre les rapports de test
+        # Une version bloquée par les tests doit dire pourquoi : le journal de Gradle
+        # ne nomme que le test, jamais l'exception qui l'a fait tomber.
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rapports-de-test
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Restituer le trousseau de signature
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}

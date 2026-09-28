@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.AppDatabase
@@ -28,6 +29,7 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -77,7 +79,15 @@ class ScreensScreenshotTest {
     @After
     fun tearDown() {
         preloadJobs.forEach { it.cancel() }
-        db.close()
+        // On arrête d'abord le ViewModel, et l'on ne ferme **pas** la base.
+        //
+        // Fermer une base que des flux Room observent encore fait échouer leur
+        // prochaine requête ; l'exception part alors dans une coroutine que personne
+        // n'attend, et le test *suivant* en hérite (`UncaughtExceptionsBeforeTest`).
+        // Le hasard de l'ordre et du temps de calcul ne l'exposait pas dans la CI de
+        // développement, il l'a exposée à la publication de la 2.0. Une base en
+        // mémoire n'a rien à libérer : elle disparaît avec son test.
+        viewModel.viewModelScope.cancel()
     }
 
     /** Les parcours de la maquette, à peu de chose près. */
