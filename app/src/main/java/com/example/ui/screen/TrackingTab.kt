@@ -541,9 +541,12 @@ private fun CompactStat(label: String, value: String, unit: String?, style: Text
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 2.dp)) {
             RollingNumber(value, style)
             if (unit != null) {
+                // Hauteur de ligne explicite : héritée du style par défaut (24 sp), elle
+                // rendait l'unité plus haute que le chiffre, qui la calait alors en haut.
                 Text(
                     unit,
                     fontSize = 10.sp,
+                    lineHeight = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
