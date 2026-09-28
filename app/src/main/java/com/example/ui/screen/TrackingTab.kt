@@ -72,8 +72,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -206,6 +208,12 @@ fun TrackingTab(
     val currentSpeed = currentUserLocation?.speed?.toDouble() ?: liveStats.currentSpeedMps
     val trackName = allTracks.firstOrNull { it.id == currentTrackId }?.name ?: "Nouveau parcours"
 
+    // Hauteur de la carte de statistiques, pour poser le bandeau des tracés masqués
+    // juste en dessous : elle grandit quand un enregistrement démarre.
+    var statsCardHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val zoomBannerTop = with(density) { statsCardHeightPx.toDp() } + 24.dp
+
     val startNew = {
         viewModel.startRecording(context, "Nouveau parcours", "Parcours")
         showStartOptions = false
@@ -220,7 +228,7 @@ fun TrackingTab(
             currentUserLocation = currentUserLocation,
             overlayTracks = selectedImportedPoints,
             isCurrentTracking = isTracking,
-            zoomBannerTopPadding = 72.dp,
+            zoomBannerTopPadding = zoomBannerTop,
             isAutoFollowActive = isAutoFollowActive,
             onAutoFollowChanged = { isAutoFollowActive = it },
             initialCenterLat = viewModel.lastMapCenterLat,
@@ -237,102 +245,107 @@ fun TrackingTab(
             tileStyle = tileStyle
         )
 
-        // --- Haut de l'écran : pastille GPS (ou alerte), bouton de fond de carte.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp)
-        ) {
-            when {
-                !hasLocationPermission -> GpsChip(
-                    icon = Icons.Rounded.LocationDisabled,
-                    text = "Localisation désactivée",
-                    modifier = Modifier.alpha(0.5f)
-                )
-                activeAlertState == AlertState.LOST -> GpsAlert(
-                    lost = true,
-                    subtitle = if (isTracking) "L'enregistrement reprendra dès son retour" else "Position en attente du signal"
-                )
-                activeAlertState == AlertState.FOUND -> GpsAlert(
-                    lost = false,
-                    subtitle = gpsAccuracy?.let { "Précision ±${it.toInt()} m" } ?: "Position retrouvée"
-                )
-                !signalFound -> SearchingChip()
-                else -> GpsChip(
-                    icon = Icons.Rounded.GpsFixed,
-                    text = if (isTracking && gpsAccuracy != null) "GPS · ±${gpsAccuracy!!.toInt()} m" else "Signal trouvé"
-                )
-            }
-        }
-        if (hasLocationPermission) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 72.dp, end = 16.dp)
-                    .size(48.dp)
-                    .shadow(6.dp, RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .clickable {
-                        tileStyle = if (tileStyle == "usgs_sat") "mapnik" else "usgs_sat"
-                        prefs.edit().putString("pref_map_style", tileStyle).apply()
-                    }
-                    .testTag("map_layers_button")
-            ) {
-                Icon(Icons.Rounded.Layers, contentDescription = "Changer de fond de carte")
-            }
-        }
-
-        // --- Bas de l'écran : recentrage, statistiques, commandes.
+        // --- Haut de l'écran : la carte de statistiques, à la place qu'occupait
+        // l'ancien bandeau d'altitude — à la demande de l'auteur, qui a gardé le
+        // dessin de la maquette mais voulu retrouver la disposition d'avant. Les
+        // alertes de signal la recouvrent le temps de s'afficher, comme avant.
         if (hasLocationPermission) {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.End,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = 100.dp)
+                    .statusBarsPadding()
+                    .padding(start = 12.dp, end = 12.dp, top = 12.dp)
             ) {
-                val canRecenter = currentUserLocation != null || livePoints.isNotEmpty()
-                if (!isAutoFollowActive && canRecenter && mode != ControlsMode.CHOICE) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 14.dp), contentAlignment = Alignment.CenterEnd) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .height(56.dp)
-                                .shadow(8.dp, RoundedCornerShape(20.dp))
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .clickable {
-                                    isAutoFollowActive = true
-                                    recenterTrigger++
-                                }
-                                .padding(start = 16.dp, end = 20.dp)
-                                .testTag("recenter_button")
-                        ) {
-                            Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text("Recentrer", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        }
-                    }
-                }
-
-                // La carte de statistiques s'efface pendant le choix de démarrage, que le
-                // panneau de choix recouvre. Effacement franc, sans fondu : la carte porte
-                // une ombre (voir « L'ombre tranchée » dans CLAUDE.md).
-                if (mode != ControlsMode.CHOICE) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { statsCardHeightPx = it.height }
+                ) {
                     StatsCard(
                         mode = mode,
                         stats = liveStats,
                         trackName = trackName,
                         currentSpeedMps = currentSpeed,
                         currentAltitude = currentAlt,
-                        modifier = Modifier.padding(horizontal = 12.dp)
+                        gpsIndicator = { GpsDot(found = signalFound) }
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    when (activeAlertState) {
+                        AlertState.LOST -> GpsAlert(
+                            lost = true,
+                            subtitle = if (isTracking) "L'enregistrement reprendra dès son retour" else "Position en attente du signal",
+                            modifier = Modifier.matchParentSize()
+                        )
+                        AlertState.FOUND -> GpsAlert(
+                            lost = false,
+                            subtitle = gpsAccuracy?.let { "Précision ±${it.toInt()} m" } ?: "Position retrouvée",
+                            modifier = Modifier.matchParentSize()
+                        )
+                        null -> Unit
+                    }
+                }
+                // Le fond de carte, sous la carte de statistiques, à droite : le bandeau
+                // des tracés masqués prend place à sa gauche.
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .padding(top = 12.dp, end = 4.dp)
+                        .size(48.dp)
+                        .shadow(6.dp, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .clickable {
+                            tileStyle = if (tileStyle == "usgs_sat") "mapnik" else "usgs_sat"
+                            prefs.edit().putString("pref_map_style", tileStyle).apply()
+                        }
+                        .testTag("map_layers_button")
+                ) {
+                    Icon(Icons.Rounded.Layers, contentDescription = "Changer de fond de carte")
+                }
+            }
+        } else {
+            GpsChip(
+                icon = Icons.Rounded.LocationDisabled,
+                text = "Localisation désactivée",
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(start = 16.dp, top = 12.dp)
+                    .alpha(0.5f)
+            )
+        }
+
+        // --- Bas de l'écran, à droite, comme avant : recentrage, puis le bouton
+        // principal et « Arrêter » l'un sous l'autre.
+        if (hasLocationPermission) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 12.dp, end = 16.dp, bottom = 100.dp)
+            ) {
+                val canRecenter = currentUserLocation != null || livePoints.isNotEmpty()
+                if (!isAutoFollowActive && canRecenter && mode != ControlsMode.CHOICE) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .height(56.dp)
+                            .shadow(8.dp, RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .clickable {
+                                isAutoFollowActive = true
+                                recenterTrigger++
+                            }
+                            .padding(start = 16.dp, end = 20.dp)
+                            .testTag("recenter_button")
+                    ) {
+                        Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("Recentrer", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
                 }
 
                 RecordingControls(
@@ -393,67 +406,62 @@ private fun GpsChip(icon: ImageVector, text: String, modifier: Modifier = Modifi
     }
 }
 
-/**
- * Recherche du signal : un point qui pulse. L'animation infinie ne vit que tant que
- * cette pastille est affichée — une horloge d'animation permanente empêcherait le
- * processeur de se reposer (voir « Audit batterie de la 1.2 »).
- */
 @Composable
-private fun SearchingChip() {
-    val pulse = rememberInfiniteTransition(label = "gps_search")
-    val scale by pulse.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-        label = "gps_search_scale"
-    )
-    val tertiary = MaterialTheme.colorScheme.tertiary
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier
-            .height(48.dp)
-            .shadow(6.dp, RoundedCornerShape(24.dp))
-            .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(start = 14.dp, end = 18.dp)
-            .testTag("gps_status_chip")
-    ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(20.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1.2f - scale }
-                    .clip(CircleShape)
-                    .background(tertiary)
-            )
-            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(tertiary))
-        }
-        Text("Recherche du signal…", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun GpsAlert(lost: Boolean, subtitle: String) {
+private fun GpsAlert(lost: Boolean, subtitle: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val bg = if (lost) colors.error else colors.primary
     val fg = if (lost) colors.onError else colors.onPrimary
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .shadow(8.dp, RoundedCornerShape(28.dp))
-            .clip(RoundedCornerShape(28.dp))
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        modifier = modifier
+            .clip(RoundedCornerShape(36.dp))
             .background(bg)
             .padding(horizontal = 18.dp)
             .testTag(if (lost) "gps_lost_alert" else "gps_found_alert")
     ) {
-        Icon(if (lost) Icons.Rounded.GpsOff else Icons.Rounded.GpsFixed, contentDescription = null, tint = fg, modifier = Modifier.size(26.dp))
+        Icon(if (lost) Icons.Rounded.GpsOff else Icons.Rounded.GpsFixed, contentDescription = null, tint = fg, modifier = Modifier.size(28.dp))
         Column {
-            Text(if (lost) "Signal GPS perdu" else "Signal GPS trouvé", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = fg)
+            Text(if (lost) "Signal GPS perdu" else "Signal GPS trouvé", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = fg)
             Text(subtitle, fontSize = 13.sp, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/**
+ * État du GPS dans la carte de statistiques, comme le point de l'ancien bandeau :
+ * plein quand le signal est là, qui pulse pendant la recherche. L'animation infinie
+ * ne vit que pendant la recherche — une horloge d'animation permanente empêcherait
+ * le processeur de se reposer (voir « Audit batterie de la 1.2 »).
+ */
+@Composable
+private fun GpsDot(found: Boolean) {
+    if (found) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .testTag("gps_dot_found")
+        )
+    } else {
+        val pulse = rememberInfiniteTransition(label = "gps_dot")
+        val scale by pulse.animateFloat(
+            initialValue = 0.5f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
+            label = "gps_dot_scale"
+        )
+        val tertiary = MaterialTheme.colorScheme.tertiary
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(18.dp).testTag("gps_dot_searching")) {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1.2f - scale }
+                    .clip(CircleShape)
+                    .background(tertiary)
+            )
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(tertiary))
         }
     }
 }
@@ -505,7 +513,8 @@ private fun StatsCard(
     trackName: String,
     currentSpeedMps: Double,
     currentAltitude: Double?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gpsIndicator: @Composable () -> Unit = {}
 ) {
     val colors = MaterialTheme.colorScheme
     Column(
@@ -555,8 +564,9 @@ private fun StatsCard(
                     textAlign = TextAlign.End,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp)
+                    modifier = Modifier.weight(1f).padding(start = 12.dp, end = 10.dp)
                 )
+                gpsIndicator()
             }
             Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
                 RollingNumber(kmValue(stats.distanceMeters), StatXlTextStyle.copy(color = colors.onSurface))
@@ -577,7 +587,7 @@ private fun StatsCard(
             val big = TextStyle(fontFamily = DisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 48.sp, letterSpacing = (-1).sp, fontFeatureSettings = "tnum", color = colors.onSurface)
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 IdleStat("Vitesse", speedValue(currentSpeedMps), "km/h", big, Modifier.weight(1f))
-                IdleStat("Altitude", altitudeValue(currentAltitude), "m", big, Modifier.weight(1f))
+                IdleStat("Altitude", altitudeValue(currentAltitude), "m", big, Modifier.weight(1f), trailing = gpsIndicator)
             }
         }
     }
@@ -592,9 +602,26 @@ private fun StatColumn(label: String, value: String, style: TextStyle, modifier:
 }
 
 @Composable
-private fun IdleStat(label: String, value: String, unit: String, style: TextStyle, modifier: Modifier) {
+private fun IdleStat(
+    label: String,
+    value: String,
+    unit: String,
+    style: TextStyle,
+    modifier: Modifier,
+    trailing: @Composable () -> Unit = {}
+) {
     Column(modifier = modifier) {
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.3.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            trailing()
+        }
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 6.dp)) {
             RollingNumber(value, style)
             Text(
@@ -631,8 +658,8 @@ private fun RecordingControls(
     canResumeExisting: Boolean
 ) {
     val colors = MaterialTheme.colorScheme
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-        val panelWidth = (maxWidth - 24.dp).coerceAtMost(420.dp)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
+        val panelWidth = maxWidth.coerceAtMost(420.dp)
         val panelHeight = if (canResumeExisting) 232.dp else 152.dp
         val targetWidth: Dp
         val targetHeight: Dp
@@ -664,7 +691,9 @@ private fun RecordingControls(
             label = "main_fg"
         )
 
-        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Bottom) {
+        // L'un sous l'autre, calés à droite, comme les boutons d'avant : le panneau de
+        // choix s'élargit donc vers la gauche.
+        Column(horizontalAlignment = Alignment.End) {
             val shape = RoundedCornerShape(radius)
             val mainClick: (() -> Unit)? = when (mode) {
                 ControlsMode.IDLE -> onStart
@@ -738,7 +767,7 @@ private fun StopButton(expanded: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         modifier = Modifier
-            .padding(start = 12.dp)
+            .padding(top = 12.dp)
             .graphicsLayer { scaleX = appear.value; scaleY = appear.value }
             .size(width, 88.dp)
             .shadow(8.dp, shape)

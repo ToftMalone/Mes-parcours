@@ -632,6 +632,13 @@ fait pas :
   suivante — pas de téléchargement hors de l'application.
 - **Tunnel** : la ligne « Sombre dans les tunnels » n'apparaît qu'en mode solaire,
   seul mode où elle agit.
+- **Disposition de l'écran Enregistrer** : l'auteur a gardé le dessin de la maquette
+  mais voulu retrouver **la disposition d'avant**. La carte de statistiques est en
+  haut, à la place de l'ancien bandeau d'altitude (l'état du GPS y est un point, et
+  les alertes de signal la recouvrent un instant) ; le bouton de fond de carte et le
+  bandeau des tracés masqués viennent juste en dessous. Les boutons sont en colonne
+  en bas à droite : « Recentrer », puis Démarrer ou Pause/Reprendre, puis Arrêter.
+  Ne pas revenir à la disposition centrée de la maquette.
 - **Tracés masqués** : « Laisser masqués » remplace « Masquer les tracés » dans le bandeau
   des tracés masqués — les tracés le sont déjà, le bouton range seulement le bandeau.
 
