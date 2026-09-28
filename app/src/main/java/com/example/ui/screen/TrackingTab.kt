@@ -488,8 +488,8 @@ private fun StatsCard(
     val value = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 20.sp,
-        lineHeight = 24.sp,
+        fontSize = 18.sp,
+        lineHeight = 22.sp,
         fontFeatureSettings = "tnum",
         color = colors.onSurface
     )
@@ -515,20 +515,22 @@ private fun StatsCard(
                     .background(if (mode == ControlsMode.PAUSED) colors.tertiary else LocalRecordingColor.current)
                     .testTag(if (mode == ControlsMode.PAUSED) "stats_paused_dot" else "stats_recording_dot")
             )
-            CompactStat("Distance · km", kmValue(stats.distanceMeters), value, Modifier.weight(1f))
-            CompactStat("Durée", durationValue(stats.durationSec), value, Modifier.weight(1.25f))
-            CompactStat("Vitesse · km/h", speedValue(currentSpeedMps), value, Modifier.weight(1f))
-            CompactStat("Altitude · m", altitudeValue(currentAltitude), value, Modifier.weight(0.9f))
+            // Libellés courts et unités accolées aux chiffres : quatre colonnes doivent
+            // tenir sur un téléphone de 360 dp de large.
+            CompactStat("Distance", kmValue(stats.distanceMeters), "km", value, Modifier.weight(1f))
+            CompactStat("Durée", durationValue(stats.durationSec), null, value, Modifier.weight(1.15f))
+            CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1.1f))
+            CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(0.9f))
         } else {
-            CompactStat("Vitesse · km/h", speedValue(currentSpeedMps), value, Modifier.weight(1f))
-            CompactStat("Altitude · m", altitudeValue(currentAltitude), value, Modifier.weight(1f))
+            CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
+            CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
         }
         Box(modifier = Modifier.padding(start = 6.dp)) { gpsIndicator() }
     }
 }
 
 @Composable
-private fun CompactStat(label: String, value: String, style: TextStyle, modifier: Modifier) {
+private fun CompactStat(label: String, value: String, unit: String?, style: TextStyle, modifier: Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Text(
             label,
@@ -536,7 +538,19 @@ private fun CompactStat(label: String, value: String, style: TextStyle, modifier
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
-        RollingNumber(value, style, Modifier.padding(top = 2.dp))
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 2.dp)) {
+            RollingNumber(value, style)
+            if (unit != null) {
+                Text(
+                    unit,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 2.dp, bottom = 3.dp)
+                )
+            }
+        }
     }
 }
 

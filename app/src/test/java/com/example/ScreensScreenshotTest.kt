@@ -362,6 +362,10 @@ class ScreensScreenshotTest {
 
     @Test fun enregistrer_en_cours() { startLive(false); recording(false); waitForTag("stop_fab"); shoot("enregistrer_en_cours", false) }
     @Test fun enregistrer_en_cours_sombre() { startLive(false); recording(true); waitForTag("stop_fab"); shoot("enregistrer_en_cours", true) }
+    /** Téléphone étroit (360 dp) : les quatre colonnes du bandeau doivent tenir. */
+    @Config(qualifiers = RobolectricDeviceQualifiers.SmallPhone)
+    @Test fun enregistrer_en_cours_etroit() { startLive(false); recording(false); waitForTag("stop_fab"); shoot("enregistrer_en_cours_etroit", false) }
+
     @Test fun enregistrer_pause() { startLive(true); recording(false); waitForTag("stop_fab"); shoot("enregistrer_pause", false) }
 
     @Test fun enregistrer_sans_permission() {

@@ -676,7 +676,7 @@ réseau), ombres peu fidèles, et des nombres au format anglais (« 4.4 km/h »)
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 187 tests unitaires en 22 suites : `ScreensScreenshotTest` (32, captures seules —
+- 188 tests unitaires en 22 suites : `ScreensScreenshotTest` (33, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `TrimTrackTest` (14), `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
