@@ -130,6 +130,15 @@ class ScreensScreenshotTest {
         }
     }
 
+    /**
+     * Attend que la liste des parcours soit chargée. Room la lit en arrière-plan :
+     * « Démarrer » touché avant son arrivée voit un historique vide et lance
+     * directement l'enregistrement au lieu d'ouvrir le choix.
+     */
+    private fun waitForTracks() {
+        compose.waitUntil(timeoutMillis = 10_000) { viewModel.allTracks.value.isNotEmpty() }
+    }
+
     private fun shoot(name: String, dark: Boolean) {
         compose.waitForIdle()
         captureScreenRoboImage("src/test/screenshots/refonte/${name}_${if (dark) "sombre" else "clair"}.png")
@@ -329,7 +338,7 @@ class ScreensScreenshotTest {
     @Test fun enregistrer_sombre() { recording(true); waitForTag("live_stats_panel"); shoot("enregistrer", true) }
 
     @Test fun enregistrer_choix() {
-        seed(); recording(false); waitForTag("action_fab")
+        seed(); recording(false); waitForTag("action_fab"); waitForTracks()
         compose.onNodeWithTag("action_fab").performClick()
         waitForTag("start_new_track_fab")
         shoot("enregistrer_choix", false)
@@ -346,7 +355,7 @@ class ScreensScreenshotTest {
     }
 
     @Test fun enregistrer_reprise() {
-        seed(); recording(false); waitForTag("action_fab")
+        seed(); recording(false); waitForTag("action_fab"); waitForTracks()
         compose.onNodeWithTag("action_fab").performClick()
         waitForTag("resume_existing_track_fab")
         compose.onNodeWithTag("resume_existing_track_fab").performClick()
