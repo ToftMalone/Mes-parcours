@@ -637,8 +637,9 @@ fait pas :
   place et la taille** des éléments d'avant. Un bandeau de statistiques d'une seule
   rangée en haut (vitesse et altitude, puis distance, durée, vitesse et altitude
   pendant un enregistrement ; point d'état du GPS à droite ; alertes de signal qui le
-  recouvrent un instant), le bouton de fond de carte et le bandeau des tracés masqués
-  juste en dessous. En bas à droite, des boutons ronds en colonne aux tailles
+  recouvrent un instant), le bandeau des tracés masqués juste en dessous. **Pas de
+  bouton de fond de carte sur cet écran**, à la demande de l'auteur : le choix se fait
+  uniquement dans les Paramètres (la maquette en proposait un, retiré). En bas à droite, des boutons ronds en colonne aux tailles
   d'avant : Recentrer (56 dp, toujours visible, plein quand le suivi est actif), puis
   Pause/Reprendre (56 dp) et le bouton principal (72 dp : Démarrer, Nouveau parcours
   pendant le choix, Arrêter pendant l'enregistrement) ; pendant le choix, Annuler

@@ -2,7 +2,6 @@
 
 package com.example.ui.screen
 
-import android.preference.PreferenceManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -41,7 +40,6 @@ import androidx.compose.material.icons.rounded.AddLocationAlt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.GpsOff
-import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.LocationDisabled
 import androidx.compose.material.icons.rounded.LocationOff
 import androidx.compose.material.icons.rounded.LocationOn
@@ -134,10 +132,6 @@ fun TrackingTab(
     // trace » au lieu de démarrer directement — s'il existe une trace à reprendre.
     var showStartOptions by remember { mutableStateOf(false) }
     var showResumePicker by remember { mutableStateOf(false) }
-
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    // Fond de carte, basculé par le bouton « calques » et mémorisé comme le réglage.
-    var tileStyle by remember { mutableStateOf(prefs.getString("pref_map_style", "mapnik") ?: "mapnik") }
 
     var recenterTrigger by remember { mutableIntStateOf(0) }
     var isAutoFollowActive by remember { mutableStateOf(viewModel.isAutoFollowActiveMap) }
@@ -237,8 +231,7 @@ fun TrackingTab(
                 viewModel.lastMapCenterLng = lng
                 viewModel.lastMapZoom = zoom
             },
-            onViewportChanged = { viewModel.updateMapViewport(it) },
-            tileStyle = tileStyle
+            onViewportChanged = { viewModel.updateMapViewport(it) }
         )
 
         // --- Haut de l'écran : la carte de statistiques, à la place qu'occupait
@@ -278,24 +271,6 @@ fun TrackingTab(
                         )
                         null -> Unit
                     }
-                }
-                // Le fond de carte, sous la carte de statistiques, à droite : le bandeau
-                // des tracés masqués prend place à sa gauche.
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .size(44.dp)
-                        .shadow(6.dp, RoundedCornerShape(16.dp))
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .clickable {
-                            tileStyle = if (tileStyle == "usgs_sat") "mapnik" else "usgs_sat"
-                            prefs.edit().putString("pref_map_style", tileStyle).apply()
-                        }
-                        .testTag("map_layers_button")
-                ) {
-                    Icon(Icons.Rounded.Layers, contentDescription = "Changer de fond de carte")
                 }
             }
         } else {

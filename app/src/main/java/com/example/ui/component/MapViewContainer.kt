@@ -401,13 +401,7 @@ fun MapViewContainer(
     bypassZoomThreshold: Boolean = false,
     onBypassZoomThresholdChanged: (Boolean) -> Unit = {},
     onMapStateChanged: (Double, Double, Double) -> Unit = { _, _, _ -> },
-    onViewportChanged: (MapViewport) -> Unit = {},
-    /**
-     * Fond de carte imposé par l'appelant (bouton « calques » de l'écran
-     * d'enregistrement) ; null = celui des réglages. Passer par un paramètre plutôt
-     * que par la seule préférence fait réexécuter le bloc `update` au changement.
-     */
-    tileStyle: String? = null
+    onViewportChanged: (MapViewport) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scheme = MaterialTheme.colorScheme
@@ -449,7 +443,7 @@ fun MapViewContainer(
             modifier = Modifier.fillMaxSize(),
             update = { map ->
                 val prefs = PreferenceManager.getDefaultSharedPreferences(map.context)
-                val selectedStyle = tileStyle ?: prefs.getString("pref_map_style", "mapnik") ?: "mapnik"
+                val selectedStyle = prefs.getString("pref_map_style", "mapnik") ?: "mapnik"
                 val tileSource = when (selectedStyle) {
                     "usgs_sat" -> GOOGLE_SATELLITE_TILE_SOURCE
                     else -> TileSourceFactory.MAPNIK
@@ -630,7 +624,7 @@ fun MapViewContainer(
             val bannerModifier = Modifier
                 .align(Alignment.TopStart)
                 .statusBarsPadding()
-                .padding(top = zoomBannerTopPadding, start = 16.dp, end = 76.dp)
+                .padding(top = zoomBannerTopPadding, start = 16.dp, end = 16.dp)
             when {
                 bypassZoomThreshold -> MapPill(
                     icon = Icons.Rounded.Visibility,
