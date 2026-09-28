@@ -1308,7 +1308,7 @@ private fun TrimTrackTool(
             onToggle = { deleteSource = !deleteSource },
             testTag = "trim_delete_source_row"
         )
-        if (deleteSource && (a > 0 || b > 0)) {
+        if (a > 0 || b > 0) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1317,7 +1317,7 @@ private fun TrimTrackTool(
                     .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.errorContainer)
                     .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .testTag("trim_delete_warning")
+                    .testTag("trim_warning")
             ) {
                 Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(20.dp))
                 Text(
@@ -1349,7 +1349,7 @@ private fun trimWarning(a: Int, b: Int): String {
         if (b > 0) add("les $b dernières minutes")
     }
     val what = parts.joinToString(" et ").replaceFirstChar { it.uppercase() }
-    return "$what seront perdues définitivement avec l'original."
+    return "$what ne seront pas dans la copie. Si l'original est supprimé, elles seront perdues définitivement."
 }
 
 @Composable

@@ -233,7 +233,7 @@ class ScreensScreenshotTest {
     }
 
     @Test fun outils_decoupe() {
-        seed(); tools(false); waitForTag("tools_tab")
+        seed(); tools(true); waitForTag("tools_tab")
         compose.onNodeWithTag("open_split_tool_button").performClick()
         waitForTag("split_mode_gap")
         compose.onNodeWithTag("split_mode_gap").performClick()
