@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `1.3.1` (`versionCode` 38). Elle n'est écrite qu'une fois,
+- Version courante : `2.0` (`versionCode` 39). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
