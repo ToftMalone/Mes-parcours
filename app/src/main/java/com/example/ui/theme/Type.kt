@@ -61,6 +61,9 @@ val DisplayFontFamily = FontFamily(
 /** Titres de section et de feuille (« Reprendre une trace ») : largeur normale. */
 val TitleFontFamily = FontFamily(bricolage(700, 100f, 24f))
 
+/** Citation de la dédicace (« À propos ») : 500, légèrement resserrée. */
+val QuoteFontFamily = FontFamily(bricolage(500, 92f, 24f))
+
 /** Police de l'interface. */
 val FigtreeFontFamily = FontFamily(
     figtree(400),

@@ -372,6 +372,7 @@ fun MainScreen(
     // l'utilisateur venait d'écarter.
     val detailId = viewingDetailedTrackId
     var toolOpen by remember { mutableStateOf(false) }
+    var settingsSubPageOpen by remember { mutableStateOf(false) }
 
     // Fond opaque **obligatoire** sous la transition : sans lui, on voit à travers.
     //
@@ -434,8 +435,8 @@ fun MainScreen(
             } else {
                 Scaffold(
                     bottomBar = {
-                        // Un outil ouvert a son propre bouton d'action en bas d'écran.
-                        if (!(currentTab == "outils" && toolOpen)) MainNavigationBar(
+                        // Un outil ou une page de réglages ouverts prennent tout l'écran.
+                        if (!(currentTab == "outils" && toolOpen) && !(currentTab == "parametres" && settingsSubPageOpen)) MainNavigationBar(
                             currentTab = currentTab,
                             onTabSelected = { currentTab = it },
                             showUpdateBadge = availableUpdate != null,
@@ -505,11 +506,11 @@ fun MainScreen(
                         }
                         "parametres" -> {
                             SettingsTab(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(innerPadding),
-                                hasAvailableUpdate = availableUpdate != null,
-                                onShowUpdate = { updateReopenTrigger++ }
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = innerPadding,
+                                availableUpdate = availableUpdate,
+                                onShowUpdate = { updateReopenTrigger++ },
+                                onSubPageChanged = { settingsSubPageOpen = it }
                             )
                         }
                     }

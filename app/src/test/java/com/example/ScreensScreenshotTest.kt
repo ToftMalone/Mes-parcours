@@ -17,6 +17,8 @@ import com.example.data.model.TrackPoint
 import com.example.data.repository.TrackRepository
 import com.example.ui.screen.DetailView
 import com.example.ui.screen.HistoryTab
+import com.example.ui.screen.SettingsTab
+import com.example.util.update.AvailableUpdate
 import com.example.ui.screen.ToolsTab
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
@@ -243,5 +245,40 @@ class ScreensScreenshotTest {
         compose.onNodeWithTag("open_trim_tool_button").performClick()
         waitForTag("trim_kept_bar")
         shoot("outils_rognage", false)
+    }
+
+    // -------------------------------------------------------------- Paramètres
+
+    private val sampleUpdate = AvailableUpdate(
+        versionCode = 99,
+        versionName = "1.5",
+        apkUrl = "https://github.com/ToftMalone/Mes-parcours/releases/download/v1.5/mes-parcours.apk",
+        notes = listOf("Nouvelle interface", "Profil d'altitude dans la fiche détail"),
+        sha256 = "0".repeat(64)
+    )
+
+    private fun settings(dark: Boolean, update: AvailableUpdate? = null) {
+        compose.setContent {
+            MyApplicationTheme(darkTheme = dark) {
+                SettingsTab(contentPadding = tabPadding, availableUpdate = update, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+
+    @Test fun parametres_clair() { settings(false, sampleUpdate); waitForTag("settings_screen_root"); shoot("parametres", false) }
+    @Test fun parametres_sombre() { settings(true); waitForTag("settings_screen_root"); shoot("parametres", true) }
+
+    @Test fun parametres_nouveautes() {
+        settings(false, sampleUpdate); waitForTag("settings_screen_root")
+        compose.onNodeWithTag("version_badge").performClick()
+        waitForTag("release_notes_dialog")
+        shoot("parametres_nouveautes", false)
+    }
+
+    @Test fun parametres_a_propos() {
+        settings(false); waitForTag("settings_screen_root")
+        compose.onNodeWithTag("open_about_button").performClick()
+        waitForTag("about_page")
+        shoot("parametres_a_propos", false)
     }
 }

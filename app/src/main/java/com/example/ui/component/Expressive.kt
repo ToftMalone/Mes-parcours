@@ -3,6 +3,7 @@ package com.example.ui.component
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -493,6 +494,66 @@ fun AppMessageHost(
                     }
                 }
             }
+        }
+    }
+}
+
+// ------------------------------------------------------------------ Progression
+
+/**
+ * Progression en vague de la maquette (Material 3 Expressive) : la part accomplie
+ * ondule, le reste est un trait plat, séparé d'un vide. La vague avance d'elle-même,
+ * ce qui montre que le travail continue même quand le pourcentage stagne.
+ */
+@Composable
+fun WaveProgress(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = MaterialTheme.colorScheme.secondaryContainer
+) {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "wave")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            tween(900, easing = androidx.compose.animation.core.LinearEasing)
+        ),
+        label = "wave_phase"
+    )
+    androidx.compose.foundation.Canvas(modifier = modifier.fillMaxWidth().height(14.dp)) {
+        val p = progress.coerceIn(0f, 1f)
+        val mid = size.height / 2
+        val stroke = 4.dp.toPx()
+        val gap = 6.dp.toPx()
+        val waveEnd = size.width * p
+        if (waveEnd > 0f) {
+            val amplitude = size.height / 3.5f
+            val wavelength = 20.dp.toPx()
+            val shift = phase * wavelength
+            val path = Path()
+            var x = 0f
+            path.moveTo(0f, mid + amplitude * kotlin.math.sin((x + shift) / wavelength * 2 * Math.PI).toFloat())
+            while (x < waveEnd) {
+                x = (x + 2f).coerceAtMost(waveEnd)
+                path.lineTo(x, mid + amplitude * kotlin.math.sin((x + shift) / wavelength * 2 * Math.PI).toFloat())
+            }
+            drawPath(
+                path, color,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            )
+        }
+        val trackStart = if (waveEnd > 0f) waveEnd + gap else 0f
+        if (trackStart < size.width - stroke) {
+            drawLine(
+                trackColor,
+                androidx.compose.ui.geometry.Offset(trackStart, mid),
+                androidx.compose.ui.geometry.Offset(size.width - stroke, mid),
+                strokeWidth = stroke,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round
+            )
+            // Point d'arrivée, comme l'indicateur linéaire de Material 3.
+            drawCircle(color, radius = stroke / 2, center = androidx.compose.ui.geometry.Offset(size.width - stroke / 2, mid))
         }
     }
 }

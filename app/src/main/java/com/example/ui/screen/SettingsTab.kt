@@ -3,217 +3,296 @@
 package com.example.ui.screen
 
 import android.preference.PreferenceManager
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.SatelliteAlt
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.Train
-import androidx.compose.material.icons.filled.WbTwilight
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.PinDrop
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Route
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
+import com.example.ui.component.CookieShape
+import com.example.ui.component.LocalAppMessenger
+import com.example.ui.component.MpSwitch
+import com.example.ui.component.SunShape
+import com.example.ui.theme.DisplayFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.NightModePreferences
 import com.example.ui.theme.NightModeSource
+import com.example.ui.theme.QuoteFontFamily
 import com.example.util.AutoBackupPreferences
+import com.example.util.SolarTimes
 import com.example.util.TrackStylePreferences
+import com.example.util.update.AvailableUpdate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/** Pages de l'onglet : la liste des réglages, et ses deux pages de détail. */
+private enum class SettingsPage { MAIN, CHANGELOG, ABOUT }
 
 /**
  * Écran des réglages.
  *
  * L'ordre des sections suit la fréquence d'usage : ce qu'on ajuste souvent en haut,
  * ce qu'on règle une fois pour toutes en bas. Chaque groupe ne traite qu'un sujet, et
- * chaque carte qu'un réglage — c'est ce qui évite de retomber sur une carte
+ * chaque ligne qu'un réglage — c'est ce qui évite de retomber sur une carte
  * fourre-tout mélangeant le fond de carte, l'orientation et un panneau de vitesse.
+ *
+ * Le journal des nouveautés et « À propos » sont des pages à part entière, ouvertes
+ * depuis le groupe « Application » ; le retour arrière y ramène à la liste.
  */
 @Composable
 fun SettingsTab(
     modifier: Modifier = Modifier,
-    hasAvailableUpdate: Boolean = false,
-    onShowUpdate: () -> Unit = {}
+    contentPadding: PaddingValues = PaddingValues(),
+    availableUpdate: AvailableUpdate? = null,
+    onShowUpdate: () -> Unit = {},
+    /** Une page de détail prend tout l'écran : la barre de navigation s'efface. */
+    onSubPageChanged: (Boolean) -> Unit = {}
 ) {
-    val scrollState = rememberScrollState()
+    var page by remember { mutableStateOf(SettingsPage.MAIN) }
+    LaunchedEffect(page) { onSubPageChanged(page != SettingsPage.MAIN) }
+    BackHandler(enabled = page != SettingsPage.MAIN) { page = SettingsPage.MAIN }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(16.dp)
-                .testTag("settings_screen_root")
-        ) {
-            SettingsScreenHeader()
+    when (page) {
+        SettingsPage.MAIN -> SettingsMain(
+            modifier = modifier,
+            contentPadding = contentPadding,
+            availableUpdate = availableUpdate,
+            onShowUpdate = onShowUpdate,
+            onOpenChangelog = { page = SettingsPage.CHANGELOG },
+            onOpenAbout = { page = SettingsPage.ABOUT }
+        )
+        SettingsPage.CHANGELOG -> ChangelogPage(availableUpdate, onBack = { page = SettingsPage.MAIN }, modifier = modifier)
+        SettingsPage.ABOUT -> AboutPage(onBack = { page = SettingsPage.MAIN }, modifier = modifier)
+    }
+}
 
+@Composable
+private fun SettingsMain(
+    modifier: Modifier,
+    contentPadding: PaddingValues,
+    availableUpdate: AvailableUpdate?,
+    onShowUpdate: () -> Unit,
+    onOpenChangelog: () -> Unit,
+    onOpenAbout: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
+            .padding(top = contentPadding.calculateTopPadding() + 20.dp, bottom = contentPadding.calculateBottomPadding() + 24.dp)
+            .padding(horizontal = 16.dp)
+            .testTag("settings_screen_root")
+    ) {
+        Text(
+            "Paramètres",
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight(750)),
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+
+        if (availableUpdate != null) {
             Spacer(modifier = Modifier.height(16.dp))
+            UpdateAvailableCard(availableUpdate, onShowUpdate)
+        }
 
-            if (hasAvailableUpdate) {
-                UpdateAvailableCard(onShowUpdate = onShowUpdate)
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        GroupLabel("Carte")
+        SettingsGroup {
+            MapBackgroundItem()
+            MapOrientationItem()
+        }
 
-            SettingsGroupHeader(title = "Carte", icon = Icons.Default.Map)
-            MapBackgroundCard()
-            MapOrientationCard()
+        GroupLabel("Tracés")
+        TrackThicknessItem()
 
-            SettingsGroupHeader(title = "Thème", icon = Icons.Default.DarkMode)
-            NightModeSettingsCard()
+        GroupLabel("Mode nuit")
+        NightModeGroup()
 
-            SettingsGroupHeader(title = "Tracés", icon = Icons.Default.Timeline)
-            // La couleur n'est plus un réglage global : elle se choisit parcours par
-            // parcours, sur sa pastille colorée dans l'historique. Il ne reste ici que
-            // ce qui vaut pour tous les tracés à la fois.
-            TrackThicknessSettingsCard()
+        GroupLabel("Sauvegarde automatique")
+        AutoBackupGroup()
 
-            SettingsGroupHeader(title = "Sauvegarde", icon = Icons.Default.CloudSync)
-            AutoBackupSettingsCard()
-
-            SettingsGroupHeader(title = "À propos", icon = Icons.Default.Info)
-            AboutCard()
-
-            // Évite que la dernière carte passe sous la barre de navigation flottante.
-            Spacer(modifier = Modifier.height(80.dp))
+        GroupLabel("Application")
+        SettingsGroup {
+            SettingsRow(
+                icon = Icons.Rounded.SystemUpdate,
+                title = "Mise à jour",
+                subtitle = if (availableUpdate == null) "Version installée : ${BuildConfig.VERSION_NAME}" else null,
+                onClick = if (availableUpdate != null) onShowUpdate else null,
+                testTag = "settings_update_row",
+                trailing = {
+                    if (availableUpdate != null) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .height(24.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.error)
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            Text(
+                                availableUpdate.versionName,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onError,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            )
+            SettingsRow(
+                icon = Icons.Rounded.NewReleases,
+                title = "Journal des nouveautés",
+                onClick = onOpenChangelog,
+                testTag = "version_badge",
+                trailing = { Chevron() }
+            )
+            SettingsRow(
+                icon = Icons.Rounded.Info,
+                title = "À propos",
+                onClick = onOpenAbout,
+                testTag = "open_about_button",
+                trailing = { Chevron() }
+            )
         }
     }
 }
 
-@Composable
-private fun SettingsScreenHeader() {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        Text(
-            text = "Paramètres",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = "Ajustez vos préférences & gérez l'application",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
 /**
- * Rappel qu'une mise à jour a été détectée puis ignorée (bandeau de [UpdatePrompt]
- * fermé sans télécharger ni installer). [onShowUpdate] rouvre ce même bandeau, sans
- * redemander au réseau ni redémarrer l'application.
+ * Rappel qu'une mise à jour a été détectée (feuille de [UpdatePrompt] refermée sans
+ * installer). [onShowUpdate] rouvre cette même feuille, sans redemander au réseau ni
+ * redémarrer l'application.
  */
 @Composable
-private fun UpdateAvailableCard(onShowUpdate: () -> Unit) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        ),
-        modifier = Modifier.fillMaxWidth().testTag("update_available_card")
+private fun UpdateAvailableCard(update: AvailableUpdate, onShowUpdate: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(colors.tertiaryContainer)
+            .clickable(onClick = onShowUpdate)
+            .padding(start = 18.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)
+            .testTag("update_available_card")
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(SunShape)
+                .background(colors.tertiary)
         ) {
-            Icon(
-                imageVector = Icons.Default.SystemUpdate,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(28.dp)
+            Icon(Icons.Rounded.SystemUpdate, contentDescription = null, tint = colors.tertiaryContainer, modifier = Modifier.size(24.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Version ${update.versionName} disponible",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.onTertiaryContainer
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            if (update.notes.isNotEmpty()) {
                 Text(
-                    text = "Mise à jour disponible",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Text(
-                    text = "Vous l'avez ignorée — revoir les détails",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                    update.notes.joinToString(", "),
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
+                    color = colors.onTertiaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            TextButton(
-                onClick = onShowUpdate,
-                modifier = Modifier.testTag("show_update_button")
-            ) {
-                Text(
-                    text = "Voir",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
+        }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .height(40.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.tertiary)
+                .clickable(onClick = onShowUpdate)
+                .padding(horizontal = 16.dp)
+                .testTag("show_update_button")
+        ) {
+            Text("Voir", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.onTertiary)
         }
     }
 }
@@ -221,231 +300,115 @@ private fun UpdateAvailableCard(onShowUpdate: () -> Unit) {
 // ---------------------------------------------------------------------------
 // Briques communes
 //
-// Les trois listes de choix de l'écran (fond de carte, orientation, mode nuit)
-// partageaient le même bloc recopié à l'identique. Elles passent désormais toutes
-// par SettingsChoiceList : un réglage de plus ne coûte qu'une liste de données.
+// Un groupe = un sujet, des lignes séparées de 2 dp dans un bloc aux coins de 28 dp :
+// un réglage de plus ne coûte qu'une ligne, pas un bloc recopié.
 // ---------------------------------------------------------------------------
 
 @Composable
-fun SettingsGroupHeader(
-    title: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.3.sp
-            ),
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
+private fun GroupLabel(text: String) {
+    Text(
+        text,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 24.dp, bottom = 8.dp)
+    )
 }
 
-/** Coquille commune à toutes les cartes de réglages. */
 @Composable
-private fun SettingsCard(
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp)),
+        content = content
+    )
+}
+
+/** Élément d'un groupe : fond de carte, padding de 16 dp. */
+@Composable
+private fun GroupItem(
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-        ),
-        modifier = modifier.fillMaxWidth().padding(bottom = 12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
-    }
-}
-
-/** Intitulé d'un réglage à l'intérieur d'une carte. */
-@Composable
-private fun SettingsCardTitle(title: String, subtitle: String) {
-    Text(
-        text = title,
-        fontWeight = FontWeight.Bold,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface
-    )
-    Text(
-        text = subtitle,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 12.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(16.dp),
+        content = content
     )
 }
 
-/**
- * Pastille ronde portant l'icône d'un réglage.
- *
- * Une icône vectorielle et non un emoji : l'emoji ne se teinte pas avec le thème,
- * change de dessin d'un fabricant à l'autre, et son style plein jurait avec les
- * icônes de trait des en-têtes de groupe, juste au-dessus.
- */
+/** Ligne à icône : titre, sous-titre éventuel, et un élément à droite. */
 @Composable
-private fun SettingsIconBadge(icon: ImageVector, highlighted: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(
-                if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (highlighted) MaterialTheme.colorScheme.primary
-                   else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-/** Une option exclusive d'une liste de choix. */
-private class SettingsChoice<T>(
-    val value: T,
-    val icon: ImageVector,
-    val title: String,
-    val description: String,
-    val testTag: String? = null
-)
-
-/** Liste d'options exclusives, une seule sélectionnable. */
-@Composable
-private fun <T> SettingsChoiceList(
-    choices: List<SettingsChoice<T>>,
-    selected: T,
-    onSelect: (T) -> Unit
-) {
-    choices.forEach { choice ->
-        val isSelected = choice.value == selected
-        val select = { onSelect(choice.value) }
-
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
-            ),
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-            ),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .clickable { select() }
-                .then(choice.testTag?.let { Modifier.testTag(it) } ?: Modifier)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SettingsIconBadge(icon = choice.icon, highlighted = isSelected)
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = choice.title,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = choice.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                RadioButton(
-                    selected = isSelected,
-                    onClick = select,
-                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
-                )
-            }
-        }
-    }
-}
-
-/** Réglage à bascule : icône, libellé, description, interrupteur. */
-@Composable
-private fun SettingsToggleRow(
-    icon: ImageVector,
+private fun SettingsRow(
+    icon: ImageVector?,
     title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    switchTestTag: String? = null
+    subtitle: String? = null,
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    titleAlpha: Float = 1f,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: @Composable () -> Unit = {}
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = if (subtitle != null) 14.dp else 16.dp)
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
     ) {
-        SettingsIconBadge(icon = icon, highlighted = checked && enabled)
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                    alpha = if (enabled) 1f else 0.6f
-                )
-            )
+        when {
+            leading != null -> leading()
+            icon != null -> Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
         }
-
-        Switch(
-            checked = checked && enabled,
-            enabled = enabled,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MaterialTheme.colorScheme.primary
-            ),
-            modifier = switchTestTag?.let { Modifier.testTag(it) } ?: Modifier
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.alpha(titleAlpha))
+            if (subtitle != null) {
+                Text(subtitle, fontSize = 13.sp, lineHeight = 18.sp, color = subtitleColor)
+            }
+        }
+        trailing()
     }
 }
 
-/** Remarque explicative en bas d'une carte. */
 @Composable
-private fun SettingsHint(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-        modifier = modifier.padding(top = 12.dp)
+private fun Chevron() {
+    Icon(
+        Icons.Rounded.ChevronRight,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(22.dp)
     )
+}
+
+/** Bouton radio de la maquette : anneau, et pastille qui grossit à la sélection. */
+@Composable
+private fun MpRadio(selected: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    val inner by animateDpAsState(if (selected) 10.dp else 0.dp, label = "radio_inner")
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(22.dp)
+            .border(2.dp, if (selected) colors.primary else colors.onSurfaceVariant, CircleShape)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(inner)
+                .clip(CircleShape)
+                .background(colors.primary)
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -453,91 +416,407 @@ private fun SettingsHint(text: String, modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MapBackgroundCard() {
+private fun MapBackgroundItem() {
     val context = LocalContext.current
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
     var mapStyle by remember { mutableStateOf(prefs.getString("pref_map_style", "mapnik") ?: "mapnik") }
+    val select = { value: String ->
+        mapStyle = value
+        prefs.edit().putString("pref_map_style", value).apply()
+    }
 
-    SettingsCard(modifier = Modifier.testTag("map_background_card")) {
-        SettingsCardTitle(
-            title = "Fond de carte",
-            subtitle = "Le type de cartographie utilisé pour vos sorties."
-        )
+    GroupItem(modifier = Modifier.testTag("map_background_card")) {
+        Text("Fond de carte", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 12.dp)) {
+            MapStyleThumb(
+                title = "Standard",
+                subtitle = "OpenStreetMap",
+                selected = mapStyle == "mapnik",
+                onClick = { select("mapnik") },
+                satellite = false,
+                testTag = "map_style_option_mapnik",
+                modifier = Modifier.weight(1f)
+            )
+            MapStyleThumb(
+                title = "Satellite hybride",
+                subtitle = "Google, avec noms de rues",
+                selected = mapStyle == "usgs_sat",
+                onClick = { select("usgs_sat") },
+                satellite = true,
+                testTag = "map_style_option_satellite",
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
 
-        SettingsChoiceList(
-            choices = listOf(
-                SettingsChoice(
-                    value = "mapnik",
-                    icon = Icons.Default.Map,
-                    title = "Standard (Mapnik)",
-                    description = "Carte classique OpenStreetMap",
-                    testTag = "map_style_option_mapnik"
-                ),
-                SettingsChoice(
-                    value = "usgs_sat",
-                    icon = Icons.Default.SatelliteAlt,
-                    title = "Satellite hybride (Google)",
-                    description = "Imagerie satellite haute définition enrichie des noms de rues",
-                    testTag = "map_style_option_satellite"
-                )
-            ),
-            selected = mapStyle,
-            onSelect = { value ->
-                mapStyle = value
-                prefs.edit().putString("pref_map_style", value).apply()
+/**
+ * Vignette d'un fond de carte, dessinée comme sur la maquette : quelques formes qui
+ * évoquent la carte, sans charger la moindre tuile.
+ */
+@Composable
+private fun MapStyleThumb(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    satellite: Boolean,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    val radius by animateDpAsState(if (selected) 28.dp else 18.dp, label = "thumb_radius")
+    val ring by animateColorAsState(if (selected) colors.primary else Color.Transparent, label = "thumb_ring")
+    val check by animateFloatAsState(if (selected) 1f else 0f, label = "thumb_check")
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(radius))
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(88.dp)
+                .border(3.dp, ring, RoundedCornerShape(radius))
+                .padding(3.dp)
+                .clip(RoundedCornerShape((radius - 3.dp).coerceAtLeast(0.dp)))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val u = 1.dp.toPx()
+                if (!satellite) {
+                    drawRect(Color(0xFFEEF1EA))
+                    drawOval(Color(0xFFCFE6C4), Offset(-10 * u, 10 * u), Size(70 * u, 50 * u))
+                    drawOval(Color(0xFFA9D3EA), Offset(size.width - 60 * u, 14 * u), Size(50 * u, 40 * u))
+                    rotate(-6f, Offset(size.width / 2, 59 * u)) {
+                        drawRect(Color.White, Offset(-10 * u, 56 * u), Size(size.width + 20 * u, 6 * u))
+                    }
+                    drawRect(Color.White, Offset(60 * u, 0f), Size(6 * u, size.height))
+                } else {
+                    drawRect(Color(0xFF3B4A32))
+                    drawOval(Color(0xFF2A3A24), Offset(-10 * u, 4 * u), Size(80 * u, 60 * u))
+                    drawOval(Color(0xFF1E3A4A), Offset(size.width - 62 * u, 12 * u), Size(56 * u, 44 * u))
+                    drawRoundRect(Color(0xFF6B6045), Offset(30 * u, 60 * u), Size(50 * u, 24 * u), CornerRadius(8 * u))
+                    rotate(-6f, Offset(size.width / 2, 57 * u)) {
+                        drawRect(Color(0xFFF5E7A8), Offset(-10 * u, 56 * u), Size(size.width + 20 * u, 3 * u))
+                    }
+                }
             }
+            if (satellite) {
+                Text(
+                    "Rue des Pins",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.offset(x = 8.dp, y = 36.dp)
+                )
+            }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .size(24.dp * check)
+                    .clip(CircleShape)
+                    .background(colors.primary)
+            ) {
+                if (check > 0.5f) Icon(Icons.Rounded.Check, contentDescription = "Choisi", tint = colors.onPrimary, modifier = Modifier.size(16.dp))
+            }
+        }
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+        Text(subtitle, fontSize = 12.sp, lineHeight = 15.sp, color = colors.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun MapOrientationItem() {
+    val context = LocalContext.current
+    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
+    var mapMode by remember { mutableStateOf(prefs.getString("pref_map_mode", "2d") ?: "2d") }
+
+    GroupItem(modifier = Modifier.testTag("map_orientation_card")) {
+        Text("Orientation", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 12.dp)) {
+            listOf("2d" to "2D", "3d" to "3D", "auto" to "Automatique").forEach { (value, label) ->
+                OrientationSegment(
+                    label = label,
+                    selected = mapMode == value,
+                    onClick = {
+                        mapMode = value
+                        prefs.edit().putString("pref_map_mode", value).apply()
+                    },
+                    testTag = "map_mode_option_$value",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        Text(
+            when (mapMode) {
+                "3d" -> "La carte pivote dans votre sens de déplacement."
+                "auto" -> "3D pendant l'enregistrement, 2D le reste du temps."
+                else -> "Nord toujours en haut."
+            },
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
         )
     }
 }
 
 @Composable
-private fun MapOrientationCard() {
-    val context = LocalContext.current
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var mapMode by remember { mutableStateOf(prefs.getString("pref_map_mode", "2d") ?: "2d") }
-
-    SettingsCard(modifier = Modifier.testTag("map_orientation_card")) {
-        SettingsCardTitle(
-            title = "Orientation & vue",
-            subtitle = "Carte fixe au nord, ou pivotant dans le sens de déplacement."
-        )
-
-        SettingsChoiceList(
-            choices = listOf(
-                SettingsChoice(
-                    value = "2d",
-                    icon = Icons.Default.Explore,
-                    title = "Vue 2D (nord en haut)",
-                    description = "Carte fixe orientée vers le nord",
-                    testTag = "map_mode_option_2d"
-                ),
-                SettingsChoice(
-                    value = "3d",
-                    icon = Icons.Default.Navigation,
-                    title = "Vue 3D (sens d'avancement)",
-                    description = "La carte pivote automatiquement selon votre direction",
-                    testTag = "map_mode_option_3d"
-                ),
-                SettingsChoice(
-                    value = "auto",
-                    icon = Icons.Default.AutoAwesome,
-                    title = "Automatique",
-                    description = "Vue 3D pendant un enregistrement, retour en 2D dès qu'il est arrêté",
-                    testTag = "map_mode_option_auto"
-                )
-            ),
-            selected = mapMode,
-            onSelect = { value ->
-                mapMode = value
-                prefs.edit().putString("pref_map_mode", value).apply()
-            }
-        )
+private fun OrientationSegment(label: String, selected: Boolean, onClick: () -> Unit, testTag: String, modifier: Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val radius by animateDpAsState(if (selected) 28.dp else 12.dp, label = "orient_radius")
+    val bg by animateColorAsState(if (selected) colors.primary else colors.surfaceContainer, label = "orient_bg")
+    val fg by animateColorAsState(if (selected) colors.onPrimary else colors.onSurface, label = "orient_fg")
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(radius))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+    ) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
     }
 }
 
 // ---------------------------------------------------------------------------
-// Thème
+// Tracés
 // ---------------------------------------------------------------------------
+
+/** "3,5" plutôt que "3.5" ; et "6" plutôt que "6,0". */
+private fun formatThicknessDp(value: Float): String {
+    val rounded = Math.round(value * 10) / 10f
+    return if (rounded % 1f == 0f) rounded.toInt().toString()
+    else String.format(Locale.US, "%.1f", rounded).replace('.', ',')
+}
+
+/** Pas du bouton « − / + » : un demi-dp, la plus petite différence visible. */
+private const val THICKNESS_STEP_DP = 0.5f
+
+/**
+ * Épaisseur du trait des tracés, avec aperçu en direct.
+ *
+ * Trois voies qui se répondent : les boutons « − / + » pour un ajustement fin, le
+ * champ central pour une valeur précise (virgule acceptée), le curseur pour un
+ * réglage rapide. Aucun n'est cranté sur des paliers prédéfinis, sauf le pas des
+ * boutons.
+ */
+@Composable
+private fun TrackThicknessItem() {
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val colors = MaterialTheme.colorScheme
+
+    var thicknessDp by remember { mutableStateOf(TrackStylePreferences.getThicknessDp(context)) }
+    var textValue by remember { mutableStateOf(formatThicknessDp(thicknessDp)) }
+
+    fun applyThickness(dp: Float) {
+        thicknessDp = dp.coerceIn(TrackStylePreferences.MIN_THICKNESS_DP, TrackStylePreferences.MAX_THICKNESS_DP)
+    }
+
+    /**
+     * Enregistre l'épaisseur retenue — séparé de [applyThickness] pour ne pas écrire
+     * dans les préférences à chaque pixel de glissement du curseur.
+     */
+    fun persistThickness() {
+        TrackStylePreferences.setThicknessDp(context, thicknessDp)
+    }
+
+    /**
+     * Réaffiche dans le champ la valeur réellement retenue : taper « 99 » ne doit pas
+     * laisser « 99 » à l'écran quand l'épaisseur a été ramenée au maximum.
+     */
+    fun normalizeText() {
+        textValue = formatThicknessDp(thicknessDp)
+    }
+
+    fun step(delta: Float) {
+        applyThickness(thicknessDp + delta)
+        persistThickness()
+        normalizeText()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(colors.surfaceContainerLow)
+            .padding(16.dp)
+            .testTag("track_thickness_card")
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Épaisseur du trait", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colors.surfaceContainerHigh)
+                    .padding(horizontal = 4.dp)
+            ) {
+                StepperButton(Icons.Rounded.Remove, "Affiner", "track_thickness_minus") { step(-THICKNESS_STEP_DP) }
+                BasicTextField(
+                    value = textValue,
+                    onValueChange = { input ->
+                        textValue = input
+                        input.replace(',', '.').toFloatOrNull()?.let {
+                            applyThickness(it)
+                            persistThickness()
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = colors.onSurface,
+                        fontFamily = MaterialTheme.typography.labelLarge.fontFamily
+                    ),
+                    cursorBrush = SolidColor(colors.primary),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    modifier = Modifier
+                        .width(36.dp)
+                        // Une saisie hors bornes ou illisible est ramenée à l'affichage dès
+                        // que l'on quitte le champ, plutôt que de rester là à contredire
+                        // l'épaisseur réellement appliquée.
+                        .onFocusChanged { focus -> if (!focus.isFocused) normalizeText() }
+                        .testTag("track_thickness_field")
+                )
+                Text("dp", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                StepperButton(Icons.Rounded.Add, "Épaissir", "track_thickness_plus") { step(THICKNESS_STEP_DP) }
+            }
+        }
+
+        // Aperçu : un tracé à l'épaisseur choisie, sur un fond qui rappelle la carte.
+        //
+        // Couleurs lues ici, et non dans le Canvas : la fonction de dessin est un
+        // DrawScope, pas un contexte composable, et ne peut donc pas interroger le
+        // thème. La conversion dp → pixels utilise la densité de l'écran, exactement
+        // comme TrackStylePreferences.getStrokeWidth : l'aperçu montre la même
+        // épaisseur que celle qui sera dessinée sur la carte.
+        val land = if (LocalIsDarkTheme.current) Color(0xFF1A201D) else Color(0xFFEEF1EA)
+        val lineColor = colors.primary
+        Canvas(
+            modifier = Modifier
+                .padding(top = 10.dp)
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(land)
+        ) {
+            val path = Path().apply {
+                moveTo(size.width * 0.06f, size.height * 0.7f)
+                cubicTo(
+                    size.width * 0.3f, size.height * 0.05f,
+                    size.width * 0.55f, size.height * 1.05f,
+                    size.width * 0.94f, size.height * 0.3f
+                )
+            }
+            drawPath(path, lineColor, style = Stroke(width = thicknessDp.dp.toPx(), cap = StrokeCap.Round))
+        }
+
+        ThicknessSlider(
+            value = thicknessDp,
+            onValueChange = {
+                applyThickness(it)
+                normalizeText()
+            },
+            onValueChangeFinished = { persistThickness() }
+        )
+
+        Text(
+            "La couleur se choisit parcours par parcours, sur sa pastille dans l'Historique.",
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = colors.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun StepperButton(icon: ImageVector, description: String, testTag: String, onClick: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+    ) {
+        Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** Curseur de la maquette : piste épaisse coupée autour d'une poignée verticale. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ThicknessSlider(value: Float, onValueChange: (Float) -> Unit, onValueChangeFinished: () -> Unit) {
+    val active = MaterialTheme.colorScheme.primary
+    val inactive = MaterialTheme.colorScheme.secondaryContainer
+    androidx.compose.material3.Slider(
+        value = value,
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        valueRange = TrackStylePreferences.MIN_THICKNESS_DP..TrackStylePreferences.MAX_THICKNESS_DP,
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .fillMaxWidth()
+            .height(44.dp)
+            .testTag("track_thickness_slider"),
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(width = 4.dp, height = 44.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(active)
+            )
+        },
+        track = { state ->
+            val span = state.valueRange.endInclusive - state.valueRange.start
+            val fraction = if (span > 0f) ((state.value - state.valueRange.start) / span).coerceIn(0f, 1f) else 0f
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(16.dp)
+            ) {
+                val gap = 6.dp.toPx()
+                val split = size.width * fraction
+                val r = CornerRadius(8.dp.toPx())
+                if (split - gap > 0f) drawRoundRect(active, Offset.Zero, Size(split - gap, size.height), r)
+                if (split + gap < size.width) {
+                    drawRoundRect(inactive, Offset(split + gap, 0f), Size(size.width - split - gap, size.height), r)
+                }
+            }
+        }
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Mode nuit
+// ---------------------------------------------------------------------------
+
+/**
+ * Sous-titre du mode solaire : la prochaine bascule, calculée hors ligne pour la
+ * dernière position de carte connue (voir `NightModePreferences.lastKnownLocation`).
+ */
+private fun nextSolarSwitch(lat: Double, lng: Double, now: Long): String? {
+    val hm = SimpleDateFormat("HH:mm", Locale.FRANCE)
+    return when (val today = SolarTimes.compute(lat, lng, now)) {
+        SolarTimes.Result.PolarDay -> "soleil de minuit, toujours clair"
+        SolarTimes.Result.PolarNight -> "nuit polaire, toujours sombre"
+        is SolarTimes.Result.RiseAndSet -> when {
+            now < today.sunriseUtcMillis -> "clair dès ${hm.format(Date(today.sunriseUtcMillis))}"
+            now < today.sunsetUtcMillis -> "sombre dès ${hm.format(Date(today.sunsetUtcMillis))}"
+            else -> (SolarTimes.compute(lat, lng, now + 86_400_000L) as? SolarTimes.Result.RiseAndSet)
+                ?.let { "clair dès ${hm.format(Date(it.sunriseUtcMillis))}" }
+        }
+    }
+}
 
 /**
  * Choix de ce qui déclenche le thème sombre : le réglage d'Android, ou le lever et
@@ -547,257 +826,82 @@ private fun MapOrientationCard() {
  * Le changement s'applique immédiatement : le thème observe la préférence.
  */
 @Composable
-fun NightModeSettingsCard() {
+private fun NightModeGroup() {
     val context = LocalContext.current
+    val messenger = LocalAppMessenger.current
     var source by remember { mutableStateOf(NightModePreferences.getSource(context)) }
-    var tunnelEnabled by remember {
-        mutableStateOf(NightModePreferences.isTunnelDetectionEnabled(context))
-    }
+    var tunnelEnabled by remember { mutableStateOf(NightModePreferences.isTunnelDetectionEnabled(context)) }
     val hasLightSensor = remember { NightModePreferences.hasLightSensor(context) }
+    val solarHint = remember(source) {
+        val (lat, lng) = NightModePreferences.lastKnownLocation(context)
+        nextSolarSwitch(lat, lng, System.currentTimeMillis())
+    }
+    val select = { value: NightModeSource ->
+        source = value
+        NightModePreferences.setSource(context, value)
+    }
 
-    SettingsCard(modifier = Modifier.testTag("night_mode_settings_card")) {
-        SettingsCardTitle(
-            title = "Mode nuit",
-            subtitle = "Ce qui fait basculer l'application en thème sombre."
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .testTag("night_mode_settings_card")
+    ) {
+        SettingsRow(
+            icon = null,
+            leading = { MpRadio(source == NightModeSource.SYSTEM) },
+            title = "Suivre le téléphone",
+            subtitle = "Thème du système Android",
+            onClick = { select(NightModeSource.SYSTEM) },
+            testTag = "night_mode_option_system"
         )
-
-        SettingsChoiceList(
-            choices = listOf(
-                SettingsChoice(
-                    value = NightModeSource.SYSTEM,
-                    icon = Icons.Default.PhoneAndroid,
-                    title = "Suivre le téléphone",
-                    description = "L'application passe en sombre en même temps qu'Android",
-                    testTag = "night_mode_option_system"
-                ),
-                SettingsChoice(
-                    value = NightModeSource.SOLAR,
-                    icon = Icons.Default.WbTwilight,
-                    title = "Lever et coucher du soleil",
-                    description = "Clair le jour, sombre la nuit, selon l'heure réelle du soleil là où vous êtes",
-                    testTag = "night_mode_option_solar"
-                )
-            ),
-            selected = source,
-            onSelect = { value ->
-                source = value
-                NightModePreferences.setSource(context, value)
-            }
+        SettingsRow(
+            icon = null,
+            leading = { MpRadio(source == NightModeSource.SOLAR) },
+            title = "Lever et coucher du soleil",
+            subtitle = "Heure solaire à votre position" + (solarHint?.let { " · $it" } ?: ""),
+            onClick = { select(NightModeSource.SOLAR) },
+            testTag = "night_mode_option_solar"
         )
-
-        AnimatedVisibility(visible = source == NightModeSource.SOLAR) {
-            Column {
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                SettingsToggleRow(
-                    icon = Icons.Default.Train,
-                    title = "Sombre dans les tunnels",
-                    description = if (hasLightSensor) {
-                        "Bascule en sombre le temps d'un tunnel ou d'un parking couvert, " +
-                                "puis revient au clair à la sortie"
+        // La détection de tunnel n'agit qu'en mode solaire : c'est une exception au
+        // jour, pas un réglage à part. Proposée seulement là où elle a un effet.
+        if (source == NightModeSource.SOLAR) {
+            SettingsRow(
+                icon = Icons.Rounded.LightMode,
+                title = "Sombre dans les tunnels",
+                titleAlpha = if (hasLightSensor) 1f else 0.5f,
+                subtitle = if (hasLightSensor) {
+                    "Le temps d'un tunnel ou d'un parking couvert, grâce au capteur de luminosité"
+                } else {
+                    "Cet appareil n'a pas de capteur de luminosité"
+                },
+                subtitleColor = if (hasLightSensor) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                onClick = {
+                    if (hasLightSensor) {
+                        tunnelEnabled = !tunnelEnabled
+                        NightModePreferences.setTunnelDetectionEnabled(context, tunnelEnabled)
                     } else {
-                        "Cet appareil n'a pas de capteur de luminosité"
-                    },
-                    checked = tunnelEnabled,
-                    enabled = hasLightSensor,
-                    onCheckedChange = { checked ->
-                        tunnelEnabled = checked
-                        NightModePreferences.setTunnelDetectionEnabled(context, checked)
-                    },
-                    switchTestTag = "night_mode_tunnel_switch"
-                )
-
-                AnimatedVisibility(visible = tunnelEnabled && hasLightSensor) {
-                    SettingsHint(
-                        "La bascule demande une chute franche de luminosité, et non un simple " +
-                                "seuil : rester à l'intérieur en pleine journée ne déclenche rien."
+                        messenger.show(
+                            "Pas de capteur de luminosité sur cet appareil : option indisponible.",
+                            Icons.Rounded.LightMode,
+                            isError = true
+                        )
+                    }
+                },
+                trailing = {
+                    MpSwitch(
+                        checked = tunnelEnabled && hasLightSensor,
+                        enabled = hasLightSensor,
+                        onCheckedChange = { checked ->
+                            tunnelEnabled = checked
+                            NightModePreferences.setTunnelDetectionEnabled(context, checked)
+                        },
+                        modifier = Modifier.testTag("night_mode_tunnel_switch")
                     )
                 }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tracés
-// ---------------------------------------------------------------------------
-
-/** "3,5" plutôt que "3.5" : une virgule quel que soit le réglage régional de l'appareil. */
-private fun formatThicknessDp(value: Float): String =
-    String.format(java.util.Locale.US, "%.1f", value).replace('.', ',')
-
-/**
- * Réglage de l'épaisseur du trait des tracés, avec aperçu en direct.
- *
- * Curseur continu et champ de saisie se répondent l'un l'autre : le premier pour un
- * réglage rapide, le second pour une valeur précise (en dp, avec virgule). Aucun des
- * deux n'est cranté sur des paliers prédéfinis.
- */
-@Composable
-fun TrackThicknessSettingsCard() {
-    val context = LocalContext.current
-    val density = LocalDensity.current
-
-    var thicknessDp by remember { mutableStateOf(TrackStylePreferences.getThicknessDp(context)) }
-    var textValue by remember { mutableStateOf(formatThicknessDp(thicknessDp)) }
-
-    /** Retient une épaisseur à l'écran, ramenée dans les bornes autorisées. */
-    fun applyThickness(dp: Float) {
-        thicknessDp = dp.coerceIn(
-            TrackStylePreferences.MIN_THICKNESS_DP,
-            TrackStylePreferences.MAX_THICKNESS_DP
-        )
-    }
-
-    /**
-     * Enregistre l'épaisseur retenue.
-     *
-     * Séparé de [applyThickness] pour ne pas écrire dans les préférences à chaque
-     * pixel de glissement du curseur : une seule traversée du curseur déclenchait
-     * des dizaines d'écritures, chacune réveillant les écoutes de préférences.
-     */
-    fun persistThickness() {
-        TrackStylePreferences.setThicknessDp(context, thicknessDp)
-    }
-
-    /**
-     * Réaffiche dans le champ la valeur réellement retenue.
-     *
-     * Sans ça, taper « 99 » laissait « 99 » à l'écran alors que l'épaisseur avait été
-     * ramenée au maximum, et « abc » restait affiché sans que rien ne le signale : le
-     * champ contredisait en silence le curseur et l'aperçu situés juste au-dessus.
-     */
-    fun normalizeText() {
-        textValue = formatThicknessDp(thicknessDp)
-    }
-
-    SettingsCard(modifier = Modifier.testTag("track_thickness_card")) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Épaisseur du trait",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "S'applique à tous les tracés affichés sur la carte",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            ) {
-                Text(
-                    text = "${formatThicknessDp(thicknessDp)} dp",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Aperçu : un trait à l'épaisseur choisie.
-        //
-        // La couleur est lue ici, et non dans le Canvas : la fonction de dessin est un
-        // DrawScope, pas un contexte composable, et ne peut donc pas interroger le
-        // thème. La constante figée qu'elle utilisait auparavant, elle, passait
-        // n'importe où — c'est ce qui rendait l'erreur invisible.
-        //
-        // La conversion dp → pixels utilise la densité de l'écran, exactement comme
-        // TrackStylePreferences.getStrokeWidth : l'aperçu montre donc la même
-        // épaisseur que celle qui sera dessinée sur la carte.
-        val previewColor = MaterialTheme.colorScheme.primary
-        val previewStrokeWidthPx = with(density) { thicknessDp.dp.toPx() }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                drawLine(
-                    color = previewColor,
-                    start = Offset(24f, size.height / 2f),
-                    end = Offset(size.width - 24f, size.height / 2f),
-                    strokeWidth = previewStrokeWidthPx,
-                    cap = StrokeCap.Round
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Slider(
-            value = thicknessDp,
-            onValueChange = {
-                applyThickness(it)
-                normalizeText()
-            },
-            onValueChangeFinished = { persistThickness() },
-            valueRange = TrackStylePreferences.MIN_THICKNESS_DP..TrackStylePreferences.MAX_THICKNESS_DP,
-            modifier = Modifier.fillMaxWidth().testTag("track_thickness_slider")
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "${formatThicknessDp(TrackStylePreferences.MIN_THICKNESS_DP)} dp",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "${formatThicknessDp(TrackStylePreferences.MAX_THICKNESS_DP)} dp",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = textValue,
-            onValueChange = { input ->
-                textValue = input
-                input.replace(',', '.').toFloatOrNull()?.let {
-                    applyThickness(it)
-                    persistThickness()
-                }
-            },
-            label = { Text("Valeur précise (dp)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                // Une saisie hors bornes ou illisible est ramenée à l'affichage dès
-                // que l'on quitte le champ, plutôt que de rester là à contredire
-                // l'épaisseur réellement appliquée.
-                .onFocusChanged { focus -> if (!focus.isFocused) normalizeText() }
-                .testTag("track_thickness_field")
-        )
-
-        // La couleur se règle depuis l'historique, par appui long sur une catégorie.
-        // Le geste étant indevinable, mieux vaut le rappeler là où on cherche à
-        // changer l'apparence des tracés.
-        SettingsHint(
-            "Les couleurs se choisissent dans l'onglet Historique, par appui long sur " +
-                    "« Enregistrés » ou « Importés »."
-        )
     }
 }
 
@@ -806,349 +910,118 @@ fun TrackThicknessSettingsCard() {
 // ---------------------------------------------------------------------------
 
 @Composable
-fun AutoBackupSettingsCard() {
+private fun AutoBackupGroup() {
     val context = LocalContext.current
     var isEnabled by remember { mutableStateOf(AutoBackupPreferences.isAutoBackupEnabled(context)) }
     var isGpx by remember { mutableStateOf(AutoBackupPreferences.isFormatGpx(context)) }
     var isKml by remember { mutableStateOf(AutoBackupPreferences.isFormatKml(context)) }
+    val toggle = { checked: Boolean ->
+        isEnabled = checked
+        AutoBackupPreferences.setAutoBackupEnabled(context, checked)
+    }
 
-    SettingsCard(modifier = Modifier.testTag("auto_backup_settings_card")) {
-        SettingsToggleRow(
-            icon = Icons.Default.Save,
-            title = "Sauvegarde automatique",
-            description = "Exporte automatiquement chaque trajet terminé",
-            checked = isEnabled,
-            onCheckedChange = { checked ->
-                isEnabled = checked
-                AutoBackupPreferences.setAutoBackupEnabled(context, checked)
-            },
-            switchTestTag = "auto_backup_main_toggle"
-        )
-
-        AnimatedVisibility(visible = isEnabled) {
-            Column {
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Formats d'export",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .testTag("auto_backup_settings_card")
+    ) {
+        SettingsRow(
+            icon = Icons.Rounded.Save,
+            title = "Exporter chaque trajet terminé",
+            subtitle = "Téléchargements/Mes parcours",
+            onClick = { toggle(!isEnabled) },
+            trailing = {
+                MpSwitch(
+                    checked = isEnabled,
+                    onCheckedChange = toggle,
+                    modifier = Modifier.testTag("auto_backup_main_toggle")
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Au moins un format doit rester coché, sinon la sauvegarde
-                // automatique serait activée sans rien produire.
-                FormatCheckboxRow(
-                    label = "Format GPX (.gpx)",
-                    checked = isGpx,
-                    canUncheck = isKml,
-                    testTag = "format_gpx_checkbox",
-                    onCheckedChange = { checked ->
-                        isGpx = checked
-                        AutoBackupPreferences.setFormatGpx(context, checked)
-                    }
-                )
-                FormatCheckboxRow(
-                    label = "Format KML (.kml)",
-                    checked = isKml,
-                    canUncheck = isGpx,
-                    testTag = "format_kml_checkbox",
-                    onCheckedChange = { checked ->
-                        isKml = checked
-                        AutoBackupPreferences.setFormatKml(context, checked)
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Destination",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PinDrop,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Stockage local",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Enregistre dans Download/Mes parcours/ sur l'appareil",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
             }
-        }
-    }
-}
-
-/**
- * Case de format d'export. [canUncheck] traduit la seule règle du bloc : on ne peut
- * pas décocher le dernier format restant.
- */
-@Composable
-private fun FormatCheckboxRow(
-    label: String,
-    checked: Boolean,
-    canUncheck: Boolean,
-    testTag: String,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    val toggle = {
-        val next = !checked
-        if (next || canUncheck) onCheckedChange(next)
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { toggle() }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = { next -> if (next || canUncheck) onCheckedChange(next) },
-            modifier = Modifier.testTag(testTag)
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// À propos
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun AboutCard() {
-    var showReleaseNotesDialog by remember { mutableStateOf(false) }
-
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.5.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp)
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        // Au moins un format doit rester coché, sinon la sauvegarde automatique serait
+        // activée sans rien produire.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(start = 54.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
+                .alpha(if (isEnabled) 1f else 0.45f)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Map,
-                    contentDescription = "Mes parcours",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Mes parcours",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.SansSerif
-                ),
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Badge de version, cliquable pour ouvrir le journal des nouveautés.
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
-                ),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { showReleaseNotesDialog = true }
-                    .testTag("version_badge")
-            ) {
-                Text(
-                    // Lue depuis BuildConfig : la version n'est écrite qu'une fois,
-                    // dans build.gradle.kts, et l'affichage ne peut plus dériver.
-                    text = "v${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-            }
-
-            if (showReleaseNotesDialog) {
-                ReleaseNotesDialog(onDismiss = { showReleaseNotesDialog = false })
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "Une application de suivi GPS et de cartographie moderne pour enregistrer, " +
-                        "analyser, fusionner et exporter vos parcours au format GPX, en toute sécurité.",
-                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                fontFamily = FontFamily.SansSerif,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Dédicace à Thierry
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
-                border = BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "❤️",
-                        fontSize = 22.sp,
-                        modifier = Modifier.padding(end = 12.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "Dédicace spéciale",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Application développée particulièrement pour mon père Thierry.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.Medium,
-                                lineHeight = 18.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+            FormatChip("GPX", isGpx, enabled = isEnabled, testTag = "format_gpx_checkbox") {
+                if (!isGpx || isKml) {
+                    isGpx = !isGpx
+                    AutoBackupPreferences.setFormatGpx(context, isGpx)
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Code,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Open Source",
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Code 100% libre",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "✍️", fontSize = 20.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Fait par ToftMalone",
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Développeur",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            FormatChip("KML", isKml, enabled = isEnabled, testTag = "format_kml_checkbox") {
+                if (!isKml || isGpx) {
+                    isKml = !isKml
+                    AutoBackupPreferences.setFormatKml(context, isKml)
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Mes parcours • 2026",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                fontFamily = FontFamily.Monospace
-            )
         }
     }
 }
 
-/** Une version et ce qu'elle a apporté. */
-private class Release(val version: String, val changes: List<String>)
+@Composable
+private fun FormatChip(label: String, checked: Boolean, enabled: Boolean, testTag: String, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val checkWidth by animateDpAsState(if (checked) 18.dp else 0.dp, label = "chip_check")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (checked) colors.secondaryContainer else Color.Transparent)
+            .border(1.dp, if (checked) colors.secondaryContainer else colors.outlineVariant, RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(start = 10.dp, end = 14.dp)
+            .testTag(testTag)
+    ) {
+        Box(modifier = Modifier.width(checkWidth).clip(RoundedCornerShape(0.dp))) {
+            if (checkWidth > 0.dp) Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (checked) colors.onSecondaryContainer else colors.onSurface)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pages de détail : en-tête commun
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SubPageTopBar(title: String?, onBack: () -> Unit, backTag: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .height(56.dp)
+            .offset(x = (-8).dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onBack)
+                .testTag(backTag)
+        ) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Retour")
+        }
+        if (title != null) Text(title, style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Journal des nouveautés
+// ---------------------------------------------------------------------------
+
+/** Une version, sa date de publication, et ce qu'elle a apporté. */
+private class Release(val version: String, val date: String?, val changes: List<String>)
 
 /**
  * Journal des nouveautés, de la version la plus récente à la plus ancienne.
@@ -1157,34 +1030,37 @@ private class Release(val version: String, val changes: List<String>)
  * nouvelle version, on remplace son contenu — les versions de développement se
  * succèdent trop vite pour qu'un historique ait de l'intérêt.
  *
- * **À partir de la 1.0** : on ajoute une entrée en tête au lieu de remplacer, et
- * l'historique commence à s'accumuler à la version suivante. L'affichage gère déjà
- * plusieurs versions ; rien d'autre à changer le jour où une deuxième entrée arrive.
+ * **À partir de la 1.0** : on ajoute une entrée en tête au lieu de remplacer.
  *
- * La version courante est repérée par comparaison avec `BuildConfig.VERSION_NAME` :
- * elle n'est jamais à désigner à la main.
+ * La date est celle de la publication GitHub (AAAA-MM-JJ), `null` tant que la version
+ * n'est pas publiée. La version installée est repérée par comparaison avec
+ * `BuildConfig.VERSION_NAME` : elle n'est jamais à désigner à la main.
  */
 private val RELEASES = listOf(
     Release(
         version = "1.3.1",
+        date = "2026-09-23",
         changes = listOf(
             "Correction de plusieurs failles de sécurité"
         )
     ),
     Release(
         version = "1.3",
+        date = "2026-09-15",
         changes = listOf(
             "Réduction de la consommation de batterie"
         )
     ),
     Release(
         version = "1.2",
+        date = "2026-09-09",
         changes = listOf(
             "Correction d'une faille de sécurité"
         )
     ),
     Release(
         version = "1.1",
+        date = "2026-09-02",
         changes = listOf(
             "Chargement de la carte nettement plus rapide, en vue satellite surtout",
             "L'outil de conversion CSV a été retiré"
@@ -1192,112 +1068,266 @@ private val RELEASES = listOf(
     ),
     Release(
         version = "1.0",
+        date = "2026-08-31",
         changes = listOf(
             "Première version stable"
         )
     )
 )
 
-@Composable
-private fun ReleaseNotesDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = "Journal des nouveautés",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        },
-        title = {
-            Text(
-                text = "Journal des nouveautés",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            // Défilement : le journal s'allonge à chaque version, et sans lui les
-            // versions les plus anciennes deviendraient inatteignables.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                RELEASES.forEachIndexed { index, release ->
-                    if (index > 0) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
+/** Version installée, sans le suffixe de la variante de debug. */
+private val INSTALLED_VERSION = BuildConfig.VERSION_NAME.removeSuffix("-debug")
 
-                    // Tant qu'une seule version est listée, signaler laquelle est
-                    // installée n'apprendrait rien.
-                    ReleaseHeader(
-                        release = release,
-                        showCurrentBadge = RELEASES.size > 1
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    release.changes.forEach { item ->
-                        Row(
-                            verticalAlignment = Alignment.Top,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "• ",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = item,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.testTag("close_release_notes_button")
-            ) {
-                Text("Fermer", fontWeight = FontWeight.Bold)
-            }
-        },
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.testTag("release_notes_dialog")
-    )
+private fun formatReleaseDate(date: String?, withYear: Boolean): String? {
+    if (date == null) return null
+    val parsed = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) }.getOrNull() ?: return null
+    return SimpleDateFormat(if (withYear) "d MMM yyyy" else "d MMM", Locale.FRANCE).format(parsed)
 }
 
-/** Numéro de version, marqué « actuelle » s'il s'agit de la version installée. */
 @Composable
-private fun ReleaseHeader(release: Release, showCurrentBadge: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "v${release.version}",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
+private fun ChangelogPage(availableUpdate: AvailableUpdate?, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp)
+            .testTag("release_notes_dialog")
+    ) {
+        SubPageTopBar("Nouveautés", onBack, "close_release_notes_button")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            if (availableUpdate != null) {
+                val outline = colors.outline
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .drawBehind {
+                            drawRoundRect(
+                                outline,
+                                cornerRadius = CornerRadius(28.dp.toPx()),
+                                style = Stroke(
+                                    width = 1.5.dp.toPx(),
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))
+                                )
+                            )
+                        }
+                        .padding(18.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(availableUpdate.versionName, fontFamily = DisplayFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .height(22.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(colors.tertiaryContainer)
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            Text("Disponible", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.onTertiaryContainer)
+                        }
+                    }
+                    ReleaseBullets(availableUpdate.notes, colors.onSurfaceVariant, 14)
+                }
+            }
 
-        if (showCurrentBadge && release.version == BuildConfig.VERSION_NAME) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            ) {
-                Text(
-                    text = "actuelle",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+            RELEASES.forEach { release ->
+                if (release.version == INSTALLED_VERSION) InstalledReleaseCard(release) else PastReleaseCard(release)
             }
         }
     }
+}
+
+@Composable
+private fun ReleaseBullets(items: List<String>, color: Color, fontSize: Int) {
+    Column(modifier = Modifier.padding(top = 6.dp)) {
+        items.forEach { item ->
+            Text("• $item", fontSize = fontSize.sp, lineHeight = (fontSize * 1.6f).sp, color = color)
+        }
+    }
+}
+
+@Composable
+private fun InstalledReleaseCard(release: Release) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(36.dp))
+            .background(colors.primaryContainer)
+    ) {
+        // Cookie décoratif dans le coin, comme sur la maquette.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 30.dp, y = (-30).dp)
+                .size(120.dp)
+                .alpha(0.18f)
+                .clip(CookieShape)
+                .background(colors.primary)
+        )
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    release.version,
+                    fontFamily = DisplayFontFamily,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight(750),
+                    color = colors.onPrimaryContainer
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.primary)
+                        .padding(horizontal = 10.dp)
+                ) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(14.dp))
+                    Text("Version installée", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimary)
+                }
+            }
+            formatReleaseDate(release.date, withYear = true)?.let {
+                Text(it, fontSize = 13.sp, color = colors.onPrimaryContainer, modifier = Modifier.padding(top = 2.dp))
+            }
+            Column(modifier = Modifier.padding(top = 4.dp)) {
+                ReleaseBullets(release.changes, colors.onPrimaryContainer, 15)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PastReleaseCard(release: Release) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(colors.surfaceContainerLow)
+            .padding(18.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(release.version, fontFamily = DisplayFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            formatReleaseDate(release.date, withYear = false)?.let {
+                Text(
+                    " · $it",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+        }
+        ReleaseBullets(release.changes, colors.onSurfaceVariant, 14)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// À propos
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AboutPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp)
+            .testTag("about_page")
+    ) {
+        SubPageTopBar(null, onBack, "about_back_button")
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(104.dp)
+                    .clip(CircleShape)
+                    .background(colors.primary)
+            ) {
+                Icon(Icons.Rounded.Route, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(56.dp))
+            }
+            Text(
+                "Mes parcours",
+                fontFamily = DisplayFontFamily,
+                fontSize = 32.sp,
+                fontWeight = FontWeight(750),
+                modifier = Modifier.padding(top = 14.dp)
+            )
+            // Lue depuis BuildConfig : la version n'est écrite qu'une fois, dans
+            // build.gradle.kts, et l'affichage ne peut plus dériver.
+            Text("Version ${BuildConfig.VERSION_NAME}", fontSize = 14.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+        }
+
+        // Dédicace à Thierry.
+        Box(
+            modifier = Modifier
+                .padding(top = 22.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(40.dp))
+                .background(colors.tertiaryContainer)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = (-40).dp, y = 50.dp)
+                    .size(150.dp)
+                    .alpha(0.14f)
+                    .clip(SunShape)
+                    .background(colors.tertiary)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 30.dp, y = (-40).dp)
+                    .size(110.dp)
+                    .alpha(0.14f)
+                    .clip(CookieShape)
+                    .background(colors.tertiary)
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 26.dp)
+            ) {
+                Text("DÉDICACE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = colors.onTertiaryContainer)
+                Text(
+                    "« Application développée particulièrement pour mon père Thierry »",
+                    fontFamily = QuoteFontFamily,
+                    fontSize = 24.sp,
+                    lineHeight = 31.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    color = colors.onTertiaryContainer,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Icon(
+                    Icons.Rounded.Favorite,
+                    contentDescription = null,
+                    tint = colors.tertiary,
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .size(36.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        SettingsGroup {
+            AboutRow(Icons.Rounded.Code, "Open source", "Licence GPL-3.0")
+            AboutRow(Icons.Rounded.Lock, "Stockage 100 % local", "Aucun compte, aucun serveur")
+            AboutRow(Icons.Rounded.Person, "Développeur", "ToftMalone")
+        }
+    }
+}
+
+@Composable
+private fun AboutRow(icon: ImageVector, title: String, subtitle: String) {
+    SettingsRow(icon = icon, iconTint = MaterialTheme.colorScheme.primary, title = title, subtitle = subtitle)
 }
