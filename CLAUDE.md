@@ -632,13 +632,18 @@ fait pas :
   suivante — pas de téléchargement hors de l'application.
 - **Tunnel** : la ligne « Sombre dans les tunnels » n'apparaît qu'en mode solaire,
   seul mode où elle agit.
-- **Disposition de l'écran Enregistrer** : l'auteur a gardé le dessin de la maquette
-  mais voulu retrouver **la disposition d'avant**. La carte de statistiques est en
-  haut, à la place de l'ancien bandeau d'altitude (l'état du GPS y est un point, et
-  les alertes de signal la recouvrent un instant) ; le bouton de fond de carte et le
-  bandeau des tracés masqués viennent juste en dessous. Les boutons sont en colonne
-  en bas à droite : « Recentrer », puis Démarrer ou Pause/Reprendre, puis Arrêter.
-  Ne pas revenir à la disposition centrée de la maquette.
+- **Écran Enregistrer : disposition et tailles d'avant.** L'auteur a gardé le dessin
+  de la maquette (couleurs, polices, formes, ombres), mais voulu retrouver **la
+  place et la taille** des éléments d'avant. Un bandeau de statistiques d'une seule
+  rangée en haut (vitesse et altitude, puis distance, durée, vitesse et altitude
+  pendant un enregistrement ; point d'état du GPS à droite ; alertes de signal qui le
+  recouvrent un instant), le bouton de fond de carte et le bandeau des tracés masqués
+  juste en dessous. En bas à droite, des boutons ronds en colonne aux tailles
+  d'avant : Recentrer (56 dp, toujours visible, plein quand le suivi est actif), puis
+  Pause/Reprendre (56 dp) et le bouton principal (72 dp : Démarrer, Nouveau parcours
+  pendant le choix, Arrêter pendant l'enregistrement) ; pendant le choix, Annuler
+  (48 dp) et Reprendre une trace (56 dp) au-dessus. **Ne pas revenir à la carte
+  géante ni au bouton centré de la maquette.**
 - **Tracés masqués** : « Laisser masqués » remplace « Masquer les tracés » dans le bandeau
   des tracés masqués — les tracés le sont déjà, le bouton range seulement le bandeau.
 

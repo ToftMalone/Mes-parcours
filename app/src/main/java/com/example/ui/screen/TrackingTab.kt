@@ -22,7 +22,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,7 +32,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +93,6 @@ import com.example.ui.component.ShapeBadge
 import com.example.ui.component.TrackTile
 import com.example.ui.theme.DisplayFontFamily
 import com.example.ui.theme.LocalRecordingColor
-import com.example.ui.theme.StatXlTextStyle
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
@@ -206,13 +203,12 @@ fun TrackingTab(
     val signalFound = delayedGpsStatus == "Signal trouvé"
     val currentAlt = currentAltitude?.metersAboveSeaLevel
     val currentSpeed = currentUserLocation?.speed?.toDouble() ?: liveStats.currentSpeedMps
-    val trackName = allTracks.firstOrNull { it.id == currentTrackId }?.name ?: "Nouveau parcours"
 
     // Hauteur de la carte de statistiques, pour poser le bandeau des tracés masqués
     // juste en dessous : elle grandit quand un enregistrement démarre.
     var statsCardHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
-    val zoomBannerTop = with(density) { statsCardHeightPx.toDp() } + 24.dp
+    val zoomBannerTop = with(density) { statsCardHeightPx.toDp() } + 36.dp
 
     val startNew = {
         viewModel.startRecording(context, "Nouveau parcours", "Parcours")
@@ -255,7 +251,7 @@ fun TrackingTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(start = 12.dp, end = 12.dp, top = 12.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 24.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -265,7 +261,6 @@ fun TrackingTab(
                     StatsCard(
                         mode = mode,
                         stats = liveStats,
-                        trackName = trackName,
                         currentSpeedMps = currentSpeed,
                         currentAltitude = currentAlt,
                         gpsIndicator = { GpsDot(found = signalFound) }
@@ -289,8 +284,8 @@ fun TrackingTab(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .padding(top = 12.dp, end = 4.dp)
-                        .size(48.dp)
+                        .padding(top = 12.dp)
+                        .size(44.dp)
                         .shadow(6.dp, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerLow)
@@ -314,38 +309,31 @@ fun TrackingTab(
             )
         }
 
-        // --- Bas de l'écran, à droite, comme avant : recentrage, puis le bouton
-        // principal et « Arrêter » l'un sous l'autre.
+        // --- Bas de l'écran, à droite, comme avant et aux mêmes tailles : recentrage
+        // (56 dp), puis le bouton secondaire (56 dp) et le bouton principal (72 dp).
         if (hasLocationPermission) {
             Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(start = 12.dp, end = 16.dp, bottom = 100.dp)
+                    .padding(end = 20.dp, bottom = 96.dp)
             ) {
-                val canRecenter = currentUserLocation != null || livePoints.isNotEmpty()
-                if (!isAutoFollowActive && canRecenter && mode != ControlsMode.CHOICE) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .height(56.dp)
-                            .shadow(8.dp, RoundedCornerShape(20.dp))
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickable {
-                                isAutoFollowActive = true
-                                recenterTrigger++
-                            }
-                            .padding(start = 16.dp, end = 20.dp)
-                            .testTag("recenter_button")
-                    ) {
-                        Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("Recentrer", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
+                if (currentUserLocation != null || livePoints.isNotEmpty()) {
+                    RoundButton(
+                        icon = Icons.Rounded.MyLocation,
+                        description = "Recentrer",
+                        size = 56.dp,
+                        iconSize = 24.dp,
+                        container = if (isAutoFollowActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLow,
+                        content = if (isAutoFollowActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                        testTag = "recenter_button",
+                        onClick = {
+                            isAutoFollowActive = true
+                            recenterTrigger++
+                        }
+                    )
                 }
 
                 RecordingControls(
@@ -415,7 +403,7 @@ private fun GpsAlert(lost: Boolean, subtitle: String, modifier: Modifier = Modif
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         modifier = modifier
-            .clip(RoundedCornerShape(36.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(bg)
             .padding(horizontal = 18.dp)
             .testTag(if (lost) "gps_lost_alert" else "gps_found_alert")
@@ -506,145 +494,151 @@ private fun RollingNumber(text: String, style: TextStyle, modifier: Modifier = M
     }
 }
 
+/**
+ * Bandeau de statistiques, **à la taille de l'ancien** — une seule rangée de
+ * chiffres, à la demande de l'auteur qui voulait garder la place d'avant pour la
+ * carte — mais dans le dessin de la refonte : fond de surface, Bricolage pour les
+ * chiffres, unités dans les libellés, point d'état du GPS à droite.
+ */
 @Composable
 private fun StatsCard(
     mode: ControlsMode,
     stats: LiveStats,
-    trackName: String,
     currentSpeedMps: Double,
     currentAltitude: Double?,
     modifier: Modifier = Modifier,
     gpsIndicator: @Composable () -> Unit = {}
 ) {
     val colors = MaterialTheme.colorScheme
-    Column(
+    val value = TextStyle(
+        fontFamily = DisplayFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 20.sp,
+        lineHeight = 24.sp,
+        fontFeatureSettings = "tnum",
+        color = colors.onSurface
+    )
+    val recording = mode == ControlsMode.RECORDING || mode == ControlsMode.PAUSED
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .shadow(10.dp, RoundedCornerShape(36.dp))
-            .clip(RoundedCornerShape(36.dp))
+            .shadow(8.dp, RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(colors.surfaceContainerLow)
-            .padding(horizontal = 22.dp, vertical = 20.dp)
+            .padding(start = 16.dp, end = 14.dp, top = 10.dp, bottom = 10.dp)
             .testTag("live_stats_panel")
     ) {
-        val mid = TextStyle(fontFamily = DisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 26.sp, fontFeatureSettings = "tnum", color = colors.onSurface)
-        if (mode == ControlsMode.RECORDING || mode == ControlsMode.PAUSED) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (mode == ControlsMode.RECORDING) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(colors.errorContainer)
-                            .padding(start = 10.dp, end = 12.dp)
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(LocalRecordingColor.current))
-                        Text("ENREGISTREMENT", style = MaterialTheme.typography.labelSmall, color = colors.onErrorContainer)
-                    }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(colors.tertiaryContainer)
-                            .padding(start = 8.dp, end = 12.dp)
-                    ) {
-                        Icon(Icons.Rounded.Pause, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(16.dp))
-                        Text("EN PAUSE", style = MaterialTheme.typography.labelSmall, color = colors.onTertiaryContainer)
-                    }
-                }
-                Text(
-                    trackName,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.onSurfaceVariant,
-                    textAlign = TextAlign.End,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp, end = 10.dp)
-                )
-                gpsIndicator()
-            }
-            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
-                RollingNumber(kmValue(stats.distanceMeters), StatXlTextStyle.copy(color = colors.onSurface))
-                Text(
-                    "km",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp, bottom = 10.dp)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {
-                StatColumn("Durée", durationValue(stats.durationSec), mid, Modifier.weight(1.25f))
-                StatColumn("Vitesse · km/h", speedValue(currentSpeedMps), mid, Modifier.weight(1f))
-                StatColumn("Altitude · m", altitudeValue(currentAltitude), mid, Modifier.weight(0.9f))
-            }
+        if (recording) {
+            // Point d'enregistrement devant la distance ; il passe à l'orange de la
+            // pause quand l'enregistrement est suspendu.
+            Box(
+                modifier = Modifier
+                    .padding(end = 10.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (mode == ControlsMode.PAUSED) colors.tertiary else LocalRecordingColor.current)
+                    .testTag(if (mode == ControlsMode.PAUSED) "stats_paused_dot" else "stats_recording_dot")
+            )
+            CompactStat("Distance · km", kmValue(stats.distanceMeters), value, Modifier.weight(1f))
+            CompactStat("Durée", durationValue(stats.durationSec), value, Modifier.weight(1.25f))
+            CompactStat("Vitesse · km/h", speedValue(currentSpeedMps), value, Modifier.weight(1f))
+            CompactStat("Altitude · m", altitudeValue(currentAltitude), value, Modifier.weight(0.9f))
         } else {
-            val big = TextStyle(fontFamily = DisplayFontFamily, fontWeight = FontWeight.Bold, fontSize = 48.sp, letterSpacing = (-1).sp, fontFeatureSettings = "tnum", color = colors.onSurface)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                IdleStat("Vitesse", speedValue(currentSpeedMps), "km/h", big, Modifier.weight(1f))
-                IdleStat("Altitude", altitudeValue(currentAltitude), "m", big, Modifier.weight(1f), trailing = gpsIndicator)
-            }
+            CompactStat("Vitesse · km/h", speedValue(currentSpeedMps), value, Modifier.weight(1f))
+            CompactStat("Altitude · m", altitudeValue(currentAltitude), value, Modifier.weight(1f))
         }
+        Box(modifier = Modifier.padding(start = 6.dp)) { gpsIndicator() }
     }
 }
 
 @Composable
-private fun StatColumn(label: String, value: String, style: TextStyle, modifier: Modifier) {
-    Column(modifier = modifier) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        RollingNumber(value, style, Modifier.padding(top = 4.dp))
-    }
-}
-
-@Composable
-private fun IdleStat(
-    label: String,
-    value: String,
-    unit: String,
-    style: TextStyle,
-    modifier: Modifier,
-    trailing: @Composable () -> Unit = {}
-) {
-    Column(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.3.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            trailing()
-        }
-        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 6.dp)) {
-            RollingNumber(value, style)
-            Text(
-                unit,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
-            )
-        }
+private fun CompactStat(label: String, value: String, style: TextStyle, modifier: Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 0.2.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        RollingNumber(value, style, Modifier.padding(top = 2.dp))
     }
 }
 
 // ------------------------------------------------------------------ Commandes
 
 /**
- * Le bouton principal de la maquette, qui change de forme plutôt que d'être remplacé :
- * « Démarrer » (pilule large) s'ouvre en panneau de choix, devient « Pause » (carré
- * arrondi) pendant l'enregistrement, puis « Reprendre » (pilule) en pause. « Arrêter »
- * l'accompagne dès que l'enregistrement tourne, et s'élargit en pause pour montrer
- * son libellé.
- *
- * Les dimensions s'animent, jamais l'opacité de ce qui porte une ombre.
+ * Bouton rond de la refonte, aux tailles des boutons d'avant : 72 dp pour l'action
+ * principale, 56 dp pour les secondaires, 48 dp pour annuler.
+ */
+@Composable
+private fun RoundButton(
+    icon: ImageVector,
+    description: String,
+    size: Dp,
+    iconSize: Dp,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    val bg by animateColorAsState(container, label = "round_bg")
+    val fg by animateColorAsState(content, label = "round_fg")
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(size)
+            .shadow(8.dp, CircleShape)
+            .clip(CircleShape)
+            .background(bg)
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+    ) {
+        Crossfade(targetState = icon, animationSpec = tween(160), label = "round_icon") { ic ->
+            Icon(ic, contentDescription = description, tint = fg, modifier = Modifier.size(iconSize))
+        }
+    }
+}
+
+/**
+ * Bouton rond qui apparaît en grossissant : une échelle ne rogne rien,
+ * contrairement à une transition d'AnimatedVisibility, et l'opacité reste franche
+ * (voir « L'ombre tranchée » dans CLAUDE.md).
+ */
+@Composable
+private fun PoppingRoundButton(
+    icon: ImageVector,
+    description: String,
+    size: Dp,
+    iconSize: Dp,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    val appear = remember { Animatable(0.6f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 500f)) }
+    Box(modifier = Modifier.graphicsLayer { scaleX = appear.value; scaleY = appear.value }) {
+        RoundButton(icon, description, size, iconSize, container, content, testTag, onClick)
+    }
+}
+
+/** Ce que montre le bouton principal dans un état donné. */
+private class MainButton(
+    val icon: ImageVector,
+    val description: String,
+    val container: androidx.compose.ui.graphics.Color,
+    val content: androidx.compose.ui.graphics.Color,
+    val testTag: String,
+    val onClick: () -> Unit
+)
+
+/**
+ * Les boutons d'enregistrement, en colonne et aux tailles d'avant, dans le dessin de
+ * la refonte. Le bouton du bas (72 dp) est toujours l'action principale : Démarrer,
+ * Nouveau parcours pendant le choix, Arrêter pendant l'enregistrement. Au-dessus
+ * (56 dp) : Pause ou Reprendre, ou « Reprendre une trace » pendant le choix ; et
+ * au-dessus encore, pendant le choix seulement, Annuler (48 dp).
  */
 @Composable
 private fun RecordingControls(
@@ -658,212 +652,53 @@ private fun RecordingControls(
     canResumeExisting: Boolean
 ) {
     val colors = MaterialTheme.colorScheme
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
-        val panelWidth = maxWidth.coerceAtMost(420.dp)
-        val panelHeight = if (canResumeExisting) 232.dp else 152.dp
-        val targetWidth: Dp
-        val targetHeight: Dp
-        val targetRadius: Dp
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         when (mode) {
-            ControlsMode.IDLE -> { targetWidth = 236.dp; targetHeight = 80.dp; targetRadius = 40.dp }
-            ControlsMode.CHOICE -> { targetWidth = panelWidth; targetHeight = panelHeight; targetRadius = 36.dp }
-            ControlsMode.RECORDING -> { targetWidth = 136.dp; targetHeight = 88.dp; targetRadius = 28.dp }
-            ControlsMode.PAUSED -> { targetWidth = 136.dp; targetHeight = 88.dp; targetRadius = 44.dp }
-        }
-        val springSpec = spring<Dp>(dampingRatio = 0.8f, stiffness = 500f)
-        val width by animateDpAsState(targetWidth, springSpec, label = "main_w")
-        val height by animateDpAsState(targetHeight, springSpec, label = "main_h")
-        val radius by animateDpAsState(targetRadius, springSpec, label = "main_r")
-        val bg by animateColorAsState(
-            when (mode) {
-                ControlsMode.CHOICE -> colors.surfaceContainerHigh
-                ControlsMode.RECORDING -> colors.tertiaryContainer
-                else -> colors.primary
-            },
-            label = "main_bg"
-        )
-        val fg by animateColorAsState(
-            when (mode) {
-                ControlsMode.CHOICE -> colors.onSurface
-                ControlsMode.RECORDING -> colors.onTertiaryContainer
-                else -> colors.onPrimary
-            },
-            label = "main_fg"
-        )
-
-        // L'un sous l'autre, calés à droite, comme les boutons d'avant : le panneau de
-        // choix s'élargit donc vers la gauche.
-        Column(horizontalAlignment = Alignment.End) {
-            val shape = RoundedCornerShape(radius)
-            val mainClick: (() -> Unit)? = when (mode) {
-                ControlsMode.IDLE -> onStart
-                ControlsMode.CHOICE -> null
-                else -> onPauseResume
-            }
-            Box(
-                modifier = Modifier
-                    .size(width, height)
-                    .shadow(8.dp, shape)
-                    .clip(shape)
-                    .background(bg)
-                    .then(if (mainClick != null) Modifier.clickable(onClick = mainClick) else Modifier)
-                    .testTag(
-                        when (mode) {
-                            ControlsMode.IDLE -> "action_fab"
-                            ControlsMode.CHOICE -> "start_options_panel"
-                            else -> "pause_resume_fab"
-                        }
+            ControlsMode.CHOICE -> {
+                key("cancel") {
+                    PoppingRoundButton(
+                        Icons.Rounded.Close, "Annuler", 48.dp, 20.dp,
+                        colors.surfaceContainerHighest, colors.onSurfaceVariant,
+                        "cancel_start_options_fab", onCancelChoice
                     )
-            ) {
-                Crossfade(targetState = mode, animationSpec = tween(180), label = "main_content") { m ->
-                    when (m) {
-                        ControlsMode.IDLE -> Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(Icons.Rounded.RadioButtonChecked, contentDescription = null, tint = fg, modifier = Modifier.size(30.dp))
-                            Text("Démarrer", fontFamily = DisplayFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
-                        }
-                        ControlsMode.CHOICE -> StartChoicePanel(onNewTrack, onResumeExisting, onCancelChoice, canResumeExisting, panelWidth)
-                        ControlsMode.RECORDING -> Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(Icons.Rounded.Pause, contentDescription = null, tint = fg, modifier = Modifier.size(36.dp))
-                            Text("Pause", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
-                        }
-                        ControlsMode.PAUSED -> Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = fg, modifier = Modifier.size(38.dp))
-                            Text("Reprendre", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
-                        }
+                }
+                if (canResumeExisting) {
+                    key("resume_existing") {
+                        PoppingRoundButton(
+                            Icons.Rounded.Route, "Reprendre une trace existante", 56.dp, 24.dp,
+                            colors.secondaryContainer, colors.onSecondaryContainer,
+                            "resume_existing_track_fab", onResumeExisting
+                        )
                     }
                 }
             }
-
-            if (mode == ControlsMode.RECORDING || mode == ControlsMode.PAUSED) {
-                StopButton(expanded = mode == ControlsMode.PAUSED, onClick = onStop)
+            ControlsMode.RECORDING, ControlsMode.PAUSED -> {
+                val paused = mode == ControlsMode.PAUSED
+                key("pause_resume") {
+                    PoppingRoundButton(
+                        if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                        if (paused) "Reprendre" else "Pause",
+                        56.dp, 28.dp,
+                        if (paused) colors.primary else colors.tertiaryContainer,
+                        if (paused) colors.onPrimary else colors.onTertiaryContainer,
+                        "pause_resume_fab", onPauseResume
+                    )
+                }
             }
+            ControlsMode.IDLE -> Unit
         }
-    }
-}
 
-@Composable
-private fun StopButton(expanded: Boolean, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    // Apparition en grossissant — une échelle ne rogne rien, contrairement à une
-    // transition d'AnimatedVisibility, et l'opacité reste franche.
-    val appear = remember { Animatable(0.6f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 500f)) }
-    val width by animateDpAsState(if (expanded) 150.dp else 88.dp, spring(dampingRatio = 0.8f, stiffness = 500f), label = "stop_w")
-    val radius by animateDpAsState(if (expanded) 28.dp else 44.dp, label = "stop_r")
-    val shape = RoundedCornerShape(radius)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-        modifier = Modifier
-            .padding(top = 12.dp)
-            .graphicsLayer { scaleX = appear.value; scaleY = appear.value }
-            .size(width, 88.dp)
-            .shadow(8.dp, shape)
-            .clip(shape)
-            .background(colors.errorContainer)
-            .clickable(onClick = onClick)
-            .testTag("stop_fab")
-    ) {
-        Icon(Icons.Rounded.CropSquare, contentDescription = "Arrêter", tint = colors.onErrorContainer, modifier = Modifier.size(32.dp))
-        if (expanded) {
-            Text("Arrêter", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.onErrorContainer, maxLines = 1)
+        // Le bouton principal : un seul composant, qui change de couleur et d'icône
+        // d'un état à l'autre plutôt que d'être remplacé.
+        val main = when (mode) {
+            ControlsMode.IDLE -> MainButton(Icons.Rounded.RadioButtonChecked, "Démarrer", colors.primary, colors.onPrimary, "action_fab", onStart)
+            ControlsMode.CHOICE -> MainButton(Icons.Rounded.AddLocationAlt, "Nouveau parcours", colors.primary, colors.onPrimary, "start_new_track_fab", onNewTrack)
+            else -> MainButton(Icons.Rounded.CropSquare, "Arrêter", colors.errorContainer, colors.onErrorContainer, "stop_fab", onStop)
         }
-    }
-}
-
-@Composable
-private fun StartChoicePanel(
-    onNewTrack: () -> Unit,
-    onResumeExisting: () -> Unit,
-    onCancel: () -> Unit,
-    canResumeExisting: Boolean,
-    width: Dp
-) {
-    val colors = MaterialTheme.colorScheme
-    // Largeur fixe : le contenu ne se recompose pas en se tassant pendant que le
-    // bouton s'élargit, il se découvre.
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .width(width)
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp, end = 4.dp, bottom = 4.dp)) {
-            Text("Démarrer un enregistrement", fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(colors.surfaceContainerHighest)
-                    .clickable(onClick = onCancel)
-                    .testTag("cancel_start_options_fab")
-            ) {
-                Icon(Icons.Rounded.Close, contentDescription = "Annuler", modifier = Modifier.size(22.dp))
-            }
-        }
-        ChoiceRow(
-            icon = Icons.Rounded.AddLocationAlt,
-            title = "Nouveau parcours",
-            subtitle = "Partir de zéro",
-            container = colors.primary,
-            content = colors.onPrimary,
-            onClick = onNewTrack,
-            testTag = "start_new_track_fab"
-        )
-        if (canResumeExisting) {
-            ChoiceRow(
-                icon = Icons.Rounded.Route,
-                title = "Reprendre une trace",
-                subtitle = "Continuer un parcours existant",
-                container = colors.secondaryContainer,
-                content = colors.onSecondaryContainer,
-                onClick = onResumeExisting,
-                testTag = "resume_existing_track_fab"
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChoiceRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    container: androidx.compose.ui.graphics.Color,
-    content: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit,
-    testTag: String
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(container)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp)
-            .testTag(testTag)
-    ) {
-        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(28.dp))
-        Column {
-            Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = content, maxLines = 1)
-            Text(subtitle, fontSize = 13.sp, color = content.copy(alpha = 0.9f), maxLines = 1)
-        }
+        RoundButton(main.icon, main.description, 72.dp, 34.dp, main.container, main.content, main.testTag, main.onClick)
     }
 }
 
