@@ -564,6 +564,7 @@ fun MainScreen(
             bottomPadding = when {
                 detailId != null -> 24.dp
                 currentTab == "historique" -> 168.dp
+                currentTab == "enregistrer" -> 200.dp
                 else -> 96.dp
             },
             modifier = Modifier.align(Alignment.BottomCenter)

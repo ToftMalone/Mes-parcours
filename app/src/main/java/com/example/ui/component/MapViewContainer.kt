@@ -7,37 +7,30 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.preference.PreferenceManager
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +48,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.model.MapTrack
 import com.example.data.model.MapViewport
 import com.example.data.model.TrackPoint
-import com.example.ui.screen.AlertState
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.util.OsmConfig
 import com.example.util.TrackStylePreferences
@@ -302,36 +294,69 @@ private class MapState(
      * dépend de l'état courant : la refabriquer (bitmap, canvas, trois cercles)
      * à chaque appel n'était que du travail jeté, pour un résultat identique.
      */
-    var blueDotIcon: android.graphics.drawable.Drawable? = null
+    var blueDotIcon: android.graphics.drawable.Drawable? = null,
+    /**
+     * Couleurs du thème pour les repères et la trace en cours, relevées dans la
+     * composition : le dessin d'osmdroid n'a pas accès à MaterialTheme. Un
+     * changement (bascule clair ↔ sombre) vide [markerIcons] et les polylignes.
+     */
+    var themeColors: MarkerColors? = null,
+    /** Icônes des repères déjà dessinées, par couleur et par taille. */
+    val markerIcons: MutableMap<Long, android.graphics.drawable.Drawable> = mutableMapOf()
+)
+
+/** Couleurs des repères de carte, tirées du thème. */
+internal data class MarkerColors(
+    val position: Int,
+    val start: Int,
+    val end: Int,
+    val recording: Int
 )
 
 private fun blueDotIcon(context: Context, state: MapState): android.graphics.drawable.Drawable =
-    state.blueDotIcon ?: createBlueDotIcon(context).also { state.blueDotIcon = it }
+    state.blueDotIcon ?: createDotIcon(
+        context,
+        fill = state.themeColors?.position ?: Color.parseColor("#1F6A4F"),
+        sizeDp = 26f,
+        ringDp = 4f
+    ).also { state.blueDotIcon = it }
 
-private fun createBlueDotIcon(context: Context): android.graphics.drawable.Drawable {
+/**
+ * Pastille d'un repère (départ, arrivée), dessinée une fois par couleur puis
+ * réutilisée : même raison que [MapState.blueDotIcon].
+ */
+private fun markerIcon(context: Context, state: MapState, fill: Int, sizeDp: Float): android.graphics.drawable.Drawable {
+    val key = (fill.toLong() shl 8) or sizeDp.toLong()
+    return state.markerIcons.getOrPut(key) { createDotIcon(context, fill, sizeDp, ringDp = 3f) }
+}
+
+/**
+ * Pastille de la maquette : disque de couleur cerclé de blanc, sur une ombre douce
+ * qui la détache des tuiles claires comme sombres.
+ */
+private fun createDotIcon(context: Context, fill: Int, sizeDp: Float, ringDp: Float): android.graphics.drawable.Drawable {
     val density = context.resources.displayMetrics.density
-    val sizePx = (24 * density).toInt()
+    val shadowPx = 3 * density
+    val sizePx = (sizeDp * density + 2 * shadowPx).toInt()
     val bitmap = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
-    
-    val paint = Paint().apply {
-        isAntiAlias = true
-    }
-    
-    // Draw outer subtle shadow/glow
-    paint.color = Color.parseColor("#4285F4")
-    paint.alpha = 50
-    canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f, paint)
-    
-    // Draw outer white circle border
+    val c = sizePx / 2f
+    val radius = sizeDp * density / 2f
+
+    val paint = Paint().apply { isAntiAlias = true }
+
+    // Ombre : deux disques translucides légèrement décalés vers le bas.
+    paint.color = Color.BLACK
+    paint.alpha = 40
+    canvas.drawCircle(c, c + density, radius + shadowPx * 0.8f, paint)
+
     paint.color = Color.WHITE
     paint.alpha = 255
-    canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2.8f, paint)
-    
-    // Draw inner solid blue circle
-    paint.color = Color.parseColor("#1A73E8") // Google Maps Blue
-    canvas.drawCircle(sizePx / 2f, sizePx / 2f, (sizePx / 2.8f) - (2.2f * density), paint)
-    
+    canvas.drawCircle(c, c, radius, paint)
+
+    paint.color = fill
+    canvas.drawCircle(c, c, radius - ringDp * density, paint)
+
     return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }
 
@@ -376,12 +401,24 @@ fun MapViewContainer(
     bypassZoomThreshold: Boolean = false,
     onBypassZoomThresholdChanged: (Boolean) -> Unit = {},
     onMapStateChanged: (Double, Double, Double) -> Unit = { _, _, _ -> },
-    onViewportChanged: (MapViewport) -> Unit = {}
+    onViewportChanged: (MapViewport) -> Unit = {},
+    /**
+     * Fond de carte imposé par l'appelant (bouton « calques » de l'écran
+     * d'enregistrement) ; null = celui des réglages. Passer par un paramètre plutôt
+     * que par la seule préférence fait réexécuter le bloc `update` au changement.
+     */
+    tileStyle: String? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    val markerColors = MarkerColors(
+        position = scheme.primary.toArgb(),
+        start = scheme.primary.toArgb(),
+        end = scheme.onSurface.toArgb(),
+        recording = com.example.ui.theme.LocalRecordingColor.current.toArgb()
+    )
     // Decouple zoom gesture updates from Jetpack Compose recomposition cycles
     var isZoomedOutTooMuch by remember { mutableStateOf(false) }
-    var isExpanded by remember { mutableStateOf(false) }
 
     val mapView = rememberMapViewWithLifecycle(
         initialCenterLat = initialCenterLat,
@@ -412,7 +449,7 @@ fun MapViewContainer(
             modifier = Modifier.fillMaxSize(),
             update = { map ->
                 val prefs = PreferenceManager.getDefaultSharedPreferences(map.context)
-                val selectedStyle = prefs.getString("pref_map_style", "mapnik") ?: "mapnik"
+                val selectedStyle = tileStyle ?: prefs.getString("pref_map_style", "mapnik") ?: "mapnik"
                 val tileSource = when (selectedStyle) {
                     "usgs_sat" -> GOOGLE_SATELLITE_TILE_SOURCE
                     else -> TileSourceFactory.MAPNIK
@@ -427,7 +464,6 @@ fun MapViewContainer(
                 map.setOnTouchListener { _, event ->
                     if (event.action == android.view.MotionEvent.ACTION_DOWN) {
                         onAutoFollowChanged(false)
-                        isExpanded = false
                     }
                     false
                 }
@@ -435,6 +471,16 @@ fun MapViewContainer(
                 // Retrieve or initialize map cache state
                 val state = map.tag as? MapState ?: MapState().also { map.tag = it }
                 state.bypassZoomThreshold = bypassZoomThreshold
+
+                // Bascule clair ↔ sombre : les icônes et la trace en cours changent de
+                // couleur, donc tout ce qui en est dessiné est à refaire.
+                val themeChanged = state.themeColors != markerColors
+                if (themeChanged) {
+                    state.themeColors = markerColors
+                    state.markerIcons.clear()
+                    state.blueDotIcon = null
+                    state.cachedPointsPolylines = null
+                }
                 val isZoomedOut = isZoomedOutTooMuch && !bypassZoomThreshold
 
                 // `setMultiTouchControls` n'est pas un simple réglage : chaque appel
@@ -499,7 +545,8 @@ fun MapViewContainer(
                                     state.isCurrentTracking != isCurrentTracking ||
                                     state.isInteractivityEnabled != isInteractivityEnabled ||
                                     state.mapMode != mapMode ||
-                                    styleChanged
+                                    styleChanged ||
+                                    themeChanged
 
                 val zoomBoundaryChanged = (state.wasZoomedOut != isZoomedOut)
 
@@ -539,300 +586,73 @@ fun MapViewContainer(
 
         var showWarningDialog by remember { mutableStateOf(false) }
 
-        // Floating Overlay Banner when zoomed out too much with tracks loaded
+        // Bandeau quand le zoom est trop large pour dessiner les tracés sans ralentir.
         val hasTracks = points.isNotEmpty() || overlayTracks.any { it.points.isNotEmpty() }
         val showZoomBanner = hasTracks && isZoomedOutTooMuch
-
-        var bannerAlertState by remember { mutableStateOf<AlertState?>(null) }
+        // Le bandeau replié en pastille reste replié jusqu'à la prochaine fois qu'il
+        // réapparaît : un utilisateur qui l'a écarté n'a pas à le revoir à chaque geste.
+        var bannerCollapsed by remember { mutableStateOf(false) }
+        LaunchedEffect(showZoomBanner) {
+            if (!showZoomBanner) bannerCollapsed = false
+        }
 
         if (showWarningDialog) {
-            androidx.compose.material3.AlertDialog(
+            MpDialog(
                 onDismissRequest = { showWarningDialog = false },
                 icon = {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(36.dp)
+                    ShapeBadge(
+                        icon = Icons.Rounded.Warning,
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        shape = SunShape,
+                        size = 56.dp,
+                        iconSize = 28.dp
                     )
                 },
-                title = {
-                    Text(
-                        text = "Avertissement de performance",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                },
-                text = {
-                    Text(
-                        text = "L'affichage de tracés contenant des milliers de points de coordonnées géographiques à un niveau de zoom global demande une puissance de calcul graphique très élevée pour votre appareil.\n\n⚠️ Risques potentiels :\n• Ralentissement important de l'interface et de la carte (baisse de FPS)\n• Consommation accrue de la batterie\n• Surchauffe temporaire de l'appareil lors des déplacements sur la carte\n\n💡 Alternative recommandée :\nZoomez simplement sur la carte pour que l'affichage se réactive automatiquement et de manière fluide sans forcer.\n\nVoulez-vous tout de même forcer l'affichage de l'intégralité des tracés ?",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Start
-                    )
-                },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = {
-                            showWarningDialog = false
-                            onBypassZoomThresholdChanged(true)
-                            bannerAlertState = null
-                            isExpanded = false
-                        },
-                        modifier = Modifier.testTag("confirm_bypass_zoom_button")
-                    ) {
-                        Text(
-                            text = "Accepter et afficher",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = { showWarningDialog = false }
-                    ) {
-                        Text(
-                            text = "Annuler",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp
+                title = "Forcer l'affichage ?",
+                body = "Afficher tous les tracés à ce niveau de zoom peut ralentir la carte, " +
+                    "vider la batterie plus vite et faire chauffer le téléphone.",
+                dismissLabel = "Annuler",
+                confirmLabel = "Forcer quand même",
+                confirmContainerColor = MaterialTheme.colorScheme.tertiary,
+                confirmContentColor = MaterialTheme.colorScheme.onTertiary,
+                confirmTestTag = "confirm_bypass_zoom_button",
+                onConfirm = {
+                    showWarningDialog = false
+                    onBypassZoomThresholdChanged(true)
+                }
             )
         }
 
-        LaunchedEffect(bannerAlertState) {
-            if (bannerAlertState != null) {
-                kotlinx.coroutines.delay(2000L)
-                bannerAlertState = null
-            }
-        }
-
-        var lastShowZoomBanner by remember { mutableStateOf(showZoomBanner) }
-        LaunchedEffect(showZoomBanner, bypassZoomThreshold) {
-            if (!showZoomBanner) {
-                isExpanded = false
-            }
-            if (showZoomBanner != lastShowZoomBanner) {
-                if (!bypassZoomThreshold) {
-                    if (showZoomBanner) {
-                        bannerAlertState = AlertState.LOST
-                    } else {
-                        bannerAlertState = AlertState.FOUND
-                    }
-                } else {
-                    bannerAlertState = null
-                }
-                lastShowZoomBanner = showZoomBanner
-            } else if (bypassZoomThreshold) {
-                bannerAlertState = null
-            }
-        }
-
-        val isDark = LocalIsDarkTheme.current
-        val blueBg = if (isDark) androidx.compose.ui.graphics.Color(0xFF1E293B).copy(alpha = 0.95f) else androidx.compose.ui.graphics.Color(0xFFE0F2FE).copy(alpha = 0.95f)
-        val blueText = if (isDark) androidx.compose.ui.graphics.Color(0xFF38BDF8) else androidx.compose.ui.graphics.Color(0xFF0369A1)
-        val blueBorder = if (isDark) androidx.compose.ui.graphics.Color(0xFF38BDF8).copy(alpha = 0.3f) else androidx.compose.ui.graphics.Color(0xFF0369A1).copy(alpha = 0.3f)
-
-        val animatedContainerColor by androidx.compose.animation.animateColorAsState(
-            targetValue = when (bannerAlertState) {
-                AlertState.LOST -> androidx.compose.ui.graphics.Color(0xFFEA580C)
-                AlertState.FOUND -> androidx.compose.ui.graphics.Color(0xFF10B981)
-                else -> blueBg
-            },
-            animationSpec = androidx.compose.animation.core.tween(durationMillis = 400),
-            label = "BannerBgColor"
-        )
-
-        val animatedTextColor by androidx.compose.animation.animateColorAsState(
-            targetValue = if (bannerAlertState != null) androidx.compose.ui.graphics.Color.White else blueText,
-            animationSpec = androidx.compose.animation.core.tween(durationMillis = 400),
-            label = "BannerTextColor"
-        )
-
-        val animatedBorderColor by androidx.compose.animation.animateColorAsState(
-            targetValue = if (bannerAlertState != null) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f) else blueBorder,
-            animationSpec = androidx.compose.animation.core.tween(durationMillis = 400),
-            label = "BannerBorderColor"
-        )
-
-        AnimatedVisibility(
-            visible = showZoomBanner || bannerAlertState == AlertState.FOUND,
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { -it }),
-            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }),
-            modifier = Modifier
-                .align(if (isCurrentTracking) Alignment.TopCenter else Alignment.TopStart)
+        // Pas d'AnimatedVisibility ici : elle rogne son contenu, ombre comprise, pendant
+        // toute sa transition (voir « L'ombre tranchée » dans CLAUDE.md).
+        if (showZoomBanner) {
+            val bannerModifier = Modifier
+                .align(Alignment.TopStart)
                 .statusBarsPadding()
-                .padding(
-                    top = zoomBannerTopPadding,
-                    start = 16.dp,
-                    end = if (isCurrentTracking) 16.dp else 80.dp
+                .padding(top = zoomBannerTopPadding, start = 16.dp, end = 76.dp)
+            when {
+                bypassZoomThreshold -> MapPill(
+                    icon = Icons.Rounded.Visibility,
+                    text = "Tracés affichés",
+                    actionLabel = "Masquer",
+                    onClick = { onBypassZoomThresholdChanged(false) },
+                    testTag = "hide_zoom_button",
+                    modifier = bannerModifier
                 )
-        ) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = animatedContainerColor
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier
-                    .animateContentSize(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        )
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = animatedBorderColor,
-                        shape = RoundedCornerShape(20.dp)
-                    )
-            ) {
-                val titleEmoji = when {
-                    bannerAlertState == AlertState.FOUND -> "😄"
-                    bypassZoomThreshold -> "😄"
-                    else -> "⚠️"
-                }
-                val titleText = when {
-                    bannerAlertState == AlertState.FOUND -> "Tracé affiché"
-                    bannerAlertState == AlertState.LOST -> "Tracé masqué"
-                    isExpanded -> "Tracé de carte"
-                    bypassZoomThreshold -> "Tracé affiché"
-                    else -> "Tracé masqué"
-                }
-
-                Column(
-                    modifier = Modifier
-                        .then(
-                            if (isExpanded) {
-                                Modifier.width(if (isCurrentTracking) 280.dp else 240.dp)
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .clipToBounds()
-                        .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            isExpanded = !isExpanded
-                        }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(if (isExpanded) 10.dp else 0.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = titleEmoji,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = titleText,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = animatedTextColor
-                        )
-                    }
-
-                    if (isExpanded) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier
-                                .requiredWidth(if (isCurrentTracking) 252.dp else 212.dp)
-                                .padding(top = 10.dp)
-                        ) {
-                            Text(
-                                text = if (bypassZoomThreshold) {
-                                    "L'affichage du tracé est actuellement forcé malgré le faible niveau de zoom."
-                                } else {
-                                    "Le niveau de zoom est trop faible pour afficher les tracés sans ralentissement."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.Start,
-                                color = animatedTextColor.copy(alpha = 0.9f),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            if (bypassZoomThreshold) {
-                                androidx.compose.material3.Button(
-                                    onClick = {
-                                        onBypassZoomThresholdChanged(false)
-                                        isExpanded = false
-                                    },
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                        containerColor = animatedTextColor,
-                                        contentColor = animatedContainerColor
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(38.dp)
-                                        .testTag("hide_zoom_button")
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ZoomOut,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = animatedContainerColor
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Masquer les tracés",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = animatedContainerColor
-                                        )
-                                    }
-                                }
-                            } else {
-                                androidx.compose.material3.Button(
-                                    onClick = { showWarningDialog = true },
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                        containerColor = animatedTextColor,
-                                        contentColor = animatedContainerColor
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(38.dp)
-                                        .testTag("bypass_zoom_button")
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ZoomIn,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = animatedContainerColor
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Forcer l'affichage",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = animatedContainerColor
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                bannerCollapsed -> MapPill(
+                    icon = Icons.Rounded.VisibilityOff,
+                    text = "Tracés masqués",
+                    actionLabel = null,
+                    onClick = { bannerCollapsed = false },
+                    testTag = "zoom_banner_pill",
+                    modifier = bannerModifier
+                )
+                else -> HeavyTracksBanner(
+                    onForce = { showWarningDialog = true },
+                    onDismiss = { bannerCollapsed = true },
+                    modifier = bannerModifier
+                )
             }
         }
     }
@@ -1129,14 +949,15 @@ fun rememberMapViewWithLifecycle(
 }
 
 private fun drawMarkers(map: MapView, state: MapState) {
+    val colors = state.themeColors
     if (state.points.isNotEmpty()) {
         val geoPoints = state.points.map { GeoPoint(it.latitude, it.longitude) }
         val startPoint = geoPoints.first()
         val startMarker = Marker(map).apply {
             position = startPoint
             title = "Départ"
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = map.resources.getDrawable(android.R.drawable.presence_online, null)
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = markerIcon(map.context, state, colors?.start ?: Color.parseColor("#1F6A4F"), 20f)
         }
         map.overlays.add(startMarker)
 
@@ -1147,16 +968,12 @@ private fun drawMarkers(map: MapView, state: MapState) {
             } else {
                 lastPoint
             }
-            title = if (state.isCurrentTracking) "Position Actuelle" else "Arrivée"
-            if (state.isCurrentTracking) {
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                icon = blueDotIcon(map.context, state)
+            title = if (state.isCurrentTracking) "Position actuelle" else "Arrivée"
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = if (state.isCurrentTracking) {
+                blueDotIcon(map.context, state)
             } else {
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                icon = map.resources.getDrawable(
-                    if (state.isInteractivityEnabled) android.R.drawable.presence_away else android.R.drawable.presence_busy, 
-                    null
-                )
+                markerIcon(map.context, state, colors?.end ?: Color.DKGRAY, 20f)
             }
         }
         map.overlays.add(currentMarker)
@@ -1164,7 +981,7 @@ private fun drawMarkers(map: MapView, state: MapState) {
         val currentPoint = GeoPoint(state.currentUserLocation!!.latitude, state.currentUserLocation!!.longitude)
         val currentMarker = Marker(map).apply {
             position = currentPoint
-            title = "Ma Position"
+            title = "Ma position"
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = blueDotIcon(map.context, state)
         }
@@ -1283,10 +1100,10 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
 
             for (segment in segments) {
                 if (segment.points.isNotEmpty()) {
-                    // Le rouge de l'enregistrement en cours prime sur tout : c'est le
+                    // La couleur d'enregistrement du thème prime sur tout : c'est le
                     // seul signal qui distingue la trace en train de s'écrire.
                     val trackLineColor = if (state.isCurrentTracking) {
-                        Color.parseColor("#D32F2F")
+                        state.themeColors?.recording ?: Color.parseColor("#E4572E")
                     } else {
                         TrackStylePreferences.resolveTrackColor(
                             displayColor = state.displayColor,
@@ -1425,4 +1242,100 @@ private fun calculateBearing(lat1: Double, lon1: Double, lat2: Double, lon2: Dou
     val bearingRad = Math.atan2(y, x)
     val bearingDeg = Math.toDegrees(bearingRad)
     return ((bearingDeg + 360) % 360).toFloat()
+}
+
+/**
+ * Bandeau de la maquette quand les tracés sont masqués faute de zoom suffisant :
+ * explication, « Forcer l'affichage » (avec confirmation) et « Laisser masqués ».
+ */
+@Composable
+private fun HeavyTracksBanner(onForce: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier
+            .shadow(8.dp, RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .background(colors.tertiaryContainer)
+            .padding(16.dp)
+            .testTag("zoom_banner")
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Rounded.VisibilityOff, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(24.dp))
+            Column {
+                Text(
+                    "Tracés masqués à ce niveau de zoom",
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onTertiaryContainer
+                )
+                Text(
+                    "Les tracés très détaillés ralentiraient la carte. Rapprochez-vous pour les revoir.",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = colors.onTertiaryContainer,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colors.tertiary)
+                    .clickable(onClick = onForce)
+                    .padding(horizontal = 16.dp)
+                    .testTag("bypass_zoom_button")
+            ) {
+                Text("Forcer l'affichage", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiary)
+            }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.onTertiaryContainer, RoundedCornerShape(20.dp))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 14.dp)
+                    .testTag("dismiss_zoom_banner_button")
+            ) {
+                Text("Laisser masqués", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiaryContainer)
+            }
+        }
+    }
+}
+
+/** Pastille flottante sur la carte : état des tracés, et une action éventuelle. */
+@Composable
+private fun MapPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    actionLabel: String?,
+    onClick: () -> Unit,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    Box(modifier = modifier) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .height(40.dp)
+                .shadow(6.dp, RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.tertiaryContainer)
+                .clickable(onClick = onClick)
+                .padding(start = 12.dp, end = 16.dp)
+                .testTag(testTag)
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(20.dp))
+            Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiaryContainer)
+            if (actionLabel != null) {
+                Text(actionLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.tertiary)
+            }
+        }
+    }
 }

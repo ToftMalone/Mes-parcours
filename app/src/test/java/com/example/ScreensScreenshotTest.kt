@@ -18,6 +18,8 @@ import com.example.data.repository.TrackRepository
 import com.example.ui.screen.DetailView
 import com.example.ui.screen.HistoryTab
 import com.example.ui.screen.SettingsTab
+import com.example.ui.screen.TrackingTab
+import com.example.data.model.LiveStats
 import com.example.util.update.AvailableUpdate
 import com.example.ui.screen.ToolsTab
 import com.example.ui.screen.WelcomeScreen
@@ -55,6 +57,7 @@ class ScreensScreenshotTest {
 
     private lateinit var db: AppDatabase
     private lateinit var viewModel: TrackViewModel
+    private lateinit var repository: TrackRepository
 
     /** Barre d'état et barre de navigation flottante, telles que MainScreen les réserve. */
     private val tabPadding = PaddingValues(top = 32.dp, bottom = 88.dp)
@@ -65,7 +68,8 @@ class ScreensScreenshotTest {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        viewModel = TrackViewModel(TrackRepository.createForTesting(db), context)
+        repository = TrackRepository.createForTesting(db)
+        viewModel = TrackViewModel(repository, context)
     }
 
     @After
@@ -300,4 +304,52 @@ class ScreensScreenshotTest {
     @Test fun accueil_1_sombre() { welcome(true, 0); shoot("accueil_1", true) }
     @Test fun accueil_2() { welcome(false, 1); shoot("accueil_2", false) }
     @Test fun accueil_3() { welcome(false, 2); waitForTag("welcome_continue_button"); shoot("accueil_3", false) }
+
+    // --------------------------------------------------------------- Enregistrer
+
+    private fun recording(dark: Boolean, permission: Boolean = true) {
+        repository.updateGpsStatus("Signal trouvé")
+        repository.updateGpsAccuracy(4f)
+        repository.updateAltitude(com.example.util.AltitudeFix(184.0, 3f))
+        compose.setContent {
+            MyApplicationTheme(darkTheme = dark) {
+                TrackingTab(viewModel = viewModel, hasLocationPermission = permission, onRequestPermission = {})
+            }
+        }
+    }
+
+    private fun startLive(paused: Boolean) {
+        repository.setTrackingState(true)
+        repository.setRecordingPaused(paused)
+        repository.updateLiveStats(LiveStats(durationSec = 1462, distanceMeters = 3440.0, currentSpeedMps = 3.6))
+    }
+
+    @Test fun enregistrer_clair() { recording(false); waitForTag("live_stats_panel"); shoot("enregistrer", false) }
+    @Test fun enregistrer_sombre() { recording(true); waitForTag("live_stats_panel"); shoot("enregistrer", true) }
+
+    @Test fun enregistrer_choix() {
+        seed(); recording(false); waitForTag("action_fab")
+        compose.onNodeWithTag("action_fab").performClick()
+        waitForTag("start_new_track_fab")
+        shoot("enregistrer_choix", false)
+    }
+
+    @Test fun enregistrer_en_cours() { startLive(false); recording(false); waitForTag("stop_fab"); shoot("enregistrer_en_cours", false) }
+    @Test fun enregistrer_en_cours_sombre() { startLive(false); recording(true); waitForTag("stop_fab"); shoot("enregistrer_en_cours", true) }
+    @Test fun enregistrer_pause() { startLive(true); recording(false); waitForTag("stop_fab"); shoot("enregistrer_pause", false) }
+
+    @Test fun enregistrer_sans_permission() {
+        recording(false, permission = false)
+        waitForTag("permission_denied_card")
+        shoot("enregistrer_sans_permission", false)
+    }
+
+    @Test fun enregistrer_reprise() {
+        seed(); recording(false); waitForTag("action_fab")
+        compose.onNodeWithTag("action_fab").performClick()
+        waitForTag("resume_existing_track_fab")
+        compose.onNodeWithTag("resume_existing_track_fab").performClick()
+        waitForTag("resume_picker_cancel")
+        shoot("enregistrer_reprise", false)
+    }
 }
