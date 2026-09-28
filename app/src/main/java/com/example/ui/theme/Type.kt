@@ -1,6 +1,7 @@
 package com.example.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -23,7 +24,14 @@ import com.example.R
 // Les axes ne s'appliquent qu'à partir d'Android 8 (API 26). En deçà — minSdk 24 —
 // le fichier est lu dans son instance par défaut : la bonne police, mais ni
 // resserrée ni graissée. Dégradation acceptée, ces versions étant marginales.
+//
+// `Font(resId, …, variationSettings)` est encore marqué expérimental dans la
+// version de Compose du projet (BOM 2024.09) : l'accepter explicitement est exigé,
+// la compilation échoue sinon. L'API existe depuis Compose 1.2 et n'a pas bougé
+// depuis ; le risque accepté est celui d'une retouche de signature à une montée de
+// version, que la compilation signalerait aussitôt.
 
+@OptIn(ExperimentalTextApi::class)
 private fun bricolage(weight: Int, width: Float, opticalSize: Float) = Font(
     resId = R.font.bricolage_grotesque,
     weight = FontWeight(weight),
@@ -34,6 +42,7 @@ private fun bricolage(weight: Int, width: Float, opticalSize: Float) = Font(
     )
 )
 
+@OptIn(ExperimentalTextApi::class)
 private fun figtree(weight: Int) = Font(
     resId = R.font.figtree,
     weight = FontWeight(weight),
