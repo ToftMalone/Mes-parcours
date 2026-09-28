@@ -572,12 +572,14 @@ inverser, et l'assombrir la rendrait illisible.
 - Préférences via `android.preference.PreferenceManager` (déprécié mais uniforme
   dans tout le projet — ne pas migrer à moitié).
 - `testTag` posés sur les éléments d'interface pour les tests Compose.
-- **Écran des réglages** : un groupe par sujet (`SettingsGroupHeader`), une carte par
-  réglage (`SettingsCard`), et jamais deux réglages sans lien dans la même carte.
-  Les briques `SettingsChoiceList` (options exclusives), `SettingsToggleRow`
-  (interrupteur) et `SettingsHint` (remarque) sont là pour ça : un réglage de plus ne
-  doit coûter qu'une liste de données, pas un bloc recopié. L'ordre des groupes suit
-  la fréquence d'usage, du plus courant au plus rare.
+- **Écran des réglages** : un groupe par sujet (`GroupLabel` + `SettingsGroup`, lignes
+  séparées de 2 dp dans un bloc aux coins de 28 dp), une ligne par réglage
+  (`SettingsRow`, `GroupItem`), et jamais deux réglages sans lien sur la même ligne.
+  Un réglage de plus ne doit coûter qu'une ligne, pas un bloc recopié. L'ordre des
+  groupes suit la fréquence d'usage, du plus courant au plus rare.
+- **Messages à l'utilisateur** : `LocalAppMessenger.current.show(…)`, pas de `Toast`,
+  dans tout ce qui est Compose. Seul `AutoBackupManager`, hors composition, garde le
+  sien.
 
 ## Refonte de l'interface
 
@@ -586,38 +588,60 @@ L'auteur a fourni une maquette complète (export HTML interactif : « Mes parcou
 dans un style Material 3 Expressive. **Elle n'est pas versée au dépôt** ; une session
 qui reprend le chantier sans elle doit la redemander à l'auteur.
 
-Presque tout ce qu'elle montre existe déjà dans l'application : c'est un
-**habillage**, pas une réécriture. Trois choix de l'auteur encadrent le chantier :
+**La refonte est appliquée à toute l'application.** Prévue d'abord par étapes, un APK
+à chacune, elle a finalement été faite d'un bloc à la demande de l'auteur (« fais
+tout, tu me donneras l'application de début à la fin »), après un premier APK de la
+seule étape de base qui ne ressemblait pas assez à la maquette. Choix de l'auteur qui
+tiennent toujours :
 
-1. **Palette fixe**, plus de couleur dynamique (Material You) sur Android 12+ — alors
-   que la maquette la prévoyait en secours seulement. L'application a la même allure
-   quel que soit le fond d'écran.
-2. **Habillage d'abord.** Les éléments que la maquette ajoute (ci-dessous) viendront
-   une fois l'habillage validé sur téléphone, un par un.
-3. **Par étapes, un APK de debug à chacune**, à essayer sur téléphone avant la
-   suivante. Environ 7 700 lignes d'interface sont concernées, et rien ne se compile
-   en session web : tout faire d'un bloc exposait à un retour arrière massif, comme
-   celui de la précédente tentative de thème.
+1. **Palette fixe**, plus de couleur dynamique (Material You) sur Android 12+. Mêmes
+   couleurs quel que soit le fond d'écran.
+2. Ne pas reprendre les numéros de version 2.x de la maquette, ni ses cartes
+   dessinées : la carte reste OpenStreetMap et son filtre sombre (voir « Thème sombre
+   de la carte »).
 
-Étapes :
+**Où est quoi :**
 
-1. **Base** — fait : couleurs (`Color.kt`, `Theme.kt`), polices et échelle
-   typographique (`Type.kt`), formes, barre de navigation flottante
-   (`ui/component/MainNavigationBar.kt`).
-2. Historique et fiche détail.
-3. Outils, Paramètres, mise à jour, accueil.
-4. Enregistrer — en dernier, `TrackingTab` et `MapViewContainer` étant les plus
-   délicats (voir les nombreuses sections sur le zoom et le suivi plus haut).
+- `ui/theme/` — couleurs (`Color.kt`), `Theme.kt` (formes, `LocalRecordingColor`),
+  polices et échelle typographique (`Type.kt`, dont `StatXlTextStyle` et
+  `QuoteFontFamily`).
+- `ui/component/Expressive.kt` — les briques partagées : formes `CookieShape` et
+  `SunShape` (relevées point par point sur la maquette), `ShapeBadge`, `TrackTile`,
+  `MpSwitch`, boutons, `MpDialog`, `MpSheet`, `WaveProgress`, et les messages en bas
+  d'écran (`AppMessenger` / `LocalAppMessenger` / `AppMessageHost`) qui remplacent les
+  `Toast` d'Android dans l'interface Compose.
+- `ui/component/MainNavigationBar.kt` — la barre flottante. Elle s'efface quand un
+  outil ou une page de réglages (nouveautés, À propos) occupe l'écran.
+- Chaque écran a été refait dans son fichier : `HistoryTab`, `DetailView`,
+  `ToolsTab`, `SettingsTab` (avec les pages « Nouveautés » et « À propos »),
+  `UpdatePrompt` (étapes en feuilles du bas), `WelcomeScreen` (trois pages),
+  `TrackingTab` et les calques de `MapViewContainer` (repères aux couleurs du thème,
+  bandeau des tracés masqués, dialogue « Forcer l'affichage »).
 
-**Nouveautés de la maquette, laissées pour après l'habillage** : profil d'altitude
-dans la fiche détail ; aperçu des morceaux avant un découpage ; accueil en trois
-pages ; téléchargement de mise à jour poursuivi en arrière-plan ; dates dans le
-journal des nouveautés et date d'une mise à jour ignorée ; pastille « Nouveau » sur
-un parcours importé ; bouton Pause dans la notification ; icône d'application. Ne
-pas reprendre les numéros de version 2.x de la maquette, ni ses cartes dessinées :
-la carte reste OpenStreetMap et son filtre sombre (voir « Thème sombre de la carte »).
-Les couleurs de tracé proposées (`MaquetteTrackPalette`) ne sont pas encore branchées :
-les changer touche l'apparence des parcours existants.
+**Écarts volontaires à la maquette**, pour ne rien promettre que l'application ne
+fait pas :
+
+- **Fusion** : la maquette dit que les originaux restent ; en réalité la fusion les
+  réunit dans le plus ancien (invariant 5, `mergeAndSaveTracks`). Les textes disent
+  ce qui se passe vraiment.
+- **Export** : la maquette écrit directement dans Téléchargements ; l'application
+  garde le sélecteur de fichier d'Android.
+- **Mise à jour** : pas de taille d'APK (inconnue avant téléchargement).
+  « Continuer en arrière-plan » range la feuille, le téléchargement se poursuit tant
+  que l'application reste ouverte, et la feuille revient d'elle-même à l'étape
+  suivante — pas de téléchargement hors de l'application.
+- **Tunnel** : la ligne « Sombre dans les tunnels » n'apparaît qu'en mode solaire,
+  seul mode où elle agit.
+- **Tracés masqués** : « Laisser masqués » remplace « Masquer les tracés » dans le bandeau
+  des tracés masqués — les tracés le sont déjà, le bouton range seulement le bandeau.
+
+**Nouveautés de la maquette déjà faites** : profil d'altitude dans la fiche détail,
+accueil en trois pages, dates dans le journal des nouveautés (dates de publication
+GitHub, champ `date` de `Release`), prochaine bascule jour/nuit sous « Lever et
+coucher du soleil ». **Restent à faire** : aperçu des morceaux avant un découpage,
+date d'une mise à jour ignorée, pastille « Nouveau » sur un parcours importé, bouton
+Pause dans la notification, badge « SIMULATION » (la simulation GPS n'est pas exposée
+au ViewModel), cône de cap sous le point de position, icône d'application.
 
 **Polices** : Bricolage Grotesque (titres, chiffres) et Figtree (interface), fichiers
 variables officiels de Google Fonts dans `res/font`, licence SIL OFL 1.1 (textes dans
@@ -627,22 +651,26 @@ dans son instance par défaut, ni resserrée ni graissée.
 
 **Regarder les pixels sans téléphone.** `debug-apk.yml` lance les tests avec
 `-Proborazzi.test.record=true` et joint les images produites à l'exécution (artefact
-`captures-ecran`). Robolectric y dessine l'interface Compose réelle — polices, couleurs,
-mise en page — de quoi la confronter à la maquette avant même d'installer l'APK. C'est
-l'application directe de la leçon de « L'ombre tranchée » : regarder avant de raisonner.
-Les ombres, elles, n'y sont pas fidèles.
+`captures-ecran`). `ScreensScreenshotTest` peuple une base en mémoire comme la
+maquette et photographie chaque écran et ses états principaux (feuilles et dialogues
+compris, par `captureScreenRoboImage`). Robolectric y dessine l'interface Compose
+réelle — polices, couleurs, mise en page — de quoi la confronter à la maquette avant
+même d'installer l'APK. C'est l'application directe de la leçon de « L'ombre
+tranchée » : regarder avant de raisonner. Limites : pas de tuiles de carte (pas de
+réseau), ombres peu fidèles, et des nombres au format anglais (« 4.4 km/h ») là où
+`FormatUtils` suit la langue de l'appareil — un téléphone français affiche « 4,4 ».
 
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 155 tests unitaires en 21 suites : `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `SplitTrackTest` (13), `TrimTrackTest` (14), `CoordinateTokenizerTest` (6),
-  `DesignSystemScreenshotTest` (6, captures seules — voir « Refonte de l'interface »),
-  `BearingTest` (10), `SolarTimesTest`
-  (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
-  `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),
-  `ElevationAccumulatorTest` (6), `DarkTilesColorFilterTest` (6), `MergeTracksTest`
-  (5), `MigrationChainTest` (3), plus trois tests d'échafaudage hérités
+- 187 tests unitaires en 22 suites : `ScreensScreenshotTest` (32, captures seules —
+  voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
+  `TrimTrackTest` (14), `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
+  (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
+  `KmlStyleTableTest` (7), `TrackSegmentsTest` (7), `CoordinateTokenizerTest` (6),
+  `DarkTilesColorFilterTest` (6), `DesignSystemScreenshotTest` (6, captures seules),
+  `ElevationAccumulatorTest` (6), `TunnelDetectorTest` (6), `MergeTracksTest` (5),
+  `MigrationChainTest` (3), plus trois tests d'échafaudage hérités
   (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
   Roborazzi).
   Ce décompte s'était mis à mentir : il annonçait 72 tests pour 11 suites alors que le
