@@ -15,7 +15,9 @@ import com.example.data.local.AppDatabase
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.repository.TrackRepository
+import com.example.ui.screen.DetailView
 import com.example.ui.screen.HistoryTab
+import com.example.ui.screen.ToolsTab
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -170,5 +172,76 @@ class ScreensScreenshotTest {
         compose.onNodeWithTag("delete_track_button_3").performClick()
         waitForTag("dialog_delete_confirm_button")
         shoot("historique_suppression", false)
+    }
+
+    // ------------------------------------------------------------ Fiche détail
+
+    private fun detail(trackId: Long, dark: Boolean) {
+        compose.setContent {
+            MyApplicationTheme(darkTheme = dark) {
+                DetailView(trackId = trackId, viewModel = viewModel, onBackClick = {})
+            }
+        }
+    }
+
+    @Test fun detail_clair() { seed(); detail(1, false); waitForTag("altitude_profile"); shoot("detail", false) }
+    @Test fun detail_sombre() { seed(); detail(1, true); waitForTag("altitude_profile"); shoot("detail", true) }
+
+    @Test fun detail_export() {
+        seed(); detail(1, false); waitForTag("export_button")
+        compose.onNodeWithTag("export_button").performClick()
+        waitForTag("export_gpx_button")
+        shoot("detail_export", false)
+    }
+
+    @Test fun detail_vide() {
+        runBlocking { db.trackDao.insertTrack(Track(name = "Balade des bords de Loire", startTime = 1_789_600_000_000L)) }
+        detail(1, false)
+        waitForTag("detail_no_coordinates")
+        shoot("detail_vide", false)
+    }
+
+    // ------------------------------------------------------------------ Outils
+
+    private fun tools(dark: Boolean) {
+        compose.setContent {
+            MyApplicationTheme(darkTheme = dark) {
+                ToolsTab(viewModel = viewModel, contentPadding = tabPadding, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+
+    @Test fun outils_clair() { tools(false); waitForTag("tools_tab"); shoot("outils", false) }
+    @Test fun outils_sombre() { tools(true); waitForTag("tools_tab"); shoot("outils", true) }
+
+    @Test fun outils_fusion() {
+        seed(); tools(false); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_merge_tool_button").performClick()
+        waitForTag("merge_source_1")
+        compose.onNodeWithTag("merge_source_1").performClick()
+        compose.onNodeWithTag("merge_source_2").performClick()
+        shoot("outils_fusion", false)
+    }
+
+    @Test fun outils_fusion_manque() {
+        tools(false); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_merge_tool_button").performClick()
+        waitForTag("tool_need_tracks")
+        shoot("outils_fusion_manque", false)
+    }
+
+    @Test fun outils_decoupe() {
+        seed(); tools(false); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_split_tool_button").performClick()
+        waitForTag("split_mode_gap")
+        compose.onNodeWithTag("split_mode_gap").performClick()
+        shoot("outils_decoupe", true)
+    }
+
+    @Test fun outils_rognage() {
+        seed(); tools(false); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_trim_tool_button").performClick()
+        waitForTag("trim_kept_bar")
+        shoot("outils_rognage", false)
     }
 }

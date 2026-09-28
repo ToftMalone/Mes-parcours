@@ -371,6 +371,7 @@ fun MainScreen(
     // parcours relançait donc une requête réseau et rouvrait le bandeau que
     // l'utilisateur venait d'écarter.
     val detailId = viewingDetailedTrackId
+    var toolOpen by remember { mutableStateOf(false) }
 
     // Fond opaque **obligatoire** sous la transition : sans lui, on voit à travers.
     //
@@ -433,7 +434,8 @@ fun MainScreen(
             } else {
                 Scaffold(
                     bottomBar = {
-                        MainNavigationBar(
+                        // Un outil ouvert a son propre bouton d'action en bas d'écran.
+                        if (!(currentTab == "outils" && toolOpen)) MainNavigationBar(
                             currentTab = currentTab,
                             onTabSelected = { currentTab = it },
                             showUpdateBadge = availableUpdate != null,
@@ -495,9 +497,10 @@ fun MainScreen(
                                 onNavigateToDetails = { id ->
                                     viewingDetailedTrackId = id
                                 },
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(innerPadding)
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = innerPadding,
+                                onInToolChanged = { toolOpen = it },
+                                onOpenHistory = { currentTab = "historique" }
                             )
                         }
                         "parametres" -> {

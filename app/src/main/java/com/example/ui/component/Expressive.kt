@@ -270,6 +270,7 @@ fun MpDialog(
     confirmContainerColor: Color = MaterialTheme.colorScheme.primary,
     confirmContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     confirmTestTag: String? = null,
+    confirmEnabled: Boolean = true,
     content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     AlertDialog(
@@ -305,6 +306,7 @@ fun MpDialog(
             MpFilledButton(
                 text = confirmLabel,
                 onClick = onConfirm,
+                enabled = confirmEnabled,
                 containerColor = confirmContainerColor,
                 contentColor = confirmContentColor,
                 modifier = if (confirmTestTag != null) Modifier.testTag(confirmTestTag) else Modifier
