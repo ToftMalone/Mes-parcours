@@ -20,6 +20,7 @@ import com.example.ui.screen.HistoryTab
 import com.example.ui.screen.SettingsTab
 import com.example.util.update.AvailableUpdate
 import com.example.ui.screen.ToolsTab
+import com.example.ui.screen.WelcomeScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -281,4 +282,22 @@ class ScreensScreenshotTest {
         waitForTag("about_page")
         shoot("parametres_a_propos", false)
     }
+
+    // ----------------------------------------------------------------- Accueil
+
+    private fun welcome(dark: Boolean, pages: Int) {
+        compose.setContent {
+            MyApplicationTheme(darkTheme = dark) { WelcomeScreen(onRequestPermissions = {}) }
+        }
+        waitForTag("welcome_screen")
+        repeat(pages) {
+            compose.onNodeWithTag("welcome_next_button").performClick()
+            compose.mainClock.advanceTimeBy(1_000)
+        }
+    }
+
+    @Test fun accueil_1() { welcome(false, 0); shoot("accueil_1", false) }
+    @Test fun accueil_1_sombre() { welcome(true, 0); shoot("accueil_1", true) }
+    @Test fun accueil_2() { welcome(false, 1); shoot("accueil_2", false) }
+    @Test fun accueil_3() { welcome(false, 2); waitForTag("welcome_continue_button"); shoot("accueil_3", false) }
 }
