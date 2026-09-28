@@ -635,8 +635,8 @@ fait pas :
 - **Écran Enregistrer : disposition et tailles d'avant.** L'auteur a gardé le dessin
   de la maquette (couleurs, polices, formes, ombres), mais voulu retrouver **la
   place et la taille** des éléments d'avant. Un bandeau de statistiques d'une seule
-  rangée en haut (vitesse et altitude, puis distance, durée, vitesse et altitude
-  pendant un enregistrement ; point d'état du GPS à droite ; alertes de signal qui le
+  rangée en haut (vitesse et altitude, puis distance, vitesse et altitude pendant
+  un enregistrement — **pas de durée**, à la demande de l'auteur ; point d'état du GPS à droite ; alertes de signal qui le
   recouvrent un instant), le bandeau des tracés masqués juste en dessous. **Pas de
   bouton de fond de carte sur cet écran**, à la demande de l'auteur : le choix se fait
   uniquement dans les Paramètres (la maquette en proposait un, retiré). En bas à droite, des boutons ronds en colonne aux tailles

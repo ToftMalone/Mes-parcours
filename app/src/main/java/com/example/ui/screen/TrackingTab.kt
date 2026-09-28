@@ -437,11 +437,6 @@ private fun speedValue(mps: Double) = String.format(Locale.FRANCE, "%.1f", (mps 
 
 private fun altitudeValue(meters: Double?) = meters?.let { Math.round(it).toString() } ?: "—"
 
-private fun durationValue(seconds: Long): String {
-    val s = seconds.coerceAtLeast(0)
-    return String.format(Locale.FRANCE, "%02d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
-}
-
 /**
  * Chiffres qui défilent un à un, comme un compteur mécanique : seul le chiffre qui
  * change bouge. Les positions sont comptées depuis la droite, pour qu'un chiffre de
@@ -515,12 +510,11 @@ private fun StatsCard(
                     .background(if (mode == ControlsMode.PAUSED) colors.tertiary else LocalRecordingColor.current)
                     .testTag(if (mode == ControlsMode.PAUSED) "stats_paused_dot" else "stats_recording_dot")
             )
-            // Libellés courts et unités accolées aux chiffres : quatre colonnes doivent
-            // tenir sur un téléphone de 360 dp de large.
+            // Distance, vitesse, altitude : les trois chiffres du bandeau d'avant. La
+            // durée n'y figure pas, à la demande de l'auteur.
             CompactStat("Distance", kmValue(stats.distanceMeters), "km", value, Modifier.weight(1f))
-            CompactStat("Durée", durationValue(stats.durationSec), null, value, Modifier.weight(1.15f))
-            CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1.1f))
-            CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(0.9f))
+            CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
+            CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
         } else {
             CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
             CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
