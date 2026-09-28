@@ -30,7 +30,7 @@ toutes les données restent sur l'appareil.
 
 ## Pile technique
 
-Kotlin 2.2.10 · Jetpack Compose + Material 3 (couleurs dynamiques Material You) ·
+Kotlin 2.2.10 · Jetpack Compose + Material 3 (palette fixe, voir « Refonte de l'interface ») ·
 Room 2.7 (KSP) · osmdroid · play-services-location · AGP 9.1.1 · Java 11 ·
 minSdk 24 / targetSdk 36 / compileSdk 36.1
 
@@ -579,11 +579,65 @@ inverser, et l'assombrir la rendrait illisible.
   doit coûter qu'une liste de données, pas un bloc recopié. L'ordre des groupes suit
   la fréquence d'usage, du plus courant au plus rare.
 
+## Refonte de l'interface
+
+L'auteur a fourni une maquette complète (export HTML interactif : « Mes parcours »,
+« Écrans », « Système de design ») : 57 états d'écran, chacun en clair et en sombre,
+dans un style Material 3 Expressive. **Elle n'est pas versée au dépôt** ; une session
+qui reprend le chantier sans elle doit la redemander à l'auteur.
+
+Presque tout ce qu'elle montre existe déjà dans l'application : c'est un
+**habillage**, pas une réécriture. Trois choix de l'auteur encadrent le chantier :
+
+1. **Palette fixe**, plus de couleur dynamique (Material You) sur Android 12+ — alors
+   que la maquette la prévoyait en secours seulement. L'application a la même allure
+   quel que soit le fond d'écran.
+2. **Habillage d'abord.** Les éléments que la maquette ajoute (ci-dessous) viendront
+   une fois l'habillage validé sur téléphone, un par un.
+3. **Par étapes, un APK de debug à chacune**, à essayer sur téléphone avant la
+   suivante. Environ 7 700 lignes d'interface sont concernées, et rien ne se compile
+   en session web : tout faire d'un bloc exposait à un retour arrière massif, comme
+   celui de la précédente tentative de thème.
+
+Étapes :
+
+1. **Base** — fait : couleurs (`Color.kt`, `Theme.kt`), polices et échelle
+   typographique (`Type.kt`), formes, barre de navigation flottante
+   (`ui/component/MainNavigationBar.kt`).
+2. Historique et fiche détail.
+3. Outils, Paramètres, mise à jour, accueil.
+4. Enregistrer — en dernier, `TrackingTab` et `MapViewContainer` étant les plus
+   délicats (voir les nombreuses sections sur le zoom et le suivi plus haut).
+
+**Nouveautés de la maquette, laissées pour après l'habillage** : profil d'altitude
+dans la fiche détail ; aperçu des morceaux avant un découpage ; accueil en trois
+pages ; téléchargement de mise à jour poursuivi en arrière-plan ; dates dans le
+journal des nouveautés et date d'une mise à jour ignorée ; pastille « Nouveau » sur
+un parcours importé ; bouton Pause dans la notification ; icône d'application. Ne
+pas reprendre les numéros de version 2.x de la maquette, ni ses cartes dessinées :
+la carte reste OpenStreetMap et son filtre sombre (voir « Thème sombre de la carte »).
+Les couleurs de tracé proposées (`MaquetteTrackPalette`) ne sont pas encore branchées :
+les changer touche l'apparence des parcours existants.
+
+**Polices** : Bricolage Grotesque (titres, chiffres) et Figtree (interface), fichiers
+variables officiels de Google Fonts dans `res/font`, licence SIL OFL 1.1 (textes dans
+`licenses/`). Bricolage est utilisée avec ses axes de largeur et de taille optique,
+qu'Android n'applique qu'à partir de l'API 26 : sur Android 7, la police s'affiche
+dans son instance par défaut, ni resserrée ni graissée.
+
+**Regarder les pixels sans téléphone.** `debug-apk.yml` lance les tests avec
+`-Proborazzi.test.record=true` et joint les images produites à l'exécution (artefact
+`captures-ecran`). Robolectric y dessine l'interface Compose réelle — polices, couleurs,
+mise en page — de quoi la confronter à la maquette avant même d'installer l'APK. C'est
+l'application directe de la leçon de « L'ombre tranchée » : regarder avant de raisonner.
+Les ombres, elles, n'y sont pas fidèles.
+
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 149 tests unitaires en 20 suites : `Iso8601Test` (16), `UpdateManifestTest` (16),
+- 155 tests unitaires en 21 suites : `Iso8601Test` (16), `UpdateManifestTest` (16),
   `SplitTrackTest` (13), `TrimTrackTest` (14), `CoordinateTokenizerTest` (6),
+  `DesignSystemScreenshotTest` (6, captures seules — voir « Refonte de l'interface »),
   `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `TrackSegmentsTest` (7), `KmlStyleTableTest` (7),
   `AltitudeSmootherTest` (7), `KmlExportTest` (7), `TunnelDetectorTest` (6),

@@ -11,29 +11,11 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,12 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.ui.component.MainNavigationBar
 import com.example.ui.viewmodel.TrackViewModel
 import android.Manifest
 import android.content.pm.PackageManager
@@ -441,93 +421,12 @@ fun MainScreen(
             } else {
                 Scaffold(
                     bottomBar = {
-                            NavigationBar(
-                                windowInsets = WindowInsets(0, 0, 0, 0),
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                tonalElevation = 8.dp,
-                                modifier = Modifier
-                                    .navigationBarsPadding()
-                                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                                    .height(72.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .border(
-                                        width = 1.dp,
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                                Color.Transparent
-                                            )
-                                        ),
-                                        shape = RoundedCornerShape(24.dp)
-                                    )
-                                    .testTag("bottom_nav_bar")
-                            ) {
-                        NavigationBarItem(
-                            selected = currentTab == "enregistrer",
-                            onClick = { currentTab = "enregistrer" },
-                            icon = {
-                                Icon(
-                                    imageVector = if (currentTab == "enregistrer") Icons.Filled.PlayArrow else Icons.Outlined.PlayArrow,
-                                    contentDescription = "Enregistrer"
-                                )
-                            },
-                            label = { Text("Enregistrer") },
-                            modifier = Modifier.testTag("tab_button_tracking")
+                        MainNavigationBar(
+                            currentTab = currentTab,
+                            onTabSelected = { currentTab = it },
+                            showUpdateBadge = availableUpdate != null
                         )
-
-                        NavigationBarItem(
-                            selected = currentTab == "historique",
-                            onClick = { currentTab = "historique" },
-                            icon = {
-                                Icon(
-                                    imageVector = if (currentTab == "historique") Icons.Filled.History else Icons.Outlined.History,
-                                    contentDescription = "Historique"
-                                )
-                            },
-                            label = { Text("Historique") },
-                            modifier = Modifier.testTag("tab_button_history")
-                        )
-
-                        NavigationBarItem(
-                            selected = currentTab == "outils",
-                            onClick = { currentTab = "outils" },
-                            icon = {
-                                Icon(
-                                    imageVector = if (currentTab == "outils") Icons.Filled.Build else Icons.Outlined.Build,
-                                    contentDescription = "Outils"
-                                )
-                            },
-                            label = { Text("Outils") },
-                            modifier = Modifier.testTag("tab_button_tools")
-                        )
-
-                        NavigationBarItem(
-                            selected = currentTab == "parametres",
-                            onClick = { currentTab = "parametres" },
-                            icon = {
-                                BadgedBox(
-                                    badge = {
-                                        // Signale une mise à jour ignorée, sans redire ce que le
-                                        // bandeau a déjà proposé : juste de quoi le retrouver.
-                                        if (availableUpdate != null) {
-                                            Badge(
-                                                containerColor = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.testTag("settings_update_badge")
-                                            )
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = if (currentTab == "parametres") Icons.Filled.Settings else Icons.Outlined.Settings,
-                                        contentDescription = "Paramètres"
-                                    )
-                                }
-                            },
-                            label = { Text("Paramètres") },
-                            modifier = Modifier.testTag("tab_button_settings")
-                        )
-                    }
-                },
+                    },
                 modifier = modifier.fillMaxSize().testTag("main_screen")
             ) { innerPadding ->
                 Box(

@@ -221,7 +221,23 @@ jobs:
       - name: Lancer les tests
         # Après la mise en ligne des APK, à dessein : un test qui échoue doit
         # colorer l'exécution en rouge sans priver pour autant des fichiers compilés.
-        run: ./gradlew --no-daemon testDebugUnitTest
+        #
+        # `roborazzi.test.record` fait écrire les captures d'écran des tests
+        # Roborazzi (sans lui, `captureRoboImage` ne produit rien). Elles ne sont
+        # comparées à aucune référence : elles servent à regarder l'interface
+        # réellement dessinée par Compose sans téléphone sous la main — voir
+        # « Refonte de l'interface » dans CLAUDE.md. Rien de tout cela n'est versé
+        # au dépôt, seuls les APK le sont.
+        run: ./gradlew --no-daemon testDebugUnitTest -Proborazzi.test.record=true
+
+      - name: Joindre les captures d'écran
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: captures-ecran
+          path: app/src/test/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Joindre les rapports de test
         if: always()

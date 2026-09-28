@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.BuildConfig
-import com.example.ui.theme.EmeraldPrimary
 import com.example.util.update.AvailableUpdate
 import com.example.util.update.UpdateChecker
 import com.example.util.update.UpdateConfig
@@ -150,7 +149,7 @@ fun UpdatePrompt(
                     text = "Version ${current.update.versionName}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = EmeraldPrimary
+                    color = MaterialTheme.colorScheme.primary
                 )
                 if (current.update.notes.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -162,7 +161,7 @@ fun UpdatePrompt(
                             Text(
                                 text = "• ",
                                 fontWeight = FontWeight.Bold,
-                                color = EmeraldPrimary,
+                                color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Text(
@@ -187,7 +186,7 @@ fun UpdatePrompt(
                 LinearProgressIndicator(
                     progress = { current.progress },
                     modifier = Modifier.fillMaxWidth(),
-                    color = EmeraldPrimary
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -279,7 +278,7 @@ private fun UpdateDialog(
             Icon(
                 imageVector = Icons.Default.Update,
                 contentDescription = null,
-                tint = EmeraldPrimary
+                tint = MaterialTheme.colorScheme.primary
             )
         },
         title = {
