@@ -305,6 +305,9 @@ private class MapState(
     val markerIcons: MutableMap<Long, android.graphics.drawable.Drawable> = mutableMapOf()
 )
 
+/** Bleu du point de position (#1A73E8). */
+private val POSITION_DOT_BLUE = Color.parseColor("#1A73E8")
+
 /** Couleurs des repères de carte, tirées du thème. */
 internal data class MarkerColors(
     val position: Int,
@@ -316,7 +319,7 @@ internal data class MarkerColors(
 private fun blueDotIcon(context: Context, state: MapState): android.graphics.drawable.Drawable =
     state.blueDotIcon ?: createDotIcon(
         context,
-        fill = state.themeColors?.position ?: Color.parseColor("#1F6A4F"),
+        fill = state.themeColors?.position ?: POSITION_DOT_BLUE,
         sizeDp = 26f,
         ringDp = 4f
     ).also { state.blueDotIcon = it }
@@ -406,7 +409,10 @@ fun MapViewContainer(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val markerColors = MarkerColors(
-        position = scheme.primary.toArgb(),
+        // Bleu de Google Maps, comme avant la refonte : c'est la couleur que l'on
+        // cherche des yeux pour se situer, et le vert du thème la perdait parmi les
+        // forêts de la carte. Le départ reste dans la couleur du thème.
+        position = POSITION_DOT_BLUE,
         start = scheme.primary.toArgb(),
         end = scheme.onSurface.toArgb(),
         recording = com.example.ui.theme.LocalRecordingColor.current.toArgb()

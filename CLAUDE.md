@@ -645,6 +645,10 @@ fait pas :
   pendant le choix, Arrêter pendant l'enregistrement) ; pendant le choix, Annuler
   (48 dp) et Reprendre une trace (56 dp) au-dessus. **Ne pas revenir à la carte
   géante ni au bouton centré de la maquette.**
+- **Point de position : bleu**, pas la couleur du thème (`POSITION_DOT_BLUE` dans
+  `MapViewContainer`, #1A73E8 — le bleu de Google Maps d'avant la refonte). Demandé
+  par l'auteur : c'est ce que l'œil cherche d'abord sur la carte. Les repères de
+  départ et d'arrivée, eux, restent aux couleurs du thème.
 - **Tracés masqués** : « Laisser masqués » remplace « Masquer les tracés » dans le bandeau
   des tracés masqués — les tracés le sont déjà, le bouton range seulement le bandeau.
 
