@@ -1039,6 +1039,13 @@ private class Release(val version: String, val date: String?, val changes: List<
  */
 private val RELEASES = listOf(
     Release(
+        version = "2.0.1",
+        date = "2026-10-05",
+        changes = listOf(
+            "Le point de position repasse au bleu"
+        )
+    ),
+    Release(
         version = "2.0",
         date = "2026-09-28",
         changes = listOf(
