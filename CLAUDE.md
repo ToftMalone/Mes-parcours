@@ -51,59 +51,18 @@ Le SDK Android est indiqué par `local.properties` (non versionné). La variante
 Sur Windows, préférer `.\gradlew.bat` ; `--offline` accélère nettement les
 itérations une fois les dépendances en cache.
 
-**Ni l'un ni l'autre ne tourne dans Claude Code sur le web.** Le conteneur n'a pas
-de SDK Android, et la politique réseau de la session bloque `dl.google.com` — donc
-aussi bien `sdkmanager` que le téléchargement de la plateforme d'API 36. Gradle
-lui-même fonctionne, et `maven.google.com` est joignable : seul le SDK manque, et
-rien ne permet de l'installer depuis là.
+**Compiler depuis Claude Code sur le web.** Le workflow `debug-apk.yml` a été
+supprimé à la demande de l'auteur : l'APK de debug se compile désormais dans la
+session elle-même. Le SDK s'y installe quand `dl.google.com` est joignable (ce qui
+n'a pas toujours été le cas) : télécharger `commandlinetools-linux-*_latest.zip`,
+rendre `cmdline-tools/latest/bin/*` exécutable (`chmod -R +x`), accepter les licences,
+installer `platforms;android-36` et `build-tools;36.0.0`, écrire `sdk.dir=…` dans
+`local.properties` (ignoré par git), puis `./gradlew assembleDebug --no-daemon`.
+Maven Central répond parfois 429 : relancer avec une pause, Gradle garde en cache ce
+qu'il a déjà obtenu. Les publications restent faites par `release.yml`.
 
-Le détour, c'est `.github/workflows/debug-apk.yml` : le runner GitHub a le SDK, il
-compile, joint les APK à l'exécution et enchaîne les tests. C'est ce qui permet de
-vérifier une modification faite en session web — et d'en récupérer un APK
-installable — sans machine de développement sous la main.
-
-**Se lance uniquement à la main** (onglet Actions → « Compiler un APK » → Run
-workflow) — plus automatiquement à chaque poussée, à la demande de l'auteur : chaque
-compilation verse un APK dans l'historique git (poids détaillé plus bas), et il ne
-veut payer ce coût que lorsqu'un APK est réellement demandé, pas à chaque commit
-poussé en cours de route. En session Claude Code, ça veut dire pousser le code
-normalement, mais **ne déclencher ce workflow que si l'auteur le demande
-explicitement** (« compile », « fais-moi un APK »…) — jamais après une simple
-implémentation.
-
-Toujours un APK de debug ; **et un APK de release signé en plus dès que le secret
-`KEYSTORE_BASE64` existe.** L'étape s'allume d'elle-même le jour où le trousseau est
-créé, il n'y aura pas à retoucher le workflow. Le contexte `secrets` n'étant lisible
-dans aucun `if`, la présence du secret transite par une sortie d'étape — c'est la
-seule voie qui permette de sauter proprement la compilation signée quand il manque.
-
-Ce workflow ne pose ni tag ni publication GitHub : il sert à essayer une version.
-La vraie publication reste `release.yml`, déclenchée par un tag annoté.
-
-**Les APK sont aussi reversés sur `main`**, à leur emplacement de compilation
-(`app/build/outputs/apk/debug/app-debug.apk`, et l'équivalent en release), à la
-demande de l'auteur qui veut les récupérer depuis l'arborescence GitHub sans passer
-par les artefacts. Trois conséquences à connaître :
-
-- `app/build` reste ignoré par git ; c'est `git add --force` qui verse le seul
-  fichier voulu. Percer le `.gitignore` ferait au contraire remonter toutes les
-  compilations locales de l'auteur à chaque `git status`.
-- Le message de commit porte toujours `[skip ci]`, par habitude prudente — ce n'est
-  plus strictement nécessaire depuis que le workflow ne se déclenche plus tout seul
-  sur une poussée, mais ça ne coûte rien et protège si ce déclencheur revenait.
-- Ces APK sont **tracés** : après une compilation locale, `git status` les
-  signalera modifiés. `git update-index --skip-worktree <chemin>` les fait taire
-  sur une machine donnée.
-- Ces commits ne portent **pas** l'identité `github-actions[bot]`, à la demande de
-  l'auteur qui ne voulait pas le voir dans la liste des contributeurs du dépôt.
-  L'adresse utilisée (`ci@mes-parcours.invalid`, domaine réservé par la RFC 2606)
-  ne correspond à aucun compte GitHub : ces commits n'y sont donc rattachés à
-  personne. Ne pas revenir à l'adresse officielle du bot
-  (`…@users.noreply.github.com`) sans le vouloir explicitement.
-
-Le poids s'accumule dans l'historique — une vingtaine de Mio par version, que git
-ne saura plus oublier sans réécriture. C'est le prix accepté du téléchargement
-direct depuis l'arborescence.
+Les APK versés sur `main` sous `app/build/outputs/apk/` ne sont donc plus mis à jour
+automatiquement : ils datent du dernier passage de l'ancien workflow (2.0.1).
 
 **Le build type `debug` porte son propre `applicationId`** (suffixe `.debug`, donc
 `com.toche.mesparcours.debug`) **et son propre `versionName`** (suffixe `-debug`,
