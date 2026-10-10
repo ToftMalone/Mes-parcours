@@ -92,7 +92,7 @@ fun MainNavigationBar(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(top = 8.dp, bottom = 12.dp),
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -104,9 +104,9 @@ fun MainNavigationBar(
             modifier = Modifier.testTag("bottom_nav_bar")
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 DESTINATIONS.forEach { destination ->
                     val selected = currentTab == destination.route
@@ -153,12 +153,14 @@ private fun NavItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            .height(48.dp)
+            .height(56.dp)
+            // Onglet réduit : une cible de 60 dp, pas seulement la largeur de l'icône.
+            .then(if (selected) Modifier else Modifier.width(60.dp))
             .clip(CircleShape)
             .background(containerColor)
             .selectable(selected = selected, onClick = onClick, role = Role.Tab)
             .animateContentSize(spring(dampingRatio = 0.6f, stiffness = 800f))
-            .padding(horizontal = if (selected) 20.dp else 0.dp)
+            .padding(horizontal = if (selected) 22.dp else 0.dp)
             .testTag(destination.testTag)
     ) {
         Box {
@@ -168,7 +170,7 @@ private fun NavItem(
                 // TalkBack. Actif, le libellé affiché suffit.
                 contentDescription = if (selected) null else destination.label,
                 tint = contentColor,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
             val dotColor = when {
                 showBadge -> MaterialTheme.colorScheme.error
@@ -191,10 +193,10 @@ private fun NavItem(
             }
         }
         if (selected) {
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = destination.label,
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Clip
