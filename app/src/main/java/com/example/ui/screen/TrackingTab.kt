@@ -293,7 +293,7 @@ fun TrackingTab(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
-                    .padding(end = 20.dp, bottom = 96.dp)
+                    .padding(end = 20.dp, bottom = 108.dp)
             ) {
                 if (currentUserLocation != null || livePoints.isNotEmpty()) {
                     RoundButton(

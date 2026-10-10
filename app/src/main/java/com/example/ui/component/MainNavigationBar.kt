@@ -89,13 +89,13 @@ fun MainNavigationBar(
 ) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
         // « Niveau 3 » de la maquette : panneau de statistiques et navigation,
         // flottants au-dessus de la carte.
-        shadowElevation = 8.dp,
+        shadowElevation = 12.dp,
         modifier = modifier
             .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
             .fillMaxWidth()
             .height(68.dp)
             .testTag("bottom_nav_bar")
@@ -150,7 +150,7 @@ private fun NavItem(
         animationSpec = tween(200),
         label = "nav_item_content"
     )
-    val dotRing = MaterialTheme.colorScheme.surfaceContainerHigh
+    val dotRing = MaterialTheme.colorScheme.surfaceContainerHighest
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
