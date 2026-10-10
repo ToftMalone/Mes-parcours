@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -87,44 +86,42 @@ fun MainNavigationBar(
     modifier: Modifier = Modifier,
     isRecording: Boolean = false
 ) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        // « Niveau 3 » de la maquette : panneau de statistiques et navigation,
-        // flottants au-dessus de la carte.
-        shadowElevation = 12.dp,
+    // Le conteneur pleine largeur ne sert qu'à centrer la pilule, qui n'a que la
+    // largeur de son contenu : une barre étirée d'un bord à l'autre ne flotte plus.
+    Box(
         modifier = modifier
-            .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
             .fillMaxWidth()
-            .height(68.dp)
-            .testTag("bottom_nav_bar")
+            .navigationBarsPadding()
+            .padding(top = 8.dp, bottom = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            // « Niveau 3 » de la maquette : panneau de statistiques et navigation,
+            // flottants au-dessus de la carte.
+            shadowElevation = 8.dp,
+            modifier = Modifier.testTag("bottom_nav_bar")
         ) {
-            DESTINATIONS.forEach { destination ->
-                val selected = currentTab == destination.route
-                NavItem(
-                    destination = destination,
-                    selected = selected,
-                    // La pastille de mise à jour ne se montre que tant qu'on n'est pas
-                    // sur l'onglet : une fois dessus, la carte en tête la remplace.
-                    showBadge = showUpdateBadge && destination.route == "parametres" && !selected,
-                    // Enregistrement en cours vu depuis un autre onglet : un point de
-                    // la couleur d'enregistrement le rappelle.
-                    showRecordingDot = isRecording && destination.route == "enregistrer" && !selected,
-                    onClick = { onTabSelected(destination.route) },
-                    // L'onglet actif prend la largeur de son libellé (environ 144 dp
-                    // pour « Paramètres », comme dans la maquette) ; les onglets réduits
-                    // se partagent le reste, ce qui remplit la barre quelle que soit la
-                    // largeur de l'écran.
-                    modifier = if (selected) Modifier else Modifier.weight(1f)
-                )
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                DESTINATIONS.forEach { destination ->
+                    val selected = currentTab == destination.route
+                    NavItem(
+                        destination = destination,
+                        selected = selected,
+                        // La pastille de mise à jour ne se montre que tant qu'on n'est pas
+                        // sur l'onglet : une fois dessus, la carte en tête la remplace.
+                        showBadge = showUpdateBadge && destination.route == "parametres" && !selected,
+                        // Enregistrement en cours vu depuis un autre onglet : un point de
+                        // la couleur d'enregistrement le rappelle.
+                        showRecordingDot = isRecording && destination.route == "enregistrer" && !selected,
+                        onClick = { onTabSelected(destination.route) }
+                    )
+                }
             }
         }
     }
@@ -140,28 +137,28 @@ private fun NavItem(
     modifier: Modifier = Modifier
 ) {
     val containerColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         animationSpec = tween(200),
         label = "nav_item_container"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onPrimaryContainer,
         animationSpec = tween(200),
         label = "nav_item_content"
     )
-    val dotRing = MaterialTheme.colorScheme.surfaceContainerHighest
+    val dotRing = MaterialTheme.colorScheme.primaryContainer
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            .height(56.dp)
+            .height(48.dp)
             .clip(CircleShape)
             .background(containerColor)
             .selectable(selected = selected, onClick = onClick, role = Role.Tab)
             .animateContentSize(spring(dampingRatio = 0.6f, stiffness = 800f))
-            .padding(horizontal = if (selected) 18.dp else 0.dp)
+            .padding(horizontal = if (selected) 20.dp else 0.dp)
             .testTag(destination.testTag)
     ) {
         Box {
