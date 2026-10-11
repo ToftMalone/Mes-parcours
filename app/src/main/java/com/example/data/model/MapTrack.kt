@@ -15,5 +15,7 @@ data class MapTrack(
     val sourceColor: Int?,
     /** Couleur choisie par l'utilisateur pour ce parcours, null s'il n'a rien choisi. */
     val displayColor: Int? = null,
+    /** Épaisseur choisie pour ce parcours, en dp, null s'il n'a rien choisi. */
+    val displayWidthDp: Float? = null,
     val points: List<TrackPoint>
 )

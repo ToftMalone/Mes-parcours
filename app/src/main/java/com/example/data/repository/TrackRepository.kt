@@ -669,7 +669,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                         // Les morceaux gardent l'apparence du parent, y compris la
                         // couleur choisie à la main s'il en avait une.
                         sourceColor = source.sourceColor,
-                        displayColor = source.displayColor
+                        displayColor = source.displayColor,
+                        displayWidthDp = source.displayWidthDp
                     )
                 )
 
@@ -818,7 +819,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                     isMerged = source.isMerged,
                     isSelectedForMap = false,
                     sourceColor = source.sourceColor,
-                    displayColor = source.displayColor
+                    displayColor = source.displayColor,
+                    displayWidthDp = source.displayWidthDp
                 )
             )
 

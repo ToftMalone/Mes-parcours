@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Track
+import com.example.ui.component.TrackThicknessControl
 import com.example.ui.component.CookieShape
 import com.example.ui.component.LocalAppMessenger
 import com.example.ui.component.MpDialog
@@ -286,8 +288,8 @@ fun HistoryTab(
         TrackColorSheet(
             track = track,
             onDismiss = { colorTrackId = null },
-            onApply = { color ->
-                viewModel.setTrackColor(track, color)
+            onApply = { color, widthDp ->
+                viewModel.setTrackStyle(track, color, widthDp)
                 colorTrackId = null
             }
         )
@@ -804,10 +806,11 @@ private fun SheetRow(
 }
 
 /**
- * Palette d'un parcours.
+ * Apparence d'un parcours : sa couleur et l'épaisseur de son trait, choisies
+ * ensemble puisque l'aperçu les montre ensemble.
  *
- * Le choix n'est appliqué qu'à « Appliquer » : on essaie une couleur sur l'aperçu sans
- * repeindre le tracé à chaque pastille touchée.
+ * Le choix n'est appliqué qu'à « Appliquer » : on essaie une couleur ou une épaisseur
+ * sur l'aperçu sans redessiner le tracé à chaque pastille touchée.
  *
  * Un parcours dont le fichier portait une couleur peut la retrouver : « Garder la
  * couleur Google Earth » remet `displayColor` à null, ce qui est exactement « couleur
@@ -818,17 +821,21 @@ private fun SheetRow(
 private fun TrackColorSheet(
     track: Track,
     onDismiss: () -> Unit,
-    onApply: (Int?) -> Unit
+    onApply: (color: Int?, widthDp: Float) -> Unit
 ) {
+    val context = LocalContext.current
+    var pendingWidth by remember {
+        mutableFloatStateOf(TrackStylePreferences.resolveThicknessDp(context, track.displayWidthDp))
+    }
     val hasFileColor = track.sourceColor != null
     var keepFileColor by remember { mutableStateOf(hasFileColor && track.displayColor == null) }
     var pending by remember { mutableIntStateOf(trackDisplayColor(track)) }
     val previewColor = if (keepFileColor) track.sourceColor ?: pending else pending
 
     MpSheet(onDismissRequest = onDismiss) {
-        SheetHeader("Couleur du tracé", track.name)
+        SheetHeader("Apparence du tracé", track.name)
         Spacer(modifier = Modifier.height(14.dp))
-        TrackColorPreview(color = Color(previewColor))
+        TrackColorPreview(color = Color(previewColor), widthDp = pendingWidth)
 
         if (hasFileColor) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -882,12 +889,15 @@ private fun TrackColorSheet(
             }
         }
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(18.dp))
+        TrackThicknessControl(value = pendingWidth, onValueChange = { pendingWidth = it })
+
+        Spacer(modifier = Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
             MpTextButton("Annuler", onDismiss)
             MpFilledButton(
                 text = "Appliquer",
-                onClick = { onApply(if (keepFileColor) null else pending) },
+                onClick = { onApply(if (keepFileColor) null else pending, pendingWidth) },
                 modifier = Modifier.testTag("color_apply_button")
             )
         }
@@ -920,9 +930,13 @@ private fun ColorSwatch(
     }
 }
 
-/** Aperçu de la couleur choisie : un tracé ondulé sur un fond de carte neutre. */
+/**
+ * Aperçu de l'apparence choisie : un tracé ondulé sur un fond de carte neutre, à
+ * l'épaisseur réelle — dp convertis par la densité de l'écran, exactement comme
+ * `TrackStylePreferences.getStrokeWidth` le fait pour la carte.
+ */
 @Composable
-private fun TrackColorPreview(color: Color) {
+private fun TrackColorPreview(color: Color, widthDp: Float) {
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
@@ -937,7 +951,7 @@ private fun TrackColorPreview(color: Color) {
             cubicTo(w * 0.22f, h * 0.30f, w * 0.38f, h * 0.95f, w * 0.55f, h * 0.55f)
             cubicTo(w * 0.70f, h * 0.20f, w * 0.85f, h * 0.30f, w * 0.97f, h * 0.36f)
         }
-        drawPath(path, color, style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, color, style = Stroke(width = widthDp.dp.toPx(), cap = StrokeCap.Round))
     }
 }
 

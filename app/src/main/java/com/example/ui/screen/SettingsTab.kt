@@ -29,13 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Code
@@ -45,7 +41,6 @@ import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -63,25 +58,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,13 +80,11 @@ import com.example.ui.component.LocalAppMessenger
 import com.example.ui.component.MpSwitch
 import com.example.ui.component.SunShape
 import com.example.ui.theme.DisplayFontFamily
-import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.NightModePreferences
 import com.example.ui.theme.NightModeSource
 import com.example.ui.theme.QuoteFontFamily
 import com.example.util.AutoBackupPreferences
 import com.example.util.SolarTimes
-import com.example.util.TrackStylePreferences
 import com.example.util.update.AvailableUpdate
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -179,9 +165,6 @@ private fun SettingsMain(
             MapBackgroundItem()
             MapOrientationItem()
         }
-
-        GroupLabel("Tracés")
-        TrackThicknessItem()
 
         GroupLabel("Mode nuit")
         NightModeGroup()
@@ -581,220 +564,6 @@ private fun OrientationSegment(label: String, selected: Boolean, onClick: () -> 
     ) {
         Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
     }
-}
-
-// ---------------------------------------------------------------------------
-// Tracés
-// ---------------------------------------------------------------------------
-
-/** "3,5" plutôt que "3.5" ; et "6" plutôt que "6,0". */
-private fun formatThicknessDp(value: Float): String {
-    val rounded = Math.round(value * 10) / 10f
-    return if (rounded % 1f == 0f) rounded.toInt().toString()
-    else String.format(Locale.US, "%.1f", rounded).replace('.', ',')
-}
-
-/** Pas du bouton « − / + » : un demi-dp, la plus petite différence visible. */
-private const val THICKNESS_STEP_DP = 0.5f
-
-/**
- * Épaisseur du trait des tracés, avec aperçu en direct.
- *
- * Trois voies qui se répondent : les boutons « − / + » pour un ajustement fin, le
- * champ central pour une valeur précise (virgule acceptée), le curseur pour un
- * réglage rapide. Aucun n'est cranté sur des paliers prédéfinis, sauf le pas des
- * boutons.
- */
-@Composable
-private fun TrackThicknessItem() {
-    val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
-    val colors = MaterialTheme.colorScheme
-
-    var thicknessDp by remember { mutableStateOf(TrackStylePreferences.getThicknessDp(context)) }
-    var textValue by remember { mutableStateOf(formatThicknessDp(thicknessDp)) }
-
-    fun applyThickness(dp: Float) {
-        thicknessDp = dp.coerceIn(TrackStylePreferences.MIN_THICKNESS_DP, TrackStylePreferences.MAX_THICKNESS_DP)
-    }
-
-    /**
-     * Enregistre l'épaisseur retenue — séparé de [applyThickness] pour ne pas écrire
-     * dans les préférences à chaque pixel de glissement du curseur.
-     */
-    fun persistThickness() {
-        TrackStylePreferences.setThicknessDp(context, thicknessDp)
-    }
-
-    /**
-     * Réaffiche dans le champ la valeur réellement retenue : taper « 99 » ne doit pas
-     * laisser « 99 » à l'écran quand l'épaisseur a été ramenée au maximum.
-     */
-    fun normalizeText() {
-        textValue = formatThicknessDp(thicknessDp)
-    }
-
-    fun step(delta: Float) {
-        applyThickness(thicknessDp + delta)
-        persistThickness()
-        normalizeText()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(colors.surfaceContainerLow)
-            .padding(16.dp)
-            .testTag("track_thickness_card")
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Épaisseur du trait", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier
-                    .height(40.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(colors.surfaceContainerHigh)
-                    .padding(horizontal = 4.dp)
-            ) {
-                StepperButton(Icons.Rounded.Remove, "Affiner", "track_thickness_minus") { step(-THICKNESS_STEP_DP) }
-                BasicTextField(
-                    value = textValue,
-                    onValueChange = { input ->
-                        textValue = input
-                        input.replace(',', '.').toFloatOrNull()?.let {
-                            applyThickness(it)
-                            persistThickness()
-                        }
-                    },
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = colors.onSurface,
-                        fontFamily = MaterialTheme.typography.labelLarge.fontFamily
-                    ),
-                    cursorBrush = SolidColor(colors.primary),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier
-                        .width(36.dp)
-                        // Une saisie hors bornes ou illisible est ramenée à l'affichage dès
-                        // que l'on quitte le champ, plutôt que de rester là à contredire
-                        // l'épaisseur réellement appliquée.
-                        .onFocusChanged { focus -> if (!focus.isFocused) normalizeText() }
-                        .testTag("track_thickness_field")
-                )
-                Text("dp", fontSize = 12.sp, color = colors.onSurfaceVariant)
-                StepperButton(Icons.Rounded.Add, "Épaissir", "track_thickness_plus") { step(THICKNESS_STEP_DP) }
-            }
-        }
-
-        // Aperçu : un tracé à l'épaisseur choisie, sur un fond qui rappelle la carte.
-        //
-        // Couleurs lues ici, et non dans le Canvas : la fonction de dessin est un
-        // DrawScope, pas un contexte composable, et ne peut donc pas interroger le
-        // thème. La conversion dp → pixels utilise la densité de l'écran, exactement
-        // comme TrackStylePreferences.getStrokeWidth : l'aperçu montre la même
-        // épaisseur que celle qui sera dessinée sur la carte.
-        val land = if (LocalIsDarkTheme.current) Color(0xFF1A201D) else Color(0xFFEEF1EA)
-        val lineColor = colors.primary
-        Canvas(
-            modifier = Modifier
-                .padding(top = 10.dp)
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(land)
-        ) {
-            val path = Path().apply {
-                moveTo(size.width * 0.06f, size.height * 0.7f)
-                cubicTo(
-                    size.width * 0.3f, size.height * 0.05f,
-                    size.width * 0.55f, size.height * 1.05f,
-                    size.width * 0.94f, size.height * 0.3f
-                )
-            }
-            drawPath(path, lineColor, style = Stroke(width = thicknessDp.dp.toPx(), cap = StrokeCap.Round))
-        }
-
-        ThicknessSlider(
-            value = thicknessDp,
-            onValueChange = {
-                applyThickness(it)
-                normalizeText()
-            },
-            onValueChangeFinished = { persistThickness() }
-        )
-
-        Text(
-            "La couleur se choisit parcours par parcours, sur sa pastille dans l'Historique.",
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            color = colors.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun StepperButton(icon: ImageVector, description: String, testTag: String, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .testTag(testTag)
-    ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
-    }
-}
-
-/** Curseur de la maquette : piste épaisse coupée autour d'une poignée verticale. */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun ThicknessSlider(value: Float, onValueChange: (Float) -> Unit, onValueChangeFinished: () -> Unit) {
-    val active = MaterialTheme.colorScheme.primary
-    val inactive = MaterialTheme.colorScheme.secondaryContainer
-    androidx.compose.material3.Slider(
-        value = value,
-        onValueChange = onValueChange,
-        onValueChangeFinished = onValueChangeFinished,
-        valueRange = TrackStylePreferences.MIN_THICKNESS_DP..TrackStylePreferences.MAX_THICKNESS_DP,
-        modifier = Modifier
-            .padding(top = 8.dp)
-            .fillMaxWidth()
-            .height(44.dp)
-            .testTag("track_thickness_slider"),
-        thumb = {
-            Box(
-                modifier = Modifier
-                    .size(width = 4.dp, height = 44.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(active)
-            )
-        },
-        track = { state ->
-            val span = state.valueRange.endInclusive - state.valueRange.start
-            val fraction = if (span > 0f) ((state.value - state.valueRange.start) / span).coerceIn(0f, 1f) else 0f
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(16.dp)
-            ) {
-                val gap = 6.dp.toPx()
-                val split = size.width * fraction
-                val r = CornerRadius(8.dp.toPx())
-                if (split - gap > 0f) drawRoundRect(active, Offset.Zero, Size(split - gap, size.height), r)
-                if (split + gap < size.width) {
-                    drawRoundRect(inactive, Offset(split + gap, 0f), Size(size.width - split - gap, size.height), r)
-                }
-            }
-        }
-    )
 }
 
 // ---------------------------------------------------------------------------

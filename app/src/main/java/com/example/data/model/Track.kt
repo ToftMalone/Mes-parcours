@@ -41,5 +41,12 @@ data class Track(
      * Remplace les trois couleurs par catégorie qui existaient jusqu'ici en
      * préférences : la couleur appartient désormais au parcours, pas à l'onglet.
      */
-    val displayColor: Int? = null
+    val displayColor: Int? = null,
+    /**
+     * Épaisseur du trait choisie pour **ce parcours précis**, en dp, ou null tant que
+     * personne n'en a choisi : il garde alors l'épaisseur générale d'avant (voir
+     * `TrackStylePreferences.resolveThicknessDp`). Se règle avec la couleur, dans la
+     * même feuille ; le réglage général a quitté les Paramètres.
+     */
+    val displayWidthDp: Float? = null
 )

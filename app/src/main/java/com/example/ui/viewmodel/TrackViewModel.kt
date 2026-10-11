@@ -262,6 +262,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 isMerged = track.isMerged,
                 sourceColor = track.sourceColor,
                 displayColor = track.displayColor,
+                displayWidthDp = track.displayWidthDp,
                 points = repository.getDisplayPoints(track.id, viewport)
             )
         }
@@ -363,13 +364,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Fixe la couleur d'un parcours, ou la remet en automatique avec [color] à null —
-     * auquel cas le parcours retrouve la couleur de son fichier d'origine s'il en a une.
+     * Fixe l'apparence d'un parcours : sa couleur, ou l'automatique avec [color] à
+     * null — auquel cas il retrouve la couleur de son fichier d'origine s'il en a
+     * une — et l'épaisseur de son trait, en dp.
      */
-    fun setTrackColor(track: Track, color: Int?) {
-        if (track.displayColor == color) return
+    fun setTrackStyle(track: Track, color: Int?, widthDp: Float) {
+        if (track.displayColor == color && track.displayWidthDp == widthDp) return
         viewModelScope.launch {
-            repository.updateTrack(track.copy(displayColor = color))
+            repository.updateTrack(track.copy(displayColor = color, displayWidthDp = widthDp))
         }
     }
 

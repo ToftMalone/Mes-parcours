@@ -130,6 +130,16 @@ se cochant sans effet visible. Symétriquement, « couleur d'origine » se dit e
 `displayColor` prime aussi sur `TrackPoint.segmentColor` au dessin : une couleur
 demandée à la main vaut pour le parcours entier, tronçons compris.
 
+**L'épaisseur du trait appartient elle aussi au parcours** (`Track.displayWidthDp`,
+migration 8→9), à la demande de l'auteur : elle se règle dans la même feuille que la
+couleur (« Apparence du tracé », pastille du parcours dans l'historique), et le réglage
+général a quitté les Paramètres. À null, le parcours garde l'épaisseur générale d'avant
+(`pref_track_thickness_dp`, que plus aucun écran n'écrit) : rien ne change à l'écran à
+la mise à jour, sans reprise à écrire. Cette valeur générale sert aussi à la trace en
+cours d'enregistrement. `TrackStylePreferences.resolveThicknessDp` tranche ; chaque
+tracé superposé est dessiné à sa propre épaisseur. Découpage et rognage la transmettent
+aux morceaux, comme la couleur.
+
 **La reprise des couleurs existantes est obligatoire.** La migration 7→8 ne peut pas
 remplir `displayColor` elle-même : la valeur à écrire vivait dans les préférences, que
 le SQL d'une migration ne sait pas lire. `TrackRepository.backfillDisplayColors`, appelé
@@ -359,7 +369,7 @@ pourquoi. À relire avant d'y toucher.
 2. **Toutes les migrations Room sont obligatoires.** Retirer l'une des migrations
    déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
    (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`), `MIGRATION_7_8`
-   (`Track.displayColor`) — rendrait la base illisible pour tout utilisateur venant
+   (`Track.displayColor`), `MIGRATION_8_9` (`Track.displayWidthDp`) — rendrait la base illisible pour tout utilisateur venant
    d'une version antérieure. Toute nouvelle version de schéma doit venir avec la sienne.
    Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
    la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec

@@ -394,6 +394,8 @@ fun MapViewContainer(
     sourceColor: Int? = null,
     /** Couleur choisie par l'utilisateur pour le parcours affiché, null s'il n'a rien choisi. */
     displayColor: Int? = null,
+    /** Épaisseur choisie pour le parcours affiché, en dp, null s'il n'a rien choisi. */
+    displayWidthDp: Float? = null,
     isCurrentTracking: Boolean = false,
     zoomBannerTopPadding: androidx.compose.ui.unit.Dp = 110.dp,
     isAutoFollowActive: Boolean = false,
@@ -534,7 +536,7 @@ fun MapViewContainer(
                 }
 
                 // Apparence choisie dans les paramètres / l'historique
-                val strokeWidth = TrackStylePreferences.getStrokeWidth(map.context)
+                val strokeWidth = TrackStylePreferences.getStrokeWidth(map.context, displayWidthDp)
 
                 val styleChanged = state.strokeWidth != strokeWidth ||
                                    state.sourceColor != sourceColor ||
@@ -1057,6 +1059,8 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
             val trackPoints = overlayTrack.points
             if (trackPoints.isNotEmpty()) {
                 val segments = buildSegmentsFromPoints(trackPoints)
+                val overlayStrokeWidth =
+                    TrackStylePreferences.getStrokeWidth(map.context, overlayTrack.displayWidthDp)
 
                 for (segment in segments) {
                     if (segment.points.isNotEmpty()) {
@@ -1072,9 +1076,11 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
                             isMerged = overlayTrack.isMerged
                         )
 
+                        // Chaque tracé superposé a son épaisseur : celle de la trace
+                        // principale ([MapState.strokeWidth]) ne vaut que pour elle.
                         val polyline = Polyline().apply {
                             outlinePaint.color = segmentColor
-                            outlinePaint.strokeWidth = state.strokeWidth
+                            outlinePaint.strokeWidth = overlayStrokeWidth
                             outlinePaint.strokeCap = Paint.Cap.ROUND
                             setPoints(segment.points)
                         }

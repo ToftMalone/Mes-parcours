@@ -75,7 +75,12 @@ object TrackStylePreferences {
 
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
-    /** Épaisseur choisie par l'utilisateur, en dp — indépendante de la densité d'écran. */
+    /**
+     * Épaisseur générale, en dp — celle qu'avait l'unique réglage des Paramètres
+     * avant que l'épaisseur ne devienne un choix par parcours. Plus aucun écran ne
+     * l'écrit : elle reste lue pour qu'un parcours sans choix propre garde l'aspect
+     * qu'il avait, et pour la trace en cours d'enregistrement.
+     */
     fun getThicknessDp(context: Context): Float {
         val stored = prefs(context).getFloat(KEY_THICKNESS_DP, DEFAULT_THICKNESS_DP)
         return stored.coerceIn(MIN_THICKNESS_DP, MAX_THICKNESS_DP)
@@ -87,12 +92,16 @@ object TrackStylePreferences {
             .apply()
     }
 
+    /** Épaisseur à employer pour un parcours : la sienne s'il en a une, sinon la générale. */
+    fun resolveThicknessDp(context: Context, displayWidthDp: Float?): Float =
+        displayWidthDp?.coerceIn(MIN_THICKNESS_DP, MAX_THICKNESS_DP) ?: getThicknessDp(context)
+
     /**
      * Largeur du trait en pixels, celle qu'attend `Paint.strokeWidth` — convertie
-     * depuis la valeur en dp choisie par l'utilisateur via la densité de l'écran.
+     * depuis les dp via la densité de l'écran.
      */
-    fun getStrokeWidth(context: Context): Float =
-        getThicknessDp(context) * context.resources.displayMetrics.density
+    fun getStrokeWidth(context: Context, displayWidthDp: Float? = null): Float =
+        resolveThicknessDp(context, displayWidthDp) * context.resources.displayMetrics.density
 
     /**
      * Couleur d'un parcours dont personne n'a choisi la couleur et dont le fichier
