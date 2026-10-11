@@ -808,6 +808,14 @@ private class Release(val version: String, val date: String?, val changes: List<
  */
 private val RELEASES = listOf(
     Release(
+        version = "2.0.2",
+        date = "2026-10-11",
+        changes = listOf(
+            "Nouvelle barre de navigation flottante",
+            "L'épaisseur du trait se choisit pour chaque parcours, avec sa couleur"
+        )
+    ),
+    Release(
         version = "2.0.1",
         date = "2026-10-05",
         changes = listOf(
