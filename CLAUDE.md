@@ -1521,6 +1521,12 @@ manque par une notification, sans en payer le prix en batterie.
 
 ## Publier une version
 
+**Ne publier que sur demande explicite de l'auteur** (« publie », « publie la
+2.0.x »…). Une demande de corrections, même accompagnée des notes de version à
+afficher, n'est **pas** une demande de publication : la 2.0.3 a été publiée ainsi par
+déduction, sans que l'auteur l'ait demandé. Corriger, compiler, pousser et fournir
+l'APK de debug, puis attendre son feu vert.
+
 `.github/workflows/release.yml` fait tout : tests, compilation signée, `update.json`,
 publication GitHub. Deux façons de le déclencher, pour un résultat identique.
 
