@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -48,5 +49,27 @@ data class Track(
      * `TrackStylePreferences.resolveThicknessDp`). Se règle avec la couleur, dans la
      * même feuille ; le réglage général a quitté les Paramètres.
      */
-    val displayWidthDp: Float? = null
-)
+    val displayWidthDp: Float? = null,
+    /**
+     * Enregistrement en pause, **mémorisé en base** (migration 9→10).
+     *
+     * La pause ne vivait que dans la mémoire du service : si Android tuait
+     * l'application pendant une pause, puis la relançait — ou après un redémarrage du
+     * téléphone — l'enregistrement reprenait tout seul, et le trajet suivant
+     * s'enregistrait alors que l'utilisateur l'avait mis en pause. N'a de sens que
+     * tant que [isRecording] est vrai.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val isPaused: Boolean = false
+) {
+    companion object {
+        /**
+         * `startTime` de la ligne réservée pendant un import, avant que le fichier
+         * n'en donne un. L'import n'est plus une seule transaction (voir
+         * `TrackRepository.importTrackFromUri`) : cette ligne existe donc en base le
+         * temps de l'import, et c'est ce repère qui la cache de l'historique et
+         * permet de la retrouver si l'application est tuée en cours de route.
+         */
+        const val IMPORT_PLACEHOLDER_START_TIME = -1L
+    }
+}

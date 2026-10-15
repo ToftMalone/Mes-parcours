@@ -808,6 +808,14 @@ private class Release(val version: String, val date: String?, val changes: List<
  */
 private val RELEASES = listOf(
     Release(
+        version = "2.0.3",
+        date = "2026-10-15",
+        changes = listOf(
+            "Correction de bugs",
+            "Optimisation de l'utilisation de la batterie"
+        )
+    ),
+    Release(
         version = "2.0.2",
         date = "2026-10-11",
         changes = listOf(

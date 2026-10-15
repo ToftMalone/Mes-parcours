@@ -884,7 +884,9 @@ private fun MergeTracksTool(
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp)
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            tracks.sortedByDescending { it.startTime }.forEach { track ->
+            // Le parcours en cours d'enregistrement n'est pas proposé : le fusionner
+            // supprimerait sa ligne sous le service (voir mergeAndSaveTracks).
+            tracks.filter { !viewModel.isBeingRecorded(it) }.sortedByDescending { it.startTime }.forEach { track ->
                 val isSelected = track.id in selectedSourceIds
                 MergeTrackRow(track, isSelected) {
                     selectedSourceIds = if (isSelected) selectedSourceIds - track.id else selectedSourceIds + track.id

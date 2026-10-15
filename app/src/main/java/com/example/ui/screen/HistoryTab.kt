@@ -277,9 +277,12 @@ fun HistoryTab(
                 actionsTrackId = null
                 resume(track)
             },
-            onDelete = {
-                actionsTrackId = null
-                deleteTrackId = track.id
+            // Pas de suppression pour le parcours en cours : voir TrackRepository.deleteTrack.
+            onDelete = if (viewModel.isBeingRecorded(track)) null else {
+                {
+                    actionsTrackId = null
+                    deleteTrackId = track.id
+                }
             }
         )
     }
@@ -302,9 +305,11 @@ fun HistoryTab(
             trackName = track.name,
             onDismiss = { deleteTrackId = null },
             onConfirm = {
-                viewModel.deleteTrack(track.id)
                 deleteTrackId = null
-                messenger.show("Parcours supprimé.", Icons.Rounded.Delete)
+                viewModel.deleteTrack(track.id) { deleted ->
+                    if (deleted) messenger.show("Parcours supprimé.", Icons.Rounded.Delete)
+                    else messenger.show(RECORDING_DELETE_REFUSED, Icons.Rounded.Error, isError = true)
+                }
             }
         )
     }
@@ -720,6 +725,9 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
 
 // ------------------------------------------------------------------ Feuilles
 
+/** Refus de supprimer le parcours en cours, partagé avec la fiche détail. */
+internal const val RECORDING_DELETE_REFUSED = "Arrête l'enregistrement avant de supprimer ce parcours."
+
 /** Feuille d'actions d'un parcours : carte, couleur, reprise, suppression. */
 @Composable
 private fun TrackActionsSheet(
@@ -729,7 +737,7 @@ private fun TrackActionsSheet(
     onToggleMap: () -> Unit,
     onChangeColor: () -> Unit,
     onResume: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: (() -> Unit)?
 ) {
     MpSheet(onDismissRequest = onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -765,11 +773,13 @@ private fun TrackActionsSheet(
                 )
             }
             SheetRow(Icons.Rounded.Polyline, "Reprendre la trace", onClick = onResume, testTag = "resume_track_card_button_${track.id}")
-            SheetRow(
-                Icons.Rounded.Delete, "Supprimer", onClick = onDelete,
-                color = MaterialTheme.colorScheme.error,
-                testTag = "delete_track_button_${track.id}"
-            )
+            if (onDelete != null) {
+                SheetRow(
+                    Icons.Rounded.Delete, "Supprimer", onClick = onDelete,
+                    color = MaterialTheme.colorScheme.error,
+                    testTag = "delete_track_button_${track.id}"
+                )
+            }
         }
     }
 }

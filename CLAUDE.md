@@ -10,7 +10,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `2.0.2` (`versionCode` 41). Elle n'est écrite qu'une fois,
+- Version courante : `2.0.3` (`versionCode` 42). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -369,7 +369,8 @@ pourquoi. À relire avant d'y toucher.
 2. **Toutes les migrations Room sont obligatoires.** Retirer l'une des migrations
    déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
    (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`), `MIGRATION_7_8`
-   (`Track.displayColor`), `MIGRATION_8_9` (`Track.displayWidthDp`) — rendrait la base illisible pour tout utilisateur venant
+   (`Track.displayColor`), `MIGRATION_8_9` (`Track.displayWidthDp`), `MIGRATION_9_10`
+   (`Track.isPaused`) — rendrait la base illisible pour tout utilisateur venant
    d'une version antérieure. Toute nouvelle version de schéma doit venir avec la sienne.
    Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
    la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec
@@ -635,9 +636,10 @@ variables officiels de Google Fonts dans `res/font`, licence SIL OFL 1.1 (textes
 qu'Android n'applique qu'à partir de l'API 26 : sur Android 7, la police s'affiche
 dans son instance par défaut, ni resserrée ni graissée.
 
-**Regarder les pixels sans téléphone.** `debug-apk.yml` lance les tests avec
-`-Proborazzi.test.record=true` et joint les images produites à l'exécution (artefact
-`captures-ecran`). `ScreensScreenshotTest` peuple une base en mémoire comme la
+**Regarder les pixels sans téléphone.** Lancer les tests avec
+`-Proborazzi.test.record=true` (dans la session, depuis la suppression de
+`debug-apk.yml`) : les images sont écrites dans `app/src/test/screenshots/refonte/`,
+à ne pas verser au dépôt. `ScreensScreenshotTest` peuple une base en mémoire comme la
 maquette et photographie chaque écran et ses états principaux (feuilles et dialogues
 compris, par `captureScreenRoboImage`). Robolectric y dessine l'interface Compose
 réelle — polices, couleurs, mise en page — de quoi la confronter à la maquette avant
@@ -649,10 +651,11 @@ réseau), ombres peu fidèles, et des nombres au format anglais (« 4.4 km/h »)
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 188 tests unitaires en 22 suites : `ScreensScreenshotTest` (33, captures seules —
+- 195 tests unitaires en 23 suites : `ScreensScreenshotTest` (33, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `TrimTrackTest` (14), `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
   (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
+  `RecordingGuardsTest` (7),
   `KmlStyleTableTest` (7), `TrackSegmentsTest` (7), `CoordinateTokenizerTest` (6),
   `DarkTilesColorFilterTest` (6), `DesignSystemScreenshotTest` (6, captures seules),
   `ElevationAccumulatorTest` (6), `TunnelDetectorTest` (6), `MergeTracksTest` (5),
@@ -687,6 +690,61 @@ réseau), ombres peu fidèles, et des nombres au format anglais (« 4.4 km/h »)
   terrain ; les versions suivantes (rognage, écran de bienvenue, notification de
   mise à jour en tâche de fond) partent directement en 1.0, sans un tour
   supplémentaire en version de développement.
+
+### Relecture de la 2.0.3 : enregistrement, pause, import
+
+Relecture « bugs, failles, choses non optimales », à la demande de l'auteur. Huit
+points corrigés ; deux autres relevés et laissés de côté par l'auteur (voir la fin).
+Journal des nouveautés volontairement réduit à « Correction de bugs » et
+« Optimisation de l'utilisation de la batterie », à sa demande.
+
+1. **Le parcours en cours ne se fusionne ni ne se supprime plus.** La fusion le
+   proposait, l'historique et la fiche détail offraient « Supprimer » : la ligne
+   disparaissait sous le service, qui continuait d'y écrire, et chaque point suivant
+   était refusé en silence par la clé étrangère. `TrackRepository.isBeingRecorded`
+   tranche ; `deleteTrack` renvoie false et `mergeAndSaveTracks` lève, en plus des
+   écrans qui n'offrent plus l'action.
+2. **La pause est mémorisée en base** (`Track.isPaused`, migration 9→10). Elle ne
+   vivait que dans le service : un processus tué pendant une pause, ou un téléphone
+   redémarré, reprenait l'enregistrement tout seul. `ACTION_RESTORE` (BootReceiver)
+   et la relance `START_STICKY` relisent l'état en base ; une pause reçue par un
+   service tout juste recréé (`hasSession` faux) est écrite sur le parcours resté
+   ouvert, puis le service s'arrête. `persistPauseState` relit `isPaused` sous un
+   verrou, pour qu'une écriture ancienne ne passe jamais après une plus récente.
+3. **La vitesse moyenne se prolonge après une reprise** : `ResumeState` porte la
+   somme et le nombre de vitesses retenues, que le service remettait à zéro.
+4. **L'export ouvre la destination en mode « wt »** : en « w », certains
+   fournisseurs de documents ne vident pas le fichier, et écraser un export plus
+   long laissait sa fin derrière le nouveau contenu.
+5. **Plus de reprise en arrière-plan sans l'autorisation « Toujours »**
+   (`RecordingRecovery`). Depuis Android 14, `startForeground` d'un service de
+   localisation lancé en arrière-plan lève une exception sans elle ; elle était
+   attrapée, mais Android tuait ensuite l'application faute de premier plan. On
+   prévient à la place par une notification, et le parcours attend en pause.
+6. **Pause, reprise, arrêt et chronomètre passent tous par le thread principal**
+   (`TrackingService.applyState`). Le chronomètre était démarré depuis le thread des
+   points après la préparation d'une reprise : une pause demandée pendant cette
+   préparation passait avant, et il tournait pendant la pause.
+7. **En pause et application quittée, le GPS passe en mode économe** (précision
+   réduite, une position toutes les dix secondes) au lieu de la pleine précision à
+   1 Hz. Écran ouvert, la précision reste pleine pour le point bleu. L'alerte de
+   perte de signal ignore désormais les pauses.
+8. **L'import n'est plus une seule transaction**, qui verrouillait la base en
+   écriture et figeait un enregistrement en cours jusqu'à la fin de l'import. Une
+   transaction par lot ; la ligne réservée porte `startTime =
+   Track.IMPORT_PLACEHOLDER_START_TIME`, qui la cache de l'historique, un échec la
+   supprime, et `cleanupInterruptedImports` (au démarrage) rattrape celle d'un import
+   tué avec l'application.
+
+**Relevés, non traités pour l'instant :**
+
+- `insertPoint` suspend : le thread unique de `pointScope` sérialise les morceaux de
+  code entre deux suspensions, pas les coroutines entières. Deux positions livrées
+  ensemble liraient donc la même position précédente, et la distance serait comptée
+  A→B + A→C. À vérifier, puis corriger en avançant `lastLocation` avant l'écriture
+  ou en traitant les positions dans une file unique.
+- Le tracé en direct, recopié et reconstruit à chaque point (voir « Rapidité et
+  batterie de la 1.3 »).
 
 ### Audit du 0.11.2
 

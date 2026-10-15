@@ -17,7 +17,7 @@ import com.example.data.model.TrackPoint
  * l'exécution. L'incrémenter sans ajouter la migration correspondante fait échouer ce
  * test — c'est précisément ce qu'on lui demande.
  */
-internal const val DATABASE_VERSION = 9
+internal const val DATABASE_VERSION = 10
 
 /**
  * `exportSchema = true` : Room écrit le schéma de chaque version dans
@@ -123,6 +123,18 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * Ajoute `isPaused` : la pause d'un enregistrement, mémorisée pour survivre à
+         * l'arrêt du processus. Une valeur par défaut est sans coût ici, la table des
+         * parcours ne compte que quelques centaines de lignes — à l'inverse de
+         * `track_points`, où l'invariant 2 l'interdit.
+         */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tracks` ADD COLUMN `isPaused` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
          * Toutes les migrations déclarées, dans l'ordre.
          *
          * Exposée pour que le test de migration applique exactement la même liste que
@@ -130,7 +142,7 @@ abstract class AppDatabase : RoomDatabase() {
          * ajoutée ici et oubliée là.
          */
         @androidx.annotation.VisibleForTesting
-        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {

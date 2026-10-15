@@ -31,7 +31,12 @@ class TrackStatsAccumulator {
 
     private var distanceMeters = 0.0
     private var maxSpeedMps = 0.0
-    private var speedSumMps = 0.0
+    /** Somme des vitesses retenues pour la moyenne : de quoi la prolonger ailleurs. */
+    var speedSumMps = 0.0
+        private set
+
+    /** Nombre de relevés comptés dans [speedSumMps]. */
+    val speedSamples: Int get() = speedPoints
     private var speedPoints = 0
 
     /** Ajoute un point. Les points doivent arriver dans l'ordre du parcours. */

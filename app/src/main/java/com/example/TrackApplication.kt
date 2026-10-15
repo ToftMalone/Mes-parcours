@@ -38,6 +38,12 @@ class TrackApplication : Application() {
         // se déclenche à cette première ouverture. Un échec ne doit pas empêcher
         // l'application de démarrer — au pire les couleurs se recalculent par défaut.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            // Un import tué avec l'application laisse sa ligne réservée en base, cachée
+            // de l'historique : on la retire ici, aucun import ne pouvant être en cours
+            // au démarrage du processus (voir TrackRepository.importTrackFromUri).
+            runCatching {
+                TrackRepository.getInstance(this@TrackApplication).cleanupInterruptedImports()
+            }
             runCatching {
                 TrackRepository.getInstance(this@TrackApplication)
                     .backfillDisplayColors(this@TrackApplication)

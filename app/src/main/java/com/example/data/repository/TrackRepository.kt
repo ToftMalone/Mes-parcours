@@ -34,7 +34,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     suspend fun resumeExistingTrack(trackId: Long): Boolean {
         val track = trackDao.getTrackById(trackId) ?: return false
-        val updated = track.copy(isRecording = true)
+        val updated = track.copy(isRecording = true, isPaused = false)
         trackDao.updateTrack(updated)
         // La trace va se remettre à grossir : ce qui avait été mis en cache quand elle
         // était figée ne la décrit déjà plus.
@@ -51,7 +51,15 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     /** Points à réafficher et statistiques de départ pour reprendre un enregistrement. */
     data class ResumeState(
         val points: List<TrackPoint>,
-        val stats: LiveStats
+        val stats: LiveStats,
+        /**
+         * De quoi prolonger la vitesse moyenne : somme des vitesses retenues et nombre
+         * de relevés. Le service repartait de zéro sur ces deux cumuls alors que la
+         * distance et la durée étaient restaurées, si bien qu'après une reprise la
+         * moyenne ne portait plus que sur ce qui avait été enregistré depuis.
+         */
+        val speedSumMps: Double = 0.0,
+        val speedSamples: Int = 0
     )
 
     /** Au-delà, on ne recalcule plus les statistiques point par point. */
@@ -75,12 +83,23 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         if (pointCount <= statsRecomputeLimit) {
             val points = trackDao.getPointsForTrack(track.id)
-            return ResumeState(points, calculateStatsFromPoints(points))
+            val accumulator = TrackStatsAccumulator()
+            for (point in points) accumulator.add(point)
+            return ResumeState(
+                points = points,
+                stats = accumulator.result(),
+                speedSumMps = accumulator.speedSumMps,
+                speedSamples = accumulator.speedSamples
+            )
         }
 
         val tail = trackDao.getLastPoints(track.id, liveTailLimit).asReversed()
         val avgSpeed = if (track.duration > 0) track.totalDistance / track.duration else track.avgSpeed
+        // Faute d'avoir relu les vitesses, on pondère la moyenne connue par l'effectif :
+        // les points à venir ne pèsent alors que leur part, comme si on avait tout relu.
         return ResumeState(
+            speedSumMps = avgSpeed * pointCount,
+            speedSamples = pointCount,
             points = tail,
             stats = LiveStats(
                 durationSec = track.duration,
@@ -135,7 +154,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 avgSpeed = stats.avgSpeedMps,
                 elevationGain = stats.elevationGain,
                 elevationLoss = stats.elevationLoss,
-                isRecording = false
+                isRecording = false,
+                isPaused = false
             )
             trackDao.updateTrack(updated)
         }
@@ -345,47 +365,74 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * points en mémoire. La ligne du parcours est insérée d'abord (pour obtenir son
      * id), puis mise à jour avec les statistiques une fois le parsing terminé.
      *
-     * Le tout dans une seule transaction : en cas d'échec, rien n'est conservé.
+     * **Une transaction par lot, plus une seule pour tout l'import.** Une transaction
+     * unique verrouillait la base en écriture d'un bout à l'autre : importer un gros
+     * KML pendant une sortie figeait l'enregistrement — points GPS, statistiques,
+     * notification — jusqu'à la fin de l'import. Chaque lot ne tient plus le verrou
+     * que le temps de son insertion.
+     *
+     * L'atomicité est rendue à la main : la ligne réservée porte un `startTime`
+     * repère ([Track.IMPORT_PLACEHOLDER_START_TIME]) qui la cache de l'historique, un
+     * échec la supprime avec ses points, et [cleanupInterruptedImports] rattrape au
+     * lancement suivant celle d'un import tué avec l'application.
      */
     suspend fun importTrackFromUri(context: Context, uri: android.net.Uri): Long =
         withContext(Dispatchers.IO) {
-            database.runInTransaction(
-                java.util.concurrent.Callable {
-                    val placeholder = Track(
-                        name = "Import en cours",
-                        startTime = 0L,
-                        isRecording = false,
-                        isImported = true,
-                        isSelectedForMap = false
-                    )
-                    val trackId = trackDao.insertTrackBlocking(placeholder)
-
-                    val summary = Importer.importFromUri(context, uri, trackId) { batch ->
-                        trackDao.insertTrackPointsBlocking(batch)
-                    } ?: throw Importer.ImportException(
-                        "Impossible de lire ou de parser le fichier. Vérifiez le format GPX/KML."
-                    )
-
-                    trackDao.updateTrackBlocking(
-                        placeholder.copy(
-                            id = trackId,
-                            name = summary.name,
-                            activityType = summary.activityType,
-                            startTime = summary.startTime,
-                            endTime = summary.endTime,
-                            totalDistance = summary.totalDistance,
-                            duration = summary.duration,
-                            maxSpeed = summary.maxSpeed,
-                            avgSpeed = summary.avgSpeed,
-                            elevationGain = summary.elevationGain,
-                            elevationLoss = summary.elevationLoss,
-                            sourceColor = summary.sourceColor
-                        )
-                    )
-                    trackId
-                }
+            val placeholder = Track(
+                name = "Import en cours",
+                startTime = Track.IMPORT_PLACEHOLDER_START_TIME,
+                isRecording = false,
+                isImported = true,
+                isSelectedForMap = false
             )
+            val trackId = trackDao.insertTrackBlocking(placeholder)
+            try {
+                val summary = Importer.importFromUri(context, uri, trackId) { batch ->
+                    trackDao.insertTrackPointsBlocking(batch)
+                } ?: throw Importer.ImportException(
+                    "Impossible de lire ou de parser le fichier. Vérifiez le format GPX/KML."
+                )
+
+                trackDao.updateTrackBlocking(
+                    placeholder.copy(
+                        id = trackId,
+                        name = summary.name,
+                        activityType = summary.activityType,
+                        startTime = summary.startTime,
+                        endTime = summary.endTime,
+                        totalDistance = summary.totalDistance,
+                        duration = summary.duration,
+                        maxSpeed = summary.maxSpeed,
+                        avgSpeed = summary.avgSpeed,
+                        elevationGain = summary.elevationGain,
+                        elevationLoss = summary.elevationLoss,
+                        sourceColor = summary.sourceColor
+                    )
+                )
+                trackId
+            } catch (e: Throwable) {
+                // NonCancellable : une annulation doit, elle aussi, laisser la base nette.
+                withContext(kotlinx.coroutines.NonCancellable) {
+                    runCatching {
+                        trackDao.deletePointsForTrack(trackId)
+                        trackDao.deleteTrack(trackId)
+                    }
+                }
+                throw e
+            }
         }
+
+    /**
+     * Supprime les lignes d'imports interrompus par l'arrêt de l'application. À
+     * n'appeler qu'au démarrage du processus : aucun import ne peut alors être en
+     * cours, puisqu'ils ne survivent pas au processus qui les a lancés.
+     */
+    fun cleanupInterruptedImports() {
+        database.runInTransaction {
+            trackDao.deleteImportPlaceholderPointsBlocking()
+            trackDao.deleteImportPlaceholdersBlocking()
+        }
+    }
 
     /**
      * Fusionne [trackIds] dans [destinationTrackId], par ordre chronologique.
@@ -410,6 +457,12 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             }
             if (tracks.size < 2) {
                 throw IllegalArgumentException("Veuillez sélectionner au moins 2 tracés à fusionner")
+            }
+            // Fusionner le parcours en cours d'enregistrement supprimait sa ligne sous le
+            // service, qui continuait d'y écrire : chaque point suivant était refusé par
+            // la clé étrangère, en silence, et tout le reste de la sortie était perdu.
+            if (tracks.any { isBeingRecorded(it) }) {
+                throw IllegalArgumentException("Un des parcours est en cours d'enregistrement")
             }
 
             val destinationTrack = tracks.find { it.id == destinationTrackId }
@@ -890,16 +943,32 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
     }
 
-    suspend fun deleteTrack(trackId: Long) {
-        trackDao.deletePointsForTrack(trackId)
-        trackDao.deleteTrack(trackId)
-        invalidatePointCaches(trackId)
-        if (_currentTrackId.value == trackId) {
-            _currentTrackId.value = null
-            _isTracking.value = false
-            _livePoints.value = emptyList()
-            _liveStats.value = LiveStats()
+    /**
+     * Supprime un parcours, sauf s'il est en cours d'enregistrement : renvoie alors
+     * false sans rien toucher.
+     *
+     * Le supprimer sous le service le laissait tourner à vide — GPS allumé,
+     * notification affichée, chaque point refusé par la clé étrangère — pendant que
+     * l'écran, lui, se croyait à l'arrêt et n'offrait plus de quoi l'interrompre.
+     */
+    suspend fun deleteTrack(trackId: Long): Boolean {
+        val track = trackDao.getTrackById(trackId)
+        if (track != null && isBeingRecorded(track)) return false
+        database.withTransaction {
+            trackDao.deletePointsForTrack(trackId)
+            trackDao.deleteTrack(trackId)
         }
+        invalidatePointCaches(trackId)
+        return true
+    }
+
+    /** Vrai pour le parcours qu'un enregistrement alimente, ou laissé ouvert en base. */
+    fun isBeingRecorded(track: Track): Boolean =
+        track.isRecording || (_isTracking.value && _currentTrackId.value == track.id)
+
+    /** Mémorise la pause en base, pour qu'elle survive à l'arrêt du processus. */
+    suspend fun setTrackPaused(trackId: Long, paused: Boolean) {
+        trackDao.setTrackPaused(trackId, paused)
     }
 
     // In-memory state tracking to sync Service with UI

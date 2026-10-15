@@ -172,10 +172,15 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
 
         viewModelScope.launch {
-            combine(repository.isAppInForeground, repository.gpsStatus, repository.isTracking) { inForeground, status, isTracking ->
-                Triple(inForeground, status, isTracking)
-            }.collect { (inForeground, status, isTracking) ->
-                updateGpsLostNotification(inForeground, status, isTracking)
+            // En pause, les positions arrivent volontairement au compte-gouttes (voir
+            // TrackingService.requestLocationUpdates) et rien ne s'enregistre : un
+            // silence n'y est pas une perte de signal à signaler.
+            combine(
+                repository.isAppInForeground, repository.gpsStatus, repository.isTracking, repository.isPaused
+            ) { inForeground, status, isTracking, isPaused ->
+                Triple(inForeground, status, isTracking && !isPaused)
+            }.collect { (inForeground, status, isRecordingActive) ->
+                updateGpsLostNotification(inForeground, status, isRecordingActive)
             }
         }
     }
@@ -383,14 +388,23 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
-    fun deleteTrack(trackId: Long) {
+    /**
+     * Supprime un parcours. [onResult] reçoit false si la suppression a été refusée
+     * parce que le parcours est en cours d'enregistrement (voir
+     * `TrackRepository.deleteTrack`).
+     */
+    fun deleteTrack(trackId: Long, onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
-            repository.deleteTrack(trackId)
-            if (_selectedTrackId.value == trackId) {
+            val deleted = repository.deleteTrack(trackId)
+            if (deleted && _selectedTrackId.value == trackId) {
                 _selectedTrackId.value = null
             }
+            onResult(deleted)
         }
     }
+
+    /** Vrai pour le parcours qu'un enregistrement alimente : ni fusion ni suppression. */
+    fun isBeingRecorded(track: Track): Boolean = repository.isBeingRecorded(track)
 
     fun selectTrack(trackId: Long?) {
         _selectedTrackId.value = trackId
@@ -555,7 +569,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val finalUri = ensureUriExtension(context, uri, format.extension)
-                val stream = context.contentResolver.openOutputStream(finalUri)
+                val stream = openTruncating(context, finalUri)
                     ?: throw java.io.IOException("Impossible d'ouvrir le fichier de destination")
                 stream.use { outputStream ->
                     outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
@@ -572,6 +586,23 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             }
         }
     }
+
+    /**
+     * Ouvre la destination en la vidant d'abord (mode « wt »).
+     *
+     * Le mode par défaut, « w », ne tronque pas le fichier chez certains fournisseurs
+     * de documents : écraser un ancien export plus long laissait sa fin derrière le
+     * nouveau contenu, et le GPX obtenu n'était plus lisible. Un fournisseur qui ne
+     * connaîtrait pas « wt » retombe sur « w », qui vaut toujours mieux qu'un échec.
+     */
+    private fun openTruncating(context: Context, uri: android.net.Uri): java.io.OutputStream? =
+        try {
+            context.contentResolver.openOutputStream(uri, "wt")
+        } catch (e: java.io.FileNotFoundException) {
+            context.contentResolver.openOutputStream(uri, "w")
+        } catch (e: IllegalArgumentException) {
+            context.contentResolver.openOutputStream(uri, "w")
+        }
 
     fun saveGPXToUri(
         context: Context,

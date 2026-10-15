@@ -415,9 +415,16 @@ fun DetailView(
                 onDismiss = { showDelete = false },
                 onConfirm = {
                     showDelete = false
-                    viewModel.deleteTrack(t.id)
-                    messenger.show("Parcours supprimé.", Icons.Rounded.Delete)
-                    goBack()
+                    // Un enregistrement qui vient de démarrer est vide, donc présente lui
+                    // aussi ce bouton : c'est le dépôt qui refuse, et l'on reste ici.
+                    viewModel.deleteTrack(t.id) { deleted ->
+                        if (deleted) {
+                            messenger.show("Parcours supprimé.", Icons.Rounded.Delete)
+                            goBack()
+                        } else {
+                            messenger.show(RECORDING_DELETE_REFUSED, Icons.Rounded.Error, isError = true)
+                        }
+                    }
                 }
             )
         }

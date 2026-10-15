@@ -12,7 +12,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TrackDao {
-    @Query("SELECT * FROM tracks ORDER BY startTime DESC")
+    // La ligne réservée d'un import en cours n'est pas encore un parcours : la montrer
+    // permettrait de l'ouvrir, de la fusionner ou de la supprimer pendant que l'import
+    // y écrit encore.
+    @Query("SELECT * FROM tracks WHERE startTime != ${Track.IMPORT_PLACEHOLDER_START_TIME} ORDER BY startTime DESC")
     fun getAllTracks(): Flow<List<Track>>
 
     @Query("SELECT * FROM tracks WHERE isSelectedForMap = 1")
@@ -269,4 +272,15 @@ interface TrackDao {
 
     @Query("DELETE FROM track_points WHERE trackId = :trackId")
     suspend fun deletePointsForTrack(trackId: Long)
+
+    /** Mémorise la pause d'un enregistrement, sans réécrire le reste de la ligne. */
+    @Query("UPDATE tracks SET isPaused = :paused WHERE id = :trackId")
+    suspend fun setTrackPaused(trackId: Long, paused: Boolean)
+
+    /** Lignes laissées par un import interrompu : voir `Track.IMPORT_PLACEHOLDER_START_TIME`. */
+    @Query("DELETE FROM track_points WHERE trackId IN (SELECT id FROM tracks WHERE startTime = ${Track.IMPORT_PLACEHOLDER_START_TIME})")
+    fun deleteImportPlaceholderPointsBlocking()
+
+    @Query("DELETE FROM tracks WHERE startTime = ${Track.IMPORT_PLACEHOLDER_START_TIME}")
+    fun deleteImportPlaceholdersBlocking()
 }
