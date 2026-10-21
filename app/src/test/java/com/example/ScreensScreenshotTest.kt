@@ -201,7 +201,7 @@ class ScreensScreenshotTest {
 
     @Test fun historique_couleur_google_earth() {
         seed(); history(false); waitForTag("history_list")
-        compose.onNodeWithTag("history_category_Importés").performClick()
+        compose.onNodeWithTag("history_category_IMPORTED").performClick()
         waitForTag("track_color_button_6")
         compose.onNodeWithTag("track_color_button_6").performClick()
         waitForTag("color_swatch_from_file")
@@ -344,7 +344,7 @@ class ScreensScreenshotTest {
     // --------------------------------------------------------------- Enregistrer
 
     private fun recording(dark: Boolean, permission: Boolean = true) {
-        repository.updateGpsStatus("Signal trouvé")
+        repository.updateGpsStatus(com.example.data.model.GpsStatus.FOUND)
         repository.updateGpsAccuracy(4f)
         repository.updateAltitude(com.example.util.AltitudeFix(184.0, 3f))
         compose.setContent {

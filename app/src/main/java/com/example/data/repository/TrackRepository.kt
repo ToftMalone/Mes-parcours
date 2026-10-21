@@ -3,12 +3,16 @@ package com.example.data.repository
 import android.content.Context
 import com.example.data.local.AppDatabase
 import com.example.data.local.TrackDao
+import com.example.data.model.GpsStatus
+import com.example.R
 import com.example.data.model.LiveStats
 import com.example.data.model.MapViewport
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.model.TrackPointMeta
 import com.example.util.Importer
+import com.example.util.UserFacingArgumentException
+import com.example.util.UserFacingStateException
 import com.example.util.Exporter
 import com.example.util.MediaStoreExporter
 import com.example.util.TrackStatsAccumulator
@@ -379,7 +383,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     suspend fun importTrackFromUri(context: Context, uri: android.net.Uri): Long =
         withContext(Dispatchers.IO) {
             val placeholder = Track(
-                name = "Import en cours",
+                name = "…",
                 startTime = Track.IMPORT_PLACEHOLDER_START_TIME,
                 isRecording = false,
                 isImported = true,
@@ -389,9 +393,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             try {
                 val summary = Importer.importFromUri(context, uri, trackId) { batch ->
                     trackDao.insertTrackPointsBlocking(batch)
-                } ?: throw Importer.ImportException(
-                    "Impossible de lire ou de parser le fichier. Vérifiez le format GPX/KML."
-                )
+                } ?: throw Importer.ImportException(R.string.err_import_unreadable)
 
                 trackDao.updateTrackBlocking(
                     placeholder.copy(
@@ -453,20 +455,20 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     ): Long {
         return database.withTransaction {
             val tracks = trackIds.map { trackId ->
-                trackDao.getTrackById(trackId) ?: throw IllegalArgumentException("Tracé $trackId introuvable")
+                trackDao.getTrackById(trackId) ?: throw UserFacingArgumentException(R.string.err_track_id_not_found, listOf(trackId))
             }
             if (tracks.size < 2) {
-                throw IllegalArgumentException("Veuillez sélectionner au moins 2 tracés à fusionner")
+                throw UserFacingArgumentException(R.string.err_merge_min_two)
             }
             // Fusionner le parcours en cours d'enregistrement supprimait sa ligne sous le
             // service, qui continuait d'y écrire : chaque point suivant était refusé par
             // la clé étrangère, en silence, et tout le reste de la sortie était perdu.
             if (tracks.any { isBeingRecorded(it) }) {
-                throw IllegalArgumentException("Un des parcours est en cours d'enregistrement")
+                throw UserFacingArgumentException(R.string.err_merge_one_recording)
             }
 
             val destinationTrack = tracks.find { it.id == destinationTrackId }
-                ?: throw IllegalArgumentException("Tracé de destination introuvable")
+                ?: throw UserFacingArgumentException(R.string.err_merge_destination_missing)
 
             val orderedTracks = tracks.sortedBy { it.startTime }
 
@@ -615,9 +617,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         deleteSource: Boolean
     ): List<Long> {
         val source = trackDao.getTrackById(sourceTrackId)
-            ?: throw IllegalArgumentException("Parcours introuvable")
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
         if (source.isRecording) {
-            throw IllegalArgumentException("Ce parcours est en cours d'enregistrement")
+            throw UserFacingArgumentException(R.string.err_track_is_recording)
         }
 
         // --- 1. Repérage des coupures, en une passe ---
@@ -668,7 +670,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
 
         if (previous == null) {
-            throw IllegalStateException("Ce parcours ne contient aucun point")
+            throw UserFacingStateException(R.string.err_track_empty)
         }
 
         // Dernière tranche : elle va jusqu'au bout, d'où la borne haute maximale.
@@ -681,12 +683,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         )
 
         if (pieces.size < 2) {
-            throw IllegalStateException(
+            throw UserFacingStateException(
                 when (mode) {
-                    SplitMode.SEGMENT_BREAKS ->
-                        "Ce parcours ne contient qu'un seul tronçon : il n'y a rien à découper."
-                    SplitMode.TIME_GAP ->
-                        "Aucune pause assez longue n'a été trouvée dans ce parcours."
+                    SplitMode.SEGMENT_BREAKS -> R.string.err_split_single_segment
+                    SplitMode.TIME_GAP -> R.string.err_split_no_gap
                 }
             )
         }
@@ -784,27 +784,25 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         deleteSource: Boolean
     ): Long {
         val source = trackDao.getTrackById(sourceTrackId)
-            ?: throw IllegalArgumentException("Parcours introuvable")
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
         if (source.isRecording) {
-            throw IllegalArgumentException("Ce parcours est en cours d'enregistrement")
+            throw UserFacingArgumentException(R.string.err_track_is_recording)
         }
         if (dropStartMillis <= 0L && dropEndMillis <= 0L) {
-            throw IllegalStateException("Choisissez au moins une durée à retirer.")
+            throw UserFacingStateException(R.string.err_trim_none_selected)
         }
 
         // --- 1. Bornes du parcours, puis repérage, en deux lectures légères ---
 
         val firstTimestamp = trackDao.getFirstPointTimestamp(sourceTrackId)
-            ?: throw IllegalStateException("Ce parcours ne contient aucun point")
+            ?: throw UserFacingStateException(R.string.err_track_empty)
         val lastTimestamp = trackDao.getLastPointTimestamp(sourceTrackId)
-            ?: throw IllegalStateException("Ce parcours ne contient aucun point")
+            ?: throw UserFacingStateException(R.string.err_track_empty)
 
         val keepFromTime = firstTimestamp + dropStartMillis
         val keepUntilTime = lastTimestamp - dropEndMillis
         if (keepFromTime >= keepUntilTime) {
-            throw IllegalStateException(
-                "Il ne resterait rien : les durées à retirer couvrent tout le parcours."
-            )
+            throw UserFacingStateException(R.string.err_trim_nothing_left)
         }
 
         // Une seule passe : les bornes retenues sont des identifiants, et les
@@ -843,9 +841,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         // Deux points au moins : en dessous, il n'y a ni tracé ni distance à montrer.
         if (keptCount < 2) {
-            throw IllegalStateException(
-                "Il ne resterait pas assez de points : réduisez les durées à retirer."
-            )
+            throw UserFacingStateException(R.string.err_trim_too_few)
         }
 
         val stats = accumulator.result()
@@ -999,8 +995,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         _liveStats.value = stats
     }
 
-    private val _gpsStatus = MutableStateFlow("Recherche de signal...")
-    val gpsStatus: StateFlow<String> = _gpsStatus.asStateFlow()
+    private val _gpsStatus = MutableStateFlow(GpsStatus.SEARCHING)
+    val gpsStatus: StateFlow<GpsStatus> = _gpsStatus.asStateFlow()
 
     private val _gpsAccuracy = MutableStateFlow<Float?>(null)
     val gpsAccuracy: StateFlow<Float?> = _gpsAccuracy.asStateFlow()
@@ -1031,7 +1027,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         _isAppInForeground.value = inForeground
     }
 
-    fun updateGpsStatus(status: String) {
+    fun updateGpsStatus(status: GpsStatus) {
         _gpsStatus.value = status
     }
 

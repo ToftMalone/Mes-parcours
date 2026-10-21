@@ -1,5 +1,7 @@
 package com.example.ui.screen
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -155,7 +157,7 @@ fun WelcomeScreen(
                         .clickable { page-- }
                         .testTag("welcome_back_button")
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Page précédente", modifier = Modifier.size(26.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.welcome_prev), modifier = Modifier.size(26.dp))
                 }
             }
             val last = page == WELCOME_PAGES - 1
@@ -171,7 +173,7 @@ fun WelcomeScreen(
                     .testTag(if (last) "welcome_continue_button" else "welcome_next_button")
             ) {
                 Text(
-                    if (last) "Commencer" else "Suivant",
+                    if (last) stringResource(R.string.welcome_start) else stringResource(R.string.welcome_next),
                     fontFamily = DisplayFontFamily,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
@@ -241,18 +243,18 @@ private fun IntroPage() {
             Text("GPX · KML", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.onSecondaryContainer)
         }
     }
-    PageTitle("Mes parcours", 48)
+    PageTitle(stringResource(R.string.app_name), 48)
     Text(
-        "Un traqueur GPS pour vos sorties en plein air.",
+        stringResource(R.string.welcome_tagline),
         fontSize = 18.sp,
         lineHeight = 26.sp,
         color = colors.onSurfaceVariant,
         modifier = Modifier.padding(top = 12.dp)
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 24.dp)) {
-        FeatureLine(Icons.Rounded.Map, "Carte interactive")
-        FeatureLine(Icons.Rounded.QueryStats, "Statistiques en direct")
-        FeatureLine(Icons.Rounded.SwapVert, "Import et export GPX / KML")
+        FeatureLine(Icons.Rounded.Map, stringResource(R.string.welcome_feature_map))
+        FeatureLine(Icons.Rounded.QueryStats, stringResource(R.string.welcome_feature_stats))
+        FeatureLine(Icons.Rounded.SwapVert, stringResource(R.string.welcome_feature_io))
     }
 }
 
@@ -294,11 +296,11 @@ private fun PrivacyPage() {
             Icon(Icons.Rounded.Lock, contentDescription = null, tint = colors.primary, modifier = Modifier.size(38.dp).offset(y = 2.dp))
         }
     }
-    PageTitle("Tout reste sur votre téléphone", 38)
+    PageTitle(stringResource(R.string.welcome_privacy_title), 38)
     Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 24.dp)) {
-        PromiseLine(Icons.Rounded.PersonOff, "Aucun compte", "Ouvrez l'app et partez, sans inscription.")
-        PromiseLine(Icons.Rounded.CloudOff, "Aucun serveur", "Vos parcours ne sont envoyés nulle part.")
-        PromiseLine(Icons.Rounded.Smartphone, "100 % local", "Vous exportez vos fichiers quand vous le décidez.")
+        PromiseLine(Icons.Rounded.PersonOff, stringResource(R.string.welcome_promise_account_title), stringResource(R.string.welcome_promise_account_text))
+        PromiseLine(Icons.Rounded.CloudOff, stringResource(R.string.welcome_promise_server_title), stringResource(R.string.welcome_promise_server_text))
+        PromiseLine(Icons.Rounded.Smartphone, stringResource(R.string.welcome_promise_local_title), stringResource(R.string.welcome_promise_local_text))
     }
 }
 
@@ -335,9 +337,9 @@ private fun PermissionsPage() {
     // Avant Android 13, les notifications ne se demandent pas : une seule autorisation.
     val asksNotifications = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     Spacer(modifier = Modifier.height(24.dp))
-    PageTitle(if (asksNotifications) "Deux autorisations" else "Une autorisation", 38)
+    PageTitle(stringResource(if (asksNotifications) R.string.welcome_permissions_title_two else R.string.welcome_permissions_title_one), 38)
     Text(
-        if (asksNotifications) "Voici pourquoi nous allons les demander." else "Voici pourquoi nous allons la demander.",
+        stringResource(if (asksNotifications) R.string.welcome_permissions_why_two else R.string.welcome_permissions_why_one),
         fontSize = 16.sp,
         color = colors.onSurfaceVariant,
         modifier = Modifier.padding(top = 8.dp)
@@ -348,8 +350,8 @@ private fun PermissionsPage() {
             container = colors.primaryContainer,
             content = colors.onPrimaryContainer,
             shape = CookieShape,
-            title = "Localisation",
-            text = "Pour tracer votre position et calculer la distance, la vitesse et le dénivelé."
+            title = stringResource(R.string.welcome_perm_location_title),
+            text = stringResource(R.string.welcome_perm_location_text)
         )
         if (asksNotifications) {
             PermissionCard(
@@ -357,8 +359,8 @@ private fun PermissionsPage() {
                 container = colors.tertiaryContainer,
                 content = colors.onTertiaryContainer,
                 shape = SunShape,
-                title = "Notifications",
-                text = "Pour suivre la progression pendant l'enregistrement et être prévenu des nouvelles versions."
+                title = stringResource(R.string.welcome_perm_notifications_title),
+                text = stringResource(R.string.welcome_perm_notifications_text)
             )
         }
     }
@@ -372,7 +374,7 @@ private fun PermissionsPage() {
     ) {
         Icon(Icons.Rounded.Bedtime, contentDescription = null, tint = colors.tertiary, modifier = Modifier.size(22.dp))
         Text(
-            "Ensuite, nous demanderons la localisation « Tout le temps » pour continuer à enregistrer écran éteint.",
+            stringResource(R.string.welcome_background_hint),
             fontSize = 14.sp,
             lineHeight = 20.sp,
             color = colors.onSurfaceVariant

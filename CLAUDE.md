@@ -1376,6 +1376,35 @@ inadvertance :
 - Les entrées de `libs.versions.toml` correspondant aux dépendances retirées sont
   restées : inertes à la compilation, elles documentent ce qui a existé.
 
+## Langues de l'interface
+
+L'application suit la langue du téléphone : `values/` est l'**anglais** (repli pour toute
+langue non prévue), `values-xx/` les traductions — fr, es, pt, de, it, ru, zh, ja, ar
+(RTL) et hi. `res/xml/locales_config.xml` les déclare pour le sélecteur « Langue de
+l'application » d'Android 13+ ; la garder alignée sur les dossiers `values-xx`.
+
+- **Aucun texte visible en dur.** Compose : `stringResource(R.string.…)` ; hors
+  composition : `context.getString`. Arguments **positionnels** (`%1$s`), et `%%` pour un
+  pour-cent littéral dans une chaîne qui a des arguments. `app_name` reste « Mes parcours »
+  partout (`translatable="false"`).
+- **Pas de pluriel à accorder** : on tourne la phrase autour d'un nombre (« Sélectionnés : 3 »)
+  plutôt que d'écrire six formes par langue.
+- **Le dépôt n'a pas de `Context`** : ses erreurs sont des `UserFacingArgumentException` /
+  `UserFacingStateException` (`util/UserFacing.kt`) qui portent l'identifiant de la chaîne ;
+  l'écran la résout à l'affichage (`Throwable.userMessage`).
+- **Jamais de chaîne traduisible comme état** : le GPS est l'énumération `GpsStatus`
+  (c'était « Signal trouvé » comparé au caractère près). Un `testTag` ne se dérive pas non
+  plus d'un libellé (`history_category_IMPORTED`).
+- **Dates et nombres** : `FormatUtils` (initialisé par `TrackApplication`) utilise
+  `DateFormat.getBestDateTimePattern` et `Locale.getDefault()` ; plus de `Locale.FRANCE`.
+- **Ajouter une langue** : un dossier `values-xx/strings.xml` complet + une ligne dans
+  `locales_config.xml`. Un texte manquant retombe sur l'anglais.
+- Les noms de parcours déjà enregistrés (« Parcours du … ») restent dans la langue de leur
+  création, comme un nom saisi à la main. Le journal des nouveautés est traduit
+  (`rel_*`) : une nouvelle version ajoute ses chaînes dans **toutes** les langues.
+- Captures dans une autre langue : `@Config(qualifiers = "de-" + RobolectricDeviceQualifiers.Pixel8)`
+  (la langue passe **avant** les qualificatifs d'écran).
+
 ## Écran de bienvenue
 
 `ui/screen/WelcomeScreen.kt`, montré une seule fois, au tout premier lancement :

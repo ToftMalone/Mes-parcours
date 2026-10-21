@@ -2,6 +2,7 @@ package com.example
 
 import android.app.Application
 import com.example.data.repository.TrackRepository
+import com.example.util.FormatUtils
 import com.example.util.OnboardingPreferences
 import com.example.util.OsmConfig
 import com.example.util.update.UpdateCheckWorker
@@ -14,6 +15,8 @@ class TrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         OsmConfig.init(this)
+        // Les formats (durées, noms de parcours) ont besoin des ressources hors composition.
+        FormatUtils.init(this)
 
         // Programme la vérification quotidienne de mise à jour — voir
         // UpdateCheckWorker pour le choix d'une tâche de fond plutôt que d'une

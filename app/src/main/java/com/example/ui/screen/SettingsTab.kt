@@ -2,6 +2,10 @@
 
 package com.example.ui.screen
 
+import com.example.util.FormatUtils
+import android.content.Context
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import android.preference.PreferenceManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -150,7 +154,7 @@ private fun SettingsMain(
             .testTag("settings_screen_root")
     ) {
         Text(
-            "Paramètres",
+            stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight(750)),
             modifier = Modifier.padding(horizontal = 4.dp)
         )
@@ -160,24 +164,24 @@ private fun SettingsMain(
             UpdateAvailableCard(availableUpdate, onShowUpdate)
         }
 
-        GroupLabel("Carte")
+        GroupLabel(stringResource(R.string.settings_group_map))
         SettingsGroup {
             MapBackgroundItem()
             MapOrientationItem()
         }
 
-        GroupLabel("Mode nuit")
+        GroupLabel(stringResource(R.string.settings_group_night))
         NightModeGroup()
 
-        GroupLabel("Sauvegarde automatique")
+        GroupLabel(stringResource(R.string.settings_group_backup))
         AutoBackupGroup()
 
-        GroupLabel("Application")
+        GroupLabel(stringResource(R.string.settings_group_app))
         SettingsGroup {
             SettingsRow(
                 icon = Icons.Rounded.SystemUpdate,
-                title = "Mise à jour",
-                subtitle = if (availableUpdate == null) "Version installée : ${BuildConfig.VERSION_NAME}" else null,
+                title = stringResource(R.string.settings_update),
+                subtitle = if (availableUpdate == null) stringResource(R.string.settings_installed_version, BuildConfig.VERSION_NAME) else null,
                 onClick = if (availableUpdate != null) onShowUpdate else null,
                 testTag = "settings_update_row",
                 trailing = {
@@ -203,14 +207,14 @@ private fun SettingsMain(
             )
             SettingsRow(
                 icon = Icons.Rounded.NewReleases,
-                title = "Journal des nouveautés",
+                title = stringResource(R.string.settings_changelog),
                 onClick = onOpenChangelog,
                 testTag = "version_badge",
                 trailing = { Chevron() }
             )
             SettingsRow(
                 icon = Icons.Rounded.Info,
-                title = "À propos",
+                title = stringResource(R.string.settings_about),
                 onClick = onOpenAbout,
                 testTag = "open_about_button",
                 trailing = { Chevron() }
@@ -249,7 +253,7 @@ private fun UpdateAvailableCard(update: AvailableUpdate, onShowUpdate: () -> Uni
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Version ${update.versionName} disponible",
+                stringResource(R.string.settings_update_available, update.versionName),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.onTertiaryContainer
@@ -275,7 +279,7 @@ private fun UpdateAvailableCard(update: AvailableUpdate, onShowUpdate: () -> Uni
                 .padding(horizontal = 16.dp)
                 .testTag("show_update_button")
         ) {
-            Text("Voir", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.onTertiary)
+            Text(stringResource(R.string.settings_update_view), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.onTertiary)
         }
     }
 }
@@ -409,11 +413,11 @@ private fun MapBackgroundItem() {
     }
 
     GroupItem(modifier = Modifier.testTag("map_background_card")) {
-        Text("Fond de carte", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.map_background), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 12.dp)) {
             MapStyleThumb(
-                title = "Standard",
-                subtitle = "OpenStreetMap",
+                title = stringResource(R.string.map_style_standard),
+                subtitle = stringResource(R.string.map_style_standard_sub),
                 selected = mapStyle == "mapnik",
                 onClick = { select("mapnik") },
                 satellite = false,
@@ -421,8 +425,8 @@ private fun MapBackgroundItem() {
                 modifier = Modifier.weight(1f)
             )
             MapStyleThumb(
-                title = "Satellite hybride",
-                subtitle = "Google, avec noms de rues",
+                title = stringResource(R.string.map_style_satellite),
+                subtitle = stringResource(R.string.map_style_satellite_sub),
                 selected = mapStyle == "usgs_sat",
                 onClick = { select("usgs_sat") },
                 satellite = true,
@@ -488,7 +492,7 @@ private fun MapStyleThumb(
             }
             if (satellite) {
                 Text(
-                    "Rue des Pins",
+                    stringResource(R.string.map_thumb_street),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -504,7 +508,7 @@ private fun MapStyleThumb(
                     .clip(CircleShape)
                     .background(colors.primary)
             ) {
-                if (check > 0.5f) Icon(Icons.Rounded.Check, contentDescription = "Choisi", tint = colors.onPrimary, modifier = Modifier.size(16.dp))
+                if (check > 0.5f) Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.picker_chosen), tint = colors.onPrimary, modifier = Modifier.size(16.dp))
             }
         }
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
@@ -519,9 +523,9 @@ private fun MapOrientationItem() {
     var mapMode by remember { mutableStateOf(prefs.getString("pref_map_mode", "2d") ?: "2d") }
 
     GroupItem(modifier = Modifier.testTag("map_orientation_card")) {
-        Text("Orientation", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.map_orientation), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 12.dp)) {
-            listOf("2d" to "2D", "3d" to "3D", "auto" to "Automatique").forEach { (value, label) ->
+            listOf("2d" to "2D", "3d" to "3D", "auto" to stringResource(R.string.map_mode_auto)).forEach { (value, label) ->
                 OrientationSegment(
                     label = label,
                     selected = mapMode == value,
@@ -535,11 +539,13 @@ private fun MapOrientationItem() {
             }
         }
         Text(
-            when (mapMode) {
-                "3d" -> "La carte pivote dans votre sens de déplacement."
-                "auto" -> "3D pendant l'enregistrement, 2D le reste du temps."
-                else -> "Nord toujours en haut."
-            },
+            stringResource(
+                when (mapMode) {
+                    "3d" -> R.string.map_mode_3d_hint
+                    "auto" -> R.string.map_mode_auto_hint
+                    else -> R.string.map_mode_2d_hint
+                }
+            ),
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
@@ -574,16 +580,17 @@ private fun OrientationSegment(label: String, selected: Boolean, onClick: () -> 
  * Sous-titre du mode solaire : la prochaine bascule, calculée hors ligne pour la
  * dernière position de carte connue (voir `NightModePreferences.lastKnownLocation`).
  */
-private fun nextSolarSwitch(lat: Double, lng: Double, now: Long): String? {
-    val hm = SimpleDateFormat("HH:mm", Locale.FRANCE)
+private fun nextSolarSwitch(context: Context, lat: Double, lng: Double, now: Long): String? {
     return when (val today = SolarTimes.compute(lat, lng, now)) {
-        SolarTimes.Result.PolarDay -> "soleil de minuit, toujours clair"
-        SolarTimes.Result.PolarNight -> "nuit polaire, toujours sombre"
+        SolarTimes.Result.PolarDay -> context.getString(R.string.solar_polar_day)
+        SolarTimes.Result.PolarNight -> context.getString(R.string.solar_polar_night)
         is SolarTimes.Result.RiseAndSet -> when {
-            now < today.sunriseUtcMillis -> "clair dès ${hm.format(Date(today.sunriseUtcMillis))}"
-            now < today.sunsetUtcMillis -> "sombre dès ${hm.format(Date(today.sunsetUtcMillis))}"
+            now < today.sunriseUtcMillis ->
+                context.getString(R.string.solar_light_from, FormatUtils.formatClock(today.sunriseUtcMillis))
+            now < today.sunsetUtcMillis ->
+                context.getString(R.string.solar_dark_from, FormatUtils.formatClock(today.sunsetUtcMillis))
             else -> (SolarTimes.compute(lat, lng, now + 86_400_000L) as? SolarTimes.Result.RiseAndSet)
-                ?.let { "clair dès ${hm.format(Date(it.sunriseUtcMillis))}" }
+                ?.let { context.getString(R.string.solar_light_from, FormatUtils.formatClock(it.sunriseUtcMillis)) }
         }
     }
 }
@@ -604,7 +611,7 @@ private fun NightModeGroup() {
     val hasLightSensor = remember { NightModePreferences.hasLightSensor(context) }
     val solarHint = remember(source) {
         val (lat, lng) = NightModePreferences.lastKnownLocation(context)
-        nextSolarSwitch(lat, lng, System.currentTimeMillis())
+        nextSolarSwitch(context, lat, lng, System.currentTimeMillis())
     }
     val select = { value: NightModeSource ->
         source = value
@@ -621,16 +628,16 @@ private fun NightModeGroup() {
         SettingsRow(
             icon = null,
             leading = { MpRadio(source == NightModeSource.SYSTEM) },
-            title = "Suivre le téléphone",
-            subtitle = "Thème du système Android",
+            title = stringResource(R.string.night_follow_phone),
+            subtitle = stringResource(R.string.night_follow_phone_sub),
             onClick = { select(NightModeSource.SYSTEM) },
             testTag = "night_mode_option_system"
         )
         SettingsRow(
             icon = null,
             leading = { MpRadio(source == NightModeSource.SOLAR) },
-            title = "Lever et coucher du soleil",
-            subtitle = "Heure solaire à votre position" + (solarHint?.let { " · $it" } ?: ""),
+            title = stringResource(R.string.night_solar),
+            subtitle = stringResource(R.string.night_solar_sub) + (solarHint?.let { " · $it" } ?: ""),
             onClick = { select(NightModeSource.SOLAR) },
             testTag = "night_mode_option_solar"
         )
@@ -639,13 +646,9 @@ private fun NightModeGroup() {
         if (source == NightModeSource.SOLAR) {
             SettingsRow(
                 icon = Icons.Rounded.LightMode,
-                title = "Sombre dans les tunnels",
+                title = stringResource(R.string.night_tunnel),
                 titleAlpha = if (hasLightSensor) 1f else 0.5f,
-                subtitle = if (hasLightSensor) {
-                    "Le temps d'un tunnel ou d'un parking couvert, grâce au capteur de luminosité"
-                } else {
-                    "Cet appareil n'a pas de capteur de luminosité"
-                },
+                subtitle = stringResource(if (hasLightSensor) R.string.night_tunnel_sub else R.string.night_tunnel_no_sensor),
                 subtitleColor = if (hasLightSensor) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 onClick = {
                     if (hasLightSensor) {
@@ -653,7 +656,7 @@ private fun NightModeGroup() {
                         NightModePreferences.setTunnelDetectionEnabled(context, tunnelEnabled)
                     } else {
                         messenger.show(
-                            "Pas de capteur de luminosité sur cet appareil : option indisponible.",
+                            context.getString(R.string.night_tunnel_no_sensor_toast),
                             Icons.Rounded.LightMode,
                             isError = true
                         )
@@ -699,8 +702,8 @@ private fun AutoBackupGroup() {
     ) {
         SettingsRow(
             icon = Icons.Rounded.Save,
-            title = "Exporter chaque trajet terminé",
-            subtitle = "Téléchargements/Mes parcours",
+            title = stringResource(R.string.backup_export_each),
+            subtitle = stringResource(R.string.backup_destination),
             onClick = { toggle(!isEnabled) },
             trailing = {
                 MpSwitch(
@@ -780,7 +783,7 @@ private fun SubPageTopBar(title: String?, onBack: () -> Unit, backTag: String) {
                 .clickable(onClick = onBack)
                 .testTag(backTag)
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Retour")
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
         }
         if (title != null) Text(title, style = MaterialTheme.typography.titleLarge)
     }
@@ -791,7 +794,7 @@ private fun SubPageTopBar(title: String?, onBack: () -> Unit, backTag: String) {
 // ---------------------------------------------------------------------------
 
 /** Une version, sa date de publication, et ce qu'elle a apporté. */
-private class Release(val version: String, val date: String?, val changes: List<String>)
+private class Release(val version: String, val date: String?, val changes: List<Int>)
 
 /**
  * Journal des nouveautés, de la version la plus récente à la plus ancienne.
@@ -811,66 +814,66 @@ private val RELEASES = listOf(
         version = "2.0.3",
         date = "2026-10-15",
         changes = listOf(
-            "Correction de bugs",
-            "Optimisation de l'utilisation de la batterie"
+            R.string.rel_2_0_3_a,
+            R.string.rel_2_0_3_b
         )
     ),
     Release(
         version = "2.0.2",
         date = "2026-10-11",
         changes = listOf(
-            "Nouvelle barre de navigation flottante",
-            "L'épaisseur du trait se choisit pour chaque parcours, avec sa couleur"
+            R.string.rel_2_0_2_a,
+            R.string.rel_2_0_2_b
         )
     ),
     Release(
         version = "2.0.1",
         date = "2026-10-05",
         changes = listOf(
-            "Le point de position repasse au bleu"
+            R.string.rel_2_0_1_a
         )
     ),
     Release(
         version = "2.0",
         date = "2026-09-28",
         changes = listOf(
-            "Refonte de l'interface"
+            R.string.rel_2_0_a
         )
     ),
     Release(
         version = "1.3.1",
         date = "2026-09-23",
         changes = listOf(
-            "Correction de plusieurs failles de sécurité"
+            R.string.rel_1_3_1_a
         )
     ),
     Release(
         version = "1.3",
         date = "2026-09-15",
         changes = listOf(
-            "Réduction de la consommation de batterie"
+            R.string.rel_1_3_a
         )
     ),
     Release(
         version = "1.2",
         date = "2026-09-09",
         changes = listOf(
-            "Correction d'une faille de sécurité"
+            R.string.rel_1_2_a
         )
     ),
     Release(
         version = "1.1",
         date = "2026-09-02",
         changes = listOf(
-            "Chargement de la carte nettement plus rapide, en vue satellite surtout",
-            "L'outil de conversion CSV a été retiré"
+            R.string.rel_1_1_a,
+            R.string.rel_1_1_b
         )
     ),
     Release(
         version = "1.0",
         date = "2026-08-31",
         changes = listOf(
-            "Première version stable"
+            R.string.rel_1_0_a
         )
     )
 )
@@ -881,7 +884,7 @@ private val INSTALLED_VERSION = BuildConfig.VERSION_NAME.removeSuffix("-debug")
 private fun formatReleaseDate(date: String?, withYear: Boolean): String? {
     if (date == null) return null
     val parsed = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) }.getOrNull() ?: return null
-    return SimpleDateFormat(if (withYear) "d MMM yyyy" else "d MMM", Locale.FRANCE).format(parsed)
+    return FormatUtils.formatDateLong(parsed.time, withYear)
 }
 
 @Composable
@@ -896,7 +899,7 @@ private fun ChangelogPage(availableUpdate: AvailableUpdate?, onBack: () -> Unit,
             .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp)
             .testTag("release_notes_dialog")
     ) {
-        SubPageTopBar("Nouveautés", onBack, "close_release_notes_button")
+        SubPageTopBar(stringResource(R.string.changelog_title), onBack, "close_release_notes_button")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
             if (availableUpdate != null) {
                 val outline = colors.outline
@@ -925,7 +928,7 @@ private fun ChangelogPage(availableUpdate: AvailableUpdate?, onBack: () -> Unit,
                                 .background(colors.tertiaryContainer)
                                 .padding(horizontal = 8.dp)
                         ) {
-                            Text("Disponible", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.onTertiaryContainer)
+                            Text(stringResource(R.string.changelog_available), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.onTertiaryContainer)
                         }
                     }
                     ReleaseBullets(availableUpdate.notes, colors.onSurfaceVariant, 14)
@@ -986,14 +989,14 @@ private fun InstalledReleaseCard(release: Release) {
                         .padding(horizontal = 10.dp)
                 ) {
                     Icon(Icons.Rounded.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(14.dp))
-                    Text("Version installée", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimary)
+                    Text(stringResource(R.string.changelog_installed), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimary)
                 }
             }
             formatReleaseDate(release.date, withYear = true)?.let {
                 Text(it, fontSize = 13.sp, color = colors.onPrimaryContainer, modifier = Modifier.padding(top = 2.dp))
             }
             Column(modifier = Modifier.padding(top = 4.dp)) {
-                ReleaseBullets(release.changes, colors.onPrimaryContainer, 15)
+                ReleaseBullets(release.changes.map { stringResource(it) }, colors.onPrimaryContainer, 15)
             }
         }
     }
@@ -1021,7 +1024,7 @@ private fun PastReleaseCard(release: Release) {
                 )
             }
         }
-        ReleaseBullets(release.changes, colors.onSurfaceVariant, 14)
+        ReleaseBullets(release.changes.map { stringResource(it) }, colors.onSurfaceVariant, 14)
     }
 }
 
@@ -1053,7 +1056,7 @@ private fun AboutPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Icon(Icons.Rounded.Route, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(56.dp))
             }
             Text(
-                "Mes parcours",
+                stringResource(R.string.app_name),
                 fontFamily = DisplayFontFamily,
                 fontSize = 32.sp,
                 fontWeight = FontWeight(750),
@@ -1061,7 +1064,7 @@ private fun AboutPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
             )
             // Lue depuis BuildConfig : la version n'est écrite qu'une fois, dans
             // build.gradle.kts, et l'affichage ne peut plus dériver.
-            Text("Version ${BuildConfig.VERSION_NAME}", fontSize = 14.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+            Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME), fontSize = 14.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
 
         // Dédicace à Thierry.
@@ -1096,9 +1099,9 @@ private fun AboutPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 26.dp)
             ) {
-                Text("DÉDICACE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = colors.onTertiaryContainer)
+                Text(stringResource(R.string.about_dedication_label), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = colors.onTertiaryContainer)
                 Text(
-                    "« Application développée particulièrement pour mon père Thierry »",
+                    stringResource(R.string.about_dedication_quote),
                     fontFamily = QuoteFontFamily,
                     fontSize = 24.sp,
                     lineHeight = 31.sp,
@@ -1120,9 +1123,9 @@ private fun AboutPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(12.dp))
         SettingsGroup {
-            AboutRow(Icons.Rounded.Code, "Open source", "Licence GPL-3.0")
-            AboutRow(Icons.Rounded.Lock, "Stockage 100 % local", "Aucun compte, aucun serveur")
-            AboutRow(Icons.Rounded.Person, "Développeur", "ToftMalone")
+            AboutRow(Icons.Rounded.Code, stringResource(R.string.about_open_source), stringResource(R.string.about_license))
+            AboutRow(Icons.Rounded.Lock, stringResource(R.string.about_local_storage), stringResource(R.string.about_no_account))
+            AboutRow(Icons.Rounded.Person, stringResource(R.string.about_developer), "ToftMalone")
         }
     }
 }

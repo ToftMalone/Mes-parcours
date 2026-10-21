@@ -5,6 +5,9 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.R
+import com.example.data.model.GpsStatus
+import com.example.util.userMessage
 import com.example.data.model.LiveStats
 import com.example.data.model.MapTrack
 import com.example.data.model.MapViewport
@@ -98,22 +101,22 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
 
     private var isGpsLostNotificationActive = false
 
-    private fun updateGpsLostNotification(inForeground: Boolean, status: String, isTracking: Boolean) {
+    private fun updateGpsLostNotification(inForeground: Boolean, status: GpsStatus, isTracking: Boolean) {
         val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
         val channelId = "gps_lost_notification_channel"
         val notificationId = 100234
 
-        val shouldShow = !inForeground && isTracking && status == "Recherche de signal..."
+        val shouldShow = !inForeground && isTracking && status == GpsStatus.SEARCHING
 
         if (shouldShow) {
             if (!isGpsLostNotificationActive) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     val channel = android.app.NotificationChannel(
                         channelId,
-                        "Perte de signal GPS",
+                        appContext.getString(R.string.gps_lost_channel_name),
                         android.app.NotificationManager.IMPORTANCE_HIGH
                     ).apply {
-                        description = "Notifications lors de la perte du signal GPS"
+                        description = appContext.getString(R.string.gps_lost_channel_description)
                     }
                     notificationManager.createNotificationChannel(channel)
                 }
@@ -129,8 +132,8 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 )
 
                 val notification = androidx.core.app.NotificationCompat.Builder(appContext, channelId)
-                    .setContentTitle("Signal GPS perdu")
-                    .setContentText("Le signal GPS est perdu 😨")
+                    .setContentTitle(appContext.getString(R.string.gps_lost_title))
+                    .setContentText(appContext.getString(R.string.gps_lost_notification_text))
                     .setSmallIcon(android.R.drawable.ic_menu_compass)
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
@@ -158,13 +161,13 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 Pair(status, inForeground)
             }.collect { (status, inForeground) ->
                 timeoutJob?.cancel()
-                if (status == "Signal trouvé") {
+                if (status == GpsStatus.FOUND) {
                     timeoutJob = launch {
                         // Background location updates are typically throttled heavily by the OS (30s-60s+),
                         // so we use a much more generous timeout of 45 seconds in the background.
                         val delayMs = if (inForeground) 8000L else 45000L
                         kotlinx.coroutines.delay(delayMs)
-                        repository.updateGpsStatus("Recherche de signal...")
+                        repository.updateGpsStatus(GpsStatus.SEARCHING)
                         repository.updateGpsAccuracy(null)
                     }
                 }
@@ -226,10 +229,10 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         repository.updateAltitude(fix)
     }
 
-    val gpsStatus: StateFlow<String> = repository.gpsStatus
+    val gpsStatus: StateFlow<GpsStatus> = repository.gpsStatus
     val gpsAccuracy: StateFlow<Float?> = repository.gpsAccuracy
 
-    fun updateGpsStatus(status: String) {
+    fun updateGpsStatus(status: GpsStatus) {
         repository.updateGpsStatus(status)
     }
 
@@ -419,11 +422,11 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 }
             } catch (e: com.example.util.Importer.ImportException) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError(e.message ?: "Fichier illisible.")
+                    onError(e.userMessage(appContext, R.string.err_file_unreadable))
                 }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError("Erreur d'importation : ${e.localizedMessage}")
+                    onError(appContext.getString(R.string.err_import_failed, e.userMessage(appContext, R.string.err_unknown)))
                 }
             }
         }
@@ -445,7 +448,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError("Erreur de fusion : ${e.localizedMessage}")
+                    onError(appContext.getString(R.string.err_merge_failed, e.userMessage(appContext, R.string.err_unknown)))
                 }
             }
         }
@@ -484,7 +487,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     // Le message porté par l'exception est déjà rédigé pour être lu
                     // (« il n'y a rien à découper »…) : le préfixer le rendrait moins
                     // clair, pas plus.
-                    onError(e.localizedMessage ?: "Erreur de découpage")
+                    onError(e.userMessage(appContext, R.string.err_split_failed))
                 }
             }
         }
@@ -521,7 +524,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     // Même raison que pour le découpage : le message de l'exception est
                     // déjà rédigé pour être lu tel quel.
-                    onError(e.localizedMessage ?: "Erreur de rognage")
+                    onError(e.userMessage(appContext, R.string.err_trim_failed))
                 }
             }
         }
@@ -570,7 +573,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             try {
                 val finalUri = ensureUriExtension(context, uri, format.extension)
                 val stream = openTruncating(context, finalUri)
-                    ?: throw java.io.IOException("Impossible d'ouvrir le fichier de destination")
+                    ?: throw java.io.IOException(context.getString(R.string.err_export_open))
                 stream.use { outputStream ->
                     outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
                         writeTrack(track, writer, format)
@@ -581,7 +584,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    onError(e.localizedMessage ?: "Erreur de sauvegarde")
+                    onError(e.userMessage(context, R.string.err_export_failed))
                 }
             }
         }

@@ -1,5 +1,7 @@
 package com.example.ui.component
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
@@ -43,22 +45,23 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
 import com.example.ui.theme.LocalRecordingColor
 
 /** Un onglet de la barre : sa clé de navigation (voir `MainScreen`), et son apparence. */
 private data class NavDestination(
     val route: String,
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
     val selectedIcon: ImageVector,
     val testTag: String
 )
 
 private val DESTINATIONS = listOf(
-    NavDestination("enregistrer", "Enregistrer", Icons.Outlined.RadioButtonChecked, Icons.Rounded.RadioButtonChecked, "tab_button_tracking"),
-    NavDestination("historique", "Historique", Icons.Outlined.History, Icons.Rounded.History, "tab_button_history"),
-    NavDestination("outils", "Outils", Icons.Outlined.Handyman, Icons.Rounded.Handyman, "tab_button_tools"),
-    NavDestination("parametres", "Paramètres", Icons.Outlined.Settings, Icons.Rounded.Settings, "tab_button_settings")
+    NavDestination("enregistrer", R.string.nav_record, Icons.Outlined.RadioButtonChecked, Icons.Rounded.RadioButtonChecked, "tab_button_tracking"),
+    NavDestination("historique", R.string.nav_history, Icons.Outlined.History, Icons.Rounded.History, "tab_button_history"),
+    NavDestination("outils", R.string.nav_tools, Icons.Outlined.Handyman, Icons.Rounded.Handyman, "tab_button_tools"),
+    NavDestination("parametres", R.string.nav_settings, Icons.Outlined.Settings, Icons.Rounded.Settings, "tab_button_settings")
 )
 
 /**
@@ -168,7 +171,7 @@ private fun NavItem(
                 imageVector = if (selected) destination.selectedIcon else destination.icon,
                 // Onglet réduit à son icône : c'est elle qui porte le nom, pour
                 // TalkBack. Actif, le libellé affiché suffit.
-                contentDescription = if (selected) null else destination.label,
+                contentDescription = if (selected) null else stringResource(destination.labelRes),
                 tint = contentColor,
                 modifier = Modifier.size(26.dp)
             )
@@ -195,7 +198,7 @@ private fun NavItem(
         if (selected) {
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = destination.label,
+                text = stringResource(destination.labelRes),
                 style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
                 color = contentColor,
                 maxLines = 1,

@@ -1,5 +1,7 @@
 package com.example.ui.screen
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -146,13 +148,13 @@ fun DetailView(
     lateinit var launchKml: () -> Unit
 
     fun onExportResult(fileName: String, retry: () -> Unit) = Pair(
-        { messenger.show("Exporté : $fileName", Icons.Rounded.DownloadDone) },
+        { messenger.show(context.getString(R.string.export_done, fileName), Icons.Rounded.DownloadDone) },
         { err: String ->
             messenger.show(
-                "Échec de l'export : $err",
+                context.getString(R.string.export_failed, err),
                 Icons.Rounded.Error,
                 isError = true,
-                actionLabel = "Réessayer",
+                actionLabel = context.getString(R.string.common_retry),
                 onAction = retry
             )
         }
@@ -237,9 +239,9 @@ fun DetailView(
                             .statusBarsPadding()
                             .padding(top = 22.dp, end = 16.dp)
                     ) {
-                        LegendChip("Départ", MaterialTheme.colorScheme.primary)
+                        LegendChip(stringResource(R.string.legend_start), MaterialTheme.colorScheme.primary)
                         LegendChip(
-                            if (isCurrentRecording) "Position" else "Arrivée",
+                            stringResource(if (isCurrentRecording) R.string.legend_position else R.string.legend_finish),
                             MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -259,7 +261,7 @@ fun DetailView(
                     .testTag("back_button")
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Retour", modifier = Modifier.size(24.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back), modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -307,7 +309,7 @@ fun DetailView(
             ) {
                 if (!isCurrentRecording) {
                     BottomAction(
-                        text = "Reprendre la trace",
+                        text = stringResource(R.string.detail_resume_track),
                         icon = Icons.Rounded.Route,
                         container = MaterialTheme.colorScheme.primary,
                         content = MaterialTheme.colorScheme.onPrimary,
@@ -316,7 +318,7 @@ fun DetailView(
                                 showRefused = true
                             } else {
                                 viewModel.resumeTrack(context, currentTrack.id) {
-                                    messenger.show("Reprise de « ${currentTrack.name} »", Icons.Rounded.Route)
+                                    messenger.show(context.getString(R.string.recording_resumed, currentTrack.name), Icons.Rounded.Route)
                                     viewModel.selectTrack(null)
                                     onBackClick()
                                     onResumeTrack?.invoke()
@@ -329,7 +331,7 @@ fun DetailView(
                     )
                 }
                 BottomAction(
-                    text = "Exporter",
+                    text = stringResource(R.string.detail_export),
                     icon = Icons.Rounded.IosShare,
                     container = MaterialTheme.colorScheme.secondaryContainer,
                     content = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -345,12 +347,12 @@ fun DetailView(
 
     if (showExport && track != null) {
         MpSheet(onDismissRequest = { showExport = false }) {
-            SheetHeader("Exporter le parcours", "Vous choisirez ensuite où enregistrer le fichier.")
+            SheetHeader(stringResource(R.string.export_sheet_title), stringResource(R.string.export_sheet_subtitle))
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 ExportCard(
                     format = "GPX",
-                    description = "Lu par la plupart des apps et des GPS",
+                    description = stringResource(R.string.export_gpx_description),
                     container = MaterialTheme.colorScheme.primaryContainer,
                     content = MaterialTheme.colorScheme.onPrimaryContainer,
                     onClick = {
@@ -363,7 +365,7 @@ fun DetailView(
                 )
                 ExportCard(
                     format = "KML",
-                    description = "Pour Google Earth et Maps",
+                    description = stringResource(R.string.export_kml_description),
                     container = MaterialTheme.colorScheme.tertiaryContainer,
                     content = MaterialTheme.colorScheme.onTertiaryContainer,
                     onClick = {
@@ -384,21 +386,21 @@ fun DetailView(
         val current = track
         MpDialog(
             onDismissRequest = { isRenaming = false },
-            title = "Renommer",
-            dismissLabel = "Annuler",
-            confirmLabel = "Renommer",
+            title = stringResource(R.string.rename_title),
+            dismissLabel = stringResource(R.string.common_cancel),
+            confirmLabel = stringResource(R.string.rename_title),
             confirmEnabled = renameText.isNotBlank(),
             onConfirm = {
                 current?.let { viewModel.renameTrack(it, renameText) }
                 isRenaming = false
-                messenger.show("Parcours renommé.", Icons.Rounded.Edit)
+                messenger.show(context.getString(R.string.track_renamed_toast), Icons.Rounded.Edit)
             }
         ) {
             OutlinedTextField(
                 value = renameText,
                 onValueChange = { renameText = it },
                 singleLine = true,
-                label = { Text("Nom du parcours") },
+                label = { Text(stringResource(R.string.rename_field_label)) },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -419,10 +421,10 @@ fun DetailView(
                     // aussi ce bouton : c'est le dépôt qui refuse, et l'on reste ici.
                     viewModel.deleteTrack(t.id) { deleted ->
                         if (deleted) {
-                            messenger.show("Parcours supprimé.", Icons.Rounded.Delete)
+                            messenger.show(context.getString(R.string.track_deleted_toast), Icons.Rounded.Delete)
                             goBack()
                         } else {
-                            messenger.show(RECORDING_DELETE_REFUSED, Icons.Rounded.Error, isError = true)
+                            messenger.show(context.getString(R.string.delete_refused_recording), Icons.Rounded.Error, isError = true)
                         }
                     }
                 }
@@ -474,7 +476,7 @@ private fun TrackStatsContent(
                 .testTag("rename_track_button")
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Edit, contentDescription = "Renommer le parcours", modifier = Modifier.size(22.dp))
+                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.rename_track_cd), modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -491,7 +493,7 @@ private fun TrackStatsContent(
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("Distance", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimaryContainer)
+            Text(stringResource(R.string.detail_stat_distance), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimaryContainer)
             Text(
                 FormatUtils.formatDistanceShort(track.totalDistance),
                 style = StatXlTextStyle.copy(fontSize = 52.sp, lineHeight = 54.sp, letterSpacing = (-1).sp),
@@ -501,7 +503,7 @@ private fun TrackStatsContent(
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text("Durée", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimaryContainer)
+            Text(stringResource(R.string.detail_stat_duration), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.onPrimaryContainer)
             Text(
                 FormatUtils.formatDurationShort(track.duration),
                 style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp, lineHeight = 32.sp),
@@ -513,17 +515,17 @@ private fun TrackStatsContent(
 
     Spacer(modifier = Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatCard("Vitesse moyenne", FormatUtils.formatSpeed(track.avgSpeed), modifier = Modifier.weight(1f))
-        StatCard("Vitesse max", FormatUtils.formatSpeed(track.maxSpeed), modifier = Modifier.weight(1f))
+        StatCard(stringResource(R.string.detail_stat_avg_speed), FormatUtils.formatSpeed(track.avgSpeed), modifier = Modifier.weight(1f))
+        StatCard(stringResource(R.string.detail_stat_max_speed), FormatUtils.formatSpeed(track.maxSpeed), modifier = Modifier.weight(1f))
     }
     Spacer(modifier = Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         StatCard(
-            "Dénivelé positif", "+" + FormatUtils.formatElevationShort(track.elevationGain),
+            stringResource(R.string.detail_stat_elev_gain), "+" + FormatUtils.formatElevationShort(track.elevationGain),
             icon = Icons.Rounded.TrendingUp, iconTint = colors.primary, modifier = Modifier.weight(1f)
         )
         StatCard(
-            "Dénivelé négatif", "−" + FormatUtils.formatElevationShort(track.elevationLoss),
+            stringResource(R.string.detail_stat_elev_loss), "−" + FormatUtils.formatElevationShort(track.elevationLoss),
             icon = Icons.Rounded.TrendingDown, iconTint = colors.tertiary, modifier = Modifier.weight(1f)
         )
     }
@@ -552,13 +554,12 @@ private fun EmptyTrackContent(track: Track, trackColor: Color, onDelete: () -> U
         Icon(Icons.Rounded.Info, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(24.dp))
         Column {
             Text(
-                "Ce parcours ne contient aucun point GPS",
+                stringResource(R.string.detail_empty_title),
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 color = colors.onTertiaryContainer
             )
             Text(
-                "L'enregistrement a sans doute été arrêté avant que le signal soit trouvé. " +
-                    "Distance, vitesse et dénivelé ne peuvent pas être calculés.",
+                stringResource(R.string.detail_empty_body),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
                 color = colors.onTertiaryContainer,
                 modifier = Modifier.padding(top = 4.dp)
@@ -567,7 +568,7 @@ private fun EmptyTrackContent(track: Track, trackColor: Color, onDelete: () -> U
     }
     Spacer(modifier = Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("Distance", "Durée", "Dénivelé").forEach { label ->
+        listOf(R.string.detail_stat_distance, R.string.detail_stat_duration, R.string.detail_stat_elevation).forEach { labelRes ->
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -575,14 +576,14 @@ private fun EmptyTrackContent(track: Track, trackColor: Color, onDelete: () -> U
                     .background(colors.surfaceContainerLow)
                     .padding(14.dp)
             ) {
-                Text(label, fontSize = 12.sp, color = colors.onSurfaceVariant)
+                Text(stringResource(labelRes), fontSize = 12.sp, color = colors.onSurfaceVariant)
                 Text("—", style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp), color = colors.onSurface)
             }
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
     BottomAction(
-        text = "Supprimer ce parcours vide",
+        text = stringResource(R.string.detail_delete_empty),
         icon = Icons.Rounded.Delete,
         container = colors.errorContainer,
         content = colors.onErrorContainer,
@@ -605,9 +606,9 @@ private fun DetailTitleStyle() = MaterialTheme.typography.headlineMedium.copy(
 @Composable
 private fun TrackMeta(track: Track, trackColor: Color) {
     val category = when {
-        track.isMerged -> "Fusionné"
-        track.isImported -> "Importé"
-        else -> "Enregistré"
+        track.isMerged -> stringResource(R.string.track_kind_merged)
+        track.isImported -> stringResource(R.string.track_kind_imported)
+        else -> stringResource(R.string.track_kind_recorded)
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -621,7 +622,7 @@ private fun TrackMeta(track: Track, trackColor: Color) {
                 .background(trackColor)
         )
         Text(
-            "$category · ${FormatUtils.formatDayDate(track.startTime)}",
+            stringResource(R.string.track_meta, category, FormatUtils.formatDayDate(track.startTime)),
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -789,7 +790,7 @@ private fun NoCoordinatesPlaceholder() {
             iconSize = 44.dp
         )
         Text(
-            "Aucune coordonnée",
+            stringResource(R.string.detail_no_coordinates),
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -896,7 +897,7 @@ private fun AltitudeProfileCard(profile: AltitudeProfile, totalLabel: String) {
             .testTag("altitude_profile")
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            Text("Profil d'altitude", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.onSurface, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.detail_altitude_profile), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.onSurface, modifier = Modifier.weight(1f))
             Text(
                 "${FormatUtils.formatElevationShort(profile.min).removeSuffix(" m")} – ${FormatUtils.formatElevationShort(profile.max)}",
                 fontSize = 13.sp,

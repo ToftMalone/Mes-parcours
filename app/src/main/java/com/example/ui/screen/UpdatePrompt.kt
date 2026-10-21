@@ -1,5 +1,7 @@
 package com.example.ui.screen
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -181,9 +183,9 @@ fun UpdatePrompt(
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 shape = SunShape
             )
-            SheetTitle("Nouvelle version disponible")
+            SheetTitle(stringResource(R.string.update_new_version))
             Text(
-                "Version ${current.update.versionName}",
+                stringResource(R.string.update_version_label, current.update.versionName),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
@@ -204,9 +206,9 @@ fun UpdatePrompt(
                 }
             }
             SheetButtons(
-                laterLabel = "Plus tard",
+                laterLabel = stringResource(R.string.common_later),
                 onLater = dismiss,
-                confirmLabel = "Télécharger",
+                confirmLabel = stringResource(R.string.update_download),
                 confirmIcon = Icons.Rounded.Download,
                 onConfirm = { startDownload(current.update) }
             )
@@ -215,7 +217,7 @@ fun UpdatePrompt(
         is UpdateState.Downloading -> if (!hiddenWhileDownloading) {
             UpdateSheet(onDismiss = { hiddenWhileDownloading = true }, testTag = "update_downloading_dialog") {
                 Text(
-                    "Téléchargement de la ${current.update.versionName}",
+                    stringResource(R.string.update_downloading, current.update.versionName),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -236,8 +238,8 @@ fun UpdatePrompt(
                         .fillMaxWidth()
                         .padding(top = 16.dp)
                 ) {
-                    MpTextButton("Annuler", onClick = dismiss)
-                    MpTextButton("Continuer en arrière-plan", onClick = { hiddenWhileDownloading = true })
+                    MpTextButton(stringResource(R.string.common_cancel), onClick = dismiss)
+                    MpTextButton(stringResource(R.string.update_continue_background), onClick = { hiddenWhileDownloading = true })
                 }
             }
         }
@@ -251,15 +253,12 @@ fun UpdatePrompt(
                 size = 72.dp,
                 iconSize = 40.dp
             )
-            SheetTitle("Prêt à installer")
-            SheetBody(
-                "La version ${current.update.versionName} est téléchargée. Vos parcours sont " +
-                    "conservés ; Android va vous demander de confirmer l'installation."
-            )
+            SheetTitle(stringResource(R.string.update_ready_title))
+            SheetBody(stringResource(R.string.update_ready_body, current.update.versionName))
             SheetButtons(
-                laterLabel = "Plus tard",
+                laterLabel = stringResource(R.string.common_later),
                 onLater = dismiss,
-                confirmLabel = "Installer",
+                confirmLabel = stringResource(R.string.update_install),
                 confirmIcon = null,
                 onConfirm = {
                     context.startActivity(UpdateDownloader.installIntent(context, current.apk))
@@ -275,15 +274,12 @@ fun UpdatePrompt(
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 shape = CookieShape
             )
-            SheetTitle("Autorisation requise")
-            SheetBody(
-                "Pour installer la mise à jour, autorisez « Mes parcours » à installer des " +
-                    "applications. Cette étape n'est demandée qu'une seule fois."
-            )
+            SheetTitle(stringResource(R.string.update_permission_title))
+            SheetBody(stringResource(R.string.update_permission_body))
             SheetButtons(
-                laterLabel = "Plus tard",
+                laterLabel = stringResource(R.string.common_later),
                 onLater = dismiss,
-                confirmLabel = "Ouvrir les réglages",
+                confirmLabel = stringResource(R.string.update_open_settings),
                 confirmIcon = Icons.AutoMirrored.Rounded.OpenInNew,
                 onConfirm = {
                     context.startActivity(UpdateDownloader.unknownSourcesSettingsIntent(context))
@@ -302,11 +298,11 @@ fun UpdatePrompt(
             ) {
                 Icon(Icons.Rounded.WifiOff, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(30.dp))
             }
-            SheetTitle("Téléchargement interrompu")
+            SheetTitle(stringResource(R.string.update_failed_title))
             val pct = (current.progress * 100).toInt()
             SheetBody(
-                if (pct > 0) "Le téléchargement s'est arrêté à $pct %. Vérifiez votre réseau puis réessayez."
-                else "La mise à jour n'a pas pu être téléchargée. Vérifiez votre réseau puis réessayez."
+                if (pct > 0) stringResource(R.string.update_failed_at_percent, pct)
+                else stringResource(R.string.update_failed_generic)
             )
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp)) {
                 Box(
@@ -326,9 +322,9 @@ fun UpdatePrompt(
                 )
             }
             SheetButtons(
-                laterLabel = "Plus tard",
+                laterLabel = stringResource(R.string.common_later),
                 onLater = dismiss,
-                confirmLabel = "Réessayer",
+                confirmLabel = stringResource(R.string.update_retry),
                 confirmIcon = Icons.Rounded.Refresh,
                 onConfirm = { startDownload(current.update) }
             )

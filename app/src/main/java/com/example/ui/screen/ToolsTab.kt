@@ -1,5 +1,8 @@
 package com.example.ui.screen
 
+import androidx.annotation.StringRes
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -110,10 +113,10 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Outils disponibles. Le menu s'étoffera au fil des versions. */
-private enum class Tool(val title: String) {
-    MERGE("Fusionner"),
-    SPLIT("Découper"),
-    TRIM("Rogner")
+private enum class Tool(@StringRes val titleRes: Int) {
+    MERGE(R.string.tool_merge),
+    SPLIT(R.string.tool_split),
+    TRIM(R.string.tool_trim)
 }
 
 /** Où en est un outil : réglages, travail en cours, résultat, ou rien à traiter. */
@@ -169,14 +172,13 @@ private fun ToolsMenu(
             .testTag("tools_tab")
     ) {
         Text(
-            "Outils",
+            stringResource(R.string.tools_title),
             style = MaterialTheme.typography.headlineLarge,
             color = colors.onBackground,
             modifier = Modifier.padding(horizontal = 4.dp)
         )
         Text(
-            "Transformez vos parcours. Découper et rogner créent des copies : l'original " +
-                "reste, sauf si vous choisissez de le supprimer.",
+            stringResource(R.string.tools_intro),
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
             color = colors.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp)
@@ -188,8 +190,8 @@ private fun ToolsMenu(
                 shape = CookieShape,
                 container = colors.primaryContainer,
                 content = colors.onPrimaryContainer,
-                title = "Fusionner",
-                subtitle = "Réunir plusieurs parcours en un seul, dans l'ordre chronologique.",
+                title = stringResource(R.string.tool_merge),
+                subtitle = stringResource(R.string.tool_merge_subtitle),
                 onClick = { onOpenTool(Tool.MERGE) },
                 testTag = "open_merge_tool_button"
             )
@@ -198,8 +200,8 @@ private fun ToolsMenu(
                 shape = RoundedCornerShape(40),
                 container = colors.tertiaryContainer,
                 content = colors.onTertiaryContainer,
-                title = "Découper",
-                subtitle = "Séparer un parcours à chaque tronçon ou à chaque longue pause.",
+                title = stringResource(R.string.tool_split),
+                subtitle = stringResource(R.string.tool_split_subtitle),
                 onClick = { onOpenTool(Tool.SPLIT) },
                 testTag = "open_split_tool_button"
             )
@@ -208,8 +210,8 @@ private fun ToolsMenu(
                 shape = SunShape,
                 container = colors.secondaryContainer,
                 content = colors.onSecondaryContainer,
-                title = "Rogner",
-                subtitle = "Retirer des minutes au début ou à la fin d'un parcours.",
+                title = stringResource(R.string.tool_trim),
+                subtitle = stringResource(R.string.tool_trim_subtitle),
                 onClick = { onOpenTool(Tool.TRIM) },
                 testTag = "open_trim_tool_button"
             )
@@ -298,9 +300,9 @@ private fun ToolScaffold(
                     .clickable(onClick = onBack)
                     .testTag(backTag)
             ) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Retour aux outils")
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.tools_back))
             }
-            Text(tool.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(stringResource(tool.titleRes), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             if (phase == ToolPhase.Form) headerExtra?.invoke()
         }
 
@@ -491,7 +493,7 @@ private fun NeedTracksState(title: String, body: String, onBack: () -> Unit, mod
         )
         Spacer(modifier = Modifier.height(22.dp))
         PillButton(
-            "Retour aux outils",
+            stringResource(R.string.tools_back),
             onClick = onBack,
             container = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -526,7 +528,7 @@ private fun PillButton(
 /** Les deux boutons de fin d'un outil : « Terminé », et l'accès au résultat. */
 @Composable
 private fun DoneButtons(onFinish: () -> Unit, primaryLabel: String?, onPrimary: () -> Unit, primaryTag: String) {
-    PillButton("Terminé", onFinish, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface, "tool_done_button")
+    PillButton(stringResource(R.string.tool_done), onFinish, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface, "tool_done_button")
     if (primaryLabel != null) {
         PillButton(primaryLabel, onPrimary, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, primaryTag)
     }
@@ -538,11 +540,14 @@ private fun displayColor(track: Track) = Color(
     TrackStylePreferences.resolveTrackColor(track.displayColor, track.sourceColor, track.isImported, track.isMerged)
 )
 
-private fun categoryOf(track: Track) = when {
-    track.isMerged -> "Fusionné"
-    track.isImported -> "Importé"
-    else -> "Enregistré"
-}
+@Composable
+private fun categoryOf(track: Track) = stringResource(
+    when {
+        track.isMerged -> R.string.track_kind_merged
+        track.isImported -> R.string.track_kind_imported
+        else -> R.string.track_kind_recorded
+    }
+)
 
 /** Champ de saisie « rempli » de la maquette : fond neutre, trait primaire dessous. */
 @Composable
@@ -642,7 +647,7 @@ private fun SelectedTrackCard(track: Track, subtitle: String, onClick: () -> Uni
             )
             Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.Rounded.UnfoldMore, contentDescription = "Changer de parcours", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(Icons.Rounded.UnfoldMore, contentDescription = stringResource(R.string.picker_change_track), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -650,7 +655,7 @@ private fun SelectedTrackCard(track: Track, subtitle: String, onClick: () -> Uni
 @Composable
 private fun TrackPickerSheet(tracks: List<Track>, selectedId: Long?, onPick: (Track) -> Unit, onDismiss: () -> Unit) {
     MpSheet(onDismissRequest = onDismiss) {
-        SheetHeader("Choisir un parcours")
+        SheetHeader(stringResource(R.string.picker_title))
         Spacer(modifier = Modifier.height(14.dp))
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -679,7 +684,7 @@ private fun TrackPickerSheet(tracks: List<Track>, selectedId: Long?, onPick: (Tr
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            "${categoryOf(track)} · ${FormatUtils.formatShortDate(track.startTime)} · ${FormatUtils.formatDistanceShort(track.totalDistance)}",
+                            stringResource(R.string.track_row_subtitle_date, categoryOf(track), FormatUtils.formatShortDate(track.startTime), FormatUtils.formatDistanceShort(track.totalDistance)),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
@@ -688,7 +693,7 @@ private fun TrackPickerSheet(tracks: List<Track>, selectedId: Long?, onPick: (Tr
                     if (selected) {
                         Icon(
                             Icons.Rounded.CheckCircle,
-                            contentDescription = "Choisi",
+                            contentDescription = stringResource(R.string.picker_chosen),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.testTag("single_track_radio_${track.id}")
                         )
@@ -794,9 +799,8 @@ private fun MergeTracksTool(
     val canMerge = n >= 2 && destinationTrack != null && mergedName.isNotBlank()
     val shownPhase = if (phase == ToolPhase.Form && tracks.size < 2) {
         ToolPhase.Need(
-            if (tracks.isEmpty()) "Aucun parcours à fusionner" else "Il faut au moins 2 parcours",
-            if (tracks.isEmpty()) "Enregistrez ou importez au moins deux parcours, puis revenez ici."
-            else "Vous n'avez qu'un seul parcours pour l'instant. Enregistrez ou importez-en un autre, puis revenez ici."
+            stringResource(if (tracks.isEmpty()) R.string.merge_need_none_title else R.string.merge_need_one_title),
+            stringResource(if (tracks.isEmpty()) R.string.merge_need_none_body else R.string.merge_need_one_body)
         )
     } else phase
 
@@ -807,8 +811,8 @@ private fun MergeTracksTool(
         screenTag = "merge_tool",
         backTag = "merge_tool_back_button",
         modifier = modifier,
-        busyTitle = "Fusion en cours…",
-        busySubtitle = "Tri chronologique des points",
+        busyTitle = stringResource(R.string.merge_busy_title),
+        busySubtitle = stringResource(R.string.merge_busy_subtitle),
         headerExtra = {
             if (n > 0) {
                 Row(
@@ -822,7 +826,7 @@ private fun MergeTracksTool(
                 ) {
                     Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                     Text(
-                        if (n > 1) "$n sélectionnés" else "1 sélectionné",
+                        stringResource(R.string.merge_selected_count, n),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimary
@@ -834,7 +838,7 @@ private fun MergeTracksTool(
             val result = (phase as? ToolPhase.Done)?.resultTrackId
             DoneButtons(
                 onFinish = onBack,
-                primaryLabel = if (result != null) "Voir le parcours" else null,
+                primaryLabel = if (result != null) stringResource(R.string.tool_view_track) else null,
                 onPrimary = {
                     if (result != null) {
                         viewModel.selectTrack(result)
@@ -846,7 +850,7 @@ private fun MergeTracksTool(
         },
         action = {
             ToolActionButton(
-                text = if (n >= 2) "Fusionner $n parcours" else "Sélectionnez au moins 2 parcours",
+                text = if (n >= 2) stringResource(R.string.merge_action, n) else stringResource(R.string.merge_action_disabled),
                 icon = Icons.Rounded.Merge,
                 enabled = canMerge,
                 testTag = "confirm_merge_button",
@@ -863,8 +867,8 @@ private fun MergeTracksTool(
                         onSuccess = { mergedId ->
                             selectedSourceIds = emptySet()
                             phase = ToolPhase.Done(
-                                title = "Parcours fusionnés",
-                                body = "« $name » réunit désormais les $count parcours, dans l'ordre chronologique.",
+                                title = context.getString(R.string.merge_done_title),
+                                body = context.getString(R.string.merge_done_body, name, count),
                                 resultTrackId = mergedId
                             )
                         },
@@ -878,7 +882,7 @@ private fun MergeTracksTool(
         }
     ) {
         Text(
-            "Choisissez au moins 2 parcours.",
+            stringResource(R.string.merge_hint),
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp)
@@ -897,7 +901,7 @@ private fun MergeTracksTool(
         FilledField(
             value = mergedName,
             onValueChange = { mergedName = it },
-            label = "Nom du résultat",
+            label = stringResource(R.string.tool_result_name_label),
             enabled = n >= 2,
             testTag = "merged_name_field"
         )
@@ -906,8 +910,7 @@ private fun MergeTracksTool(
         // La maquette promettait l'inverse ; le texte dit ce que fait réellement l'outil.
         InfoLine(
             Icons.Rounded.Sort,
-            "Les points sont remis dans l'ordre chronologique. Les parcours choisis sont " +
-                "réunis en un seul, rangé dans la catégorie du plus ancien."
+            stringResource(R.string.merge_info)
         )
     }
 }
@@ -937,7 +940,7 @@ private fun MergeTrackRow(track: Track, selected: Boolean, onToggle: () -> Unit)
                 .border(2.dp, if (selected) colors.primary else colors.onSurfaceVariant, RoundedCornerShape(7.dp))
                 .testTag("merge_checkbox_${track.id}")
         ) {
-            if (selected) Icon(Icons.Rounded.Check, contentDescription = "Sélectionné", tint = colors.onPrimary, modifier = Modifier.size(18.dp))
+            if (selected) Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.common_selected_cd), tint = colors.onPrimary, modifier = Modifier.size(18.dp))
         }
         Box(
             modifier = Modifier
@@ -961,10 +964,11 @@ private fun MergeTrackRow(track: Track, selected: Boolean, onToggle: () -> Unit)
  */
 private val PAUSE_STEPS_MINUTES = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 360)
 
+@Composable
 private fun formatMinutes(minutes: Int): String = when {
-    minutes < 60 -> "$minutes min"
-    minutes % 60 == 0 -> "${minutes / 60} h"
-    else -> String.format(Locale.FRANCE, "%d h %02d", minutes / 60, minutes % 60)
+    minutes < 60 -> stringResource(R.string.duration_minutes, minutes)
+    minutes % 60 == 0 -> stringResource(R.string.duration_hours, minutes / 60)
+    else -> stringResource(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
 }
 
 @Composable
@@ -974,6 +978,7 @@ private fun SplitTrackTool(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val messenger = LocalAppMessenger.current
     val tracks by viewModel.allTracks.collectAsState()
     val eligibleTracks = tracks.filter { !it.isRecording }.sortedByDescending { it.startTime }
@@ -996,7 +1001,7 @@ private fun SplitTrackTool(
 
     val pauseMinutes = PAUSE_STEPS_MINUTES[pauseIndex]
     val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
-        ToolPhase.Need("Aucun parcours à découper", "Enregistrez ou importez un parcours pour pouvoir le découper ici.")
+        ToolPhase.Need(stringResource(R.string.split_need_title), stringResource(R.string.split_need_body))
     } else phase
 
     ToolScaffold(
@@ -1006,14 +1011,14 @@ private fun SplitTrackTool(
         screenTag = "split_tool",
         backTag = "split_tool_back_button",
         modifier = modifier,
-        busyTitle = "Découpage en cours…",
-        busySubtitle = if (mode == TrackRepository.SplitMode.TIME_GAP) "Recherche des pauses" else "Recherche des tronçons",
+        busyTitle = stringResource(R.string.split_busy_title),
+        busySubtitle = stringResource(if (mode == TrackRepository.SplitMode.TIME_GAP) R.string.split_busy_gap else R.string.split_busy_segments),
         doneActions = {
-            DoneButtons(onFinish = onBack, primaryLabel = "Voir l'historique", onPrimary = onOpenHistory, primaryTag = "split_open_history")
+            DoneButtons(onFinish = onBack, primaryLabel = stringResource(R.string.split_view_history), onPrimary = onOpenHistory, primaryTag = "split_open_history")
         },
         action = {
             ToolActionButton(
-                text = "Découper le parcours",
+                text = stringResource(R.string.split_action),
                 icon = Icons.Rounded.ContentCut,
                 enabled = selectedTrack != null && baseName.isNotBlank(),
                 testTag = "confirm_split_button",
@@ -1031,9 +1036,11 @@ private fun SplitTrackTool(
                         onSuccess = { newTrackIds ->
                             val count = newTrackIds.size
                             phase = ToolPhase.Done(
-                                title = "Découpé en $count parcours",
-                                body = "De « $base (1) » à « $base ($count) », dans l'historique. " +
-                                    if (deleting) "L'original a été supprimé." else "L'original est conservé.",
+                                title = context.getString(R.string.split_done_title),
+                                body = context.getString(
+                                    if (deleting) R.string.split_done_body_deleted else R.string.split_done_body_kept,
+                                    base, count
+                                ),
                                 resultTrackId = null
                             )
                         },
@@ -1049,21 +1056,21 @@ private fun SplitTrackTool(
         val track = selectedTrack ?: return@ToolScaffold
         SelectedTrackCard(
             track = track,
-            subtitle = "${categoryOf(track)} · ${FormatUtils.formatDistanceShort(track.totalDistance)} · ${FormatUtils.formatDurationShort(track.duration)}",
+            subtitle = stringResource(R.string.track_row_subtitle_date, categoryOf(track), FormatUtils.formatDistanceShort(track.totalDistance), FormatUtils.formatDurationShort(track.duration)),
             onClick = { picking = true }
         )
 
-        SectionLabel("Mode de découpe")
+        SectionLabel(stringResource(R.string.split_mode_label))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             SegmentButton(
-                "À chaque tronçon", Icons.Rounded.Splitscreen,
+                stringResource(R.string.split_mode_segments), Icons.Rounded.Splitscreen,
                 selected = mode == TrackRepository.SplitMode.SEGMENT_BREAKS,
                 onClick = { mode = TrackRepository.SplitMode.SEGMENT_BREAKS },
                 testTag = "split_mode_segments",
                 modifier = Modifier.weight(1f)
             )
             SegmentButton(
-                "À chaque pause", Icons.Rounded.Coffee,
+                stringResource(R.string.split_mode_gap), Icons.Rounded.Coffee,
                 selected = mode == TrackRepository.SplitMode.TIME_GAP,
                 onClick = { mode = TrackRepository.SplitMode.TIME_GAP },
                 testTag = "split_mode_gap",
@@ -1072,7 +1079,7 @@ private fun SplitTrackTool(
         }
         if (mode == TrackRepository.SplitMode.SEGMENT_BREAKS) {
             Text(
-                "Pour un fichier importé qui réunit plusieurs trajets : chaque tronçon devient un parcours.",
+                stringResource(R.string.split_hint_segments),
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 10.dp)
@@ -1086,7 +1093,7 @@ private fun SplitTrackTool(
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(16.dp)
             ) {
-                Text("Couper après une pause d'au moins", style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp))
+                Text(stringResource(R.string.split_gap_title), style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp))
                 Text(formatMinutes(pauseMinutes), style = MaterialTheme.typography.headlineMedium)
                 MpSlider(
                     value = pauseIndex.toFloat(),
@@ -1096,12 +1103,11 @@ private fun SplitTrackTool(
                     testTag = "split_gap_slider"
                 )
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Text("5 min", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text("6 h", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(formatMinutes(PAUSE_STEPS_MINUTES.first()), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text(formatMinutes(PAUSE_STEPS_MINUTES.last()), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(
-                    "Sans effet sur un KML, ou sur un GPX sans horodatage : leurs points sont " +
-                        "régulièrement espacés, il n'y a aucune pause à trouver.",
+                    stringResource(R.string.split_gap_note),
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1111,7 +1117,7 @@ private fun SplitTrackTool(
         }
 
         Spacer(modifier = Modifier.height(14.dp))
-        FilledField(baseName, { baseName = it }, "Nom de base", "split_base_name_field")
+        FilledField(baseName, { baseName = it }, stringResource(R.string.split_base_name), "split_base_name_field")
         if (baseName.isNotBlank()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1135,14 +1141,14 @@ private fun SplitTrackTool(
         }
         Spacer(modifier = Modifier.height(10.dp))
         SwitchCard(
-            title = "Supprimer l'original",
-            subtitle = "Les morceaux en contiennent tous les points",
+            title = stringResource(R.string.tool_delete_original),
+            subtitle = stringResource(R.string.split_delete_original_hint),
             checked = deleteSource,
             onToggle = { deleteSource = !deleteSource },
             testTag = "split_delete_source_row"
         )
         Spacer(modifier = Modifier.height(14.dp))
-        InfoLine(Icons.Rounded.Verified, "Rien n'est perdu : chaque point se retrouve dans l'un des morceaux.")
+        InfoLine(Icons.Rounded.Verified, stringResource(R.string.split_info))
     }
 
     if (picking) {
@@ -1200,7 +1206,9 @@ private fun TrimTrackTool(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val messenger = LocalAppMessenger.current
+    val trimNameFormat = stringResource(R.string.trim_name_format)
     val tracks by viewModel.allTracks.collectAsState()
     val eligibleTracks = tracks.filter { !it.isRecording }.sortedByDescending { it.startTime }
 
@@ -1217,13 +1225,13 @@ private fun TrimTrackTool(
     // Le nom proposé est celui du parcours choisi, suffixé : le résultat est une
     // copie, et deux lignes du même nom dans l'historique ne se distingueraient pas.
     LaunchedEffect(selectedTrack?.id) {
-        selectedTrack?.let { newName = "${it.name} (rogné)" }
+        selectedTrack?.let { newName = trimNameFormat.format(it.name) }
     }
 
     val a = dropStartMinutes.roundToInt()
     val b = dropEndMinutes.roundToInt()
     val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
-        ToolPhase.Need("Aucun parcours à rogner", "Enregistrez ou importez un parcours pour pouvoir le rogner ici.")
+        ToolPhase.Need(stringResource(R.string.trim_need_title), stringResource(R.string.trim_need_body))
     } else phase
 
     ToolScaffold(
@@ -1233,13 +1241,13 @@ private fun TrimTrackTool(
         screenTag = "trim_tool",
         backTag = "trim_tool_back_button",
         modifier = modifier,
-        busyTitle = "Rognage en cours…",
-        busySubtitle = "Création de la copie",
+        busyTitle = stringResource(R.string.trim_busy_title),
+        busySubtitle = stringResource(R.string.trim_busy_subtitle),
         doneActions = {
             val result = (phase as? ToolPhase.Done)?.resultTrackId
             DoneButtons(
                 onFinish = onBack,
-                primaryLabel = if (result != null) "Voir le parcours" else null,
+                primaryLabel = if (result != null) stringResource(R.string.tool_view_track) else null,
                 onPrimary = {
                     if (result != null) {
                         viewModel.selectTrack(result)
@@ -1251,7 +1259,7 @@ private fun TrimTrackTool(
         },
         action = {
             ToolActionButton(
-                text = "Créer la copie rognée",
+                text = stringResource(R.string.trim_action),
                 icon = Icons.Rounded.TimerOff,
                 enabled = selectedTrack != null && newName.isNotBlank() && (a > 0 || b > 0),
                 testTag = "confirm_trim_button",
@@ -1268,9 +1276,11 @@ private fun TrimTrackTool(
                         deleteSource = deleting,
                         onSuccess = { newTrackId ->
                             phase = ToolPhase.Done(
-                                title = "Copie rognée créée",
-                                body = "« $name » est dans l'historique. " +
-                                    if (deleting) "L'original a été supprimé." else "L'original est conservé.",
+                                title = context.getString(R.string.trim_done_title),
+                                body = context.getString(
+                                    if (deleting) R.string.trim_done_body_deleted else R.string.trim_done_body_kept,
+                                    name
+                                ),
                                 resultTrackId = newTrackId
                             )
                         },
@@ -1284,11 +1294,10 @@ private fun TrimTrackTool(
         }
     ) {
         val track = selectedTrack ?: return@ToolScaffold
-        val time = SimpleDateFormat("HH:mm", Locale.FRANCE)
         val end = if (track.endTime > track.startTime) track.endTime else track.startTime + track.duration * 1000
         SelectedTrackCard(
             track = track,
-            subtitle = "${time.format(Date(track.startTime))} → ${time.format(Date(end))} · ${FormatUtils.formatDurationShort(track.duration)}",
+            subtitle = "${FormatUtils.formatClock(track.startTime)} → ${FormatUtils.formatClock(end)} · ${FormatUtils.formatDurationShort(track.duration)}",
             onClick = { picking = true }
         )
 
@@ -1296,16 +1305,16 @@ private fun TrimTrackTool(
         KeptDurationBar(totalSeconds = track.duration, dropStartMinutes = a, dropEndMinutes = b)
 
         Spacer(modifier = Modifier.height(12.dp))
-        TrimSliderCard("Retirer au début", a, dropStartMinutes, { dropStartMinutes = it }, "trim_start_slider")
+        TrimSliderCard(stringResource(R.string.trim_remove_start), a, dropStartMinutes, { dropStartMinutes = it }, "trim_start_slider")
         Spacer(modifier = Modifier.height(8.dp))
-        TrimSliderCard("Retirer à la fin", b, dropEndMinutes, { dropEndMinutes = it }, "trim_end_slider")
+        TrimSliderCard(stringResource(R.string.trim_remove_end), b, dropEndMinutes, { dropEndMinutes = it }, "trim_end_slider")
 
         Spacer(modifier = Modifier.height(12.dp))
-        FilledField(newName, { newName = it }, "Nom du résultat", "trim_name_field")
+        FilledField(newName, { newName = it }, stringResource(R.string.tool_result_name_label), "trim_name_field")
         Spacer(modifier = Modifier.height(10.dp))
         SwitchCard(
-            title = "Supprimer l'original",
-            subtitle = "Le résultat est une copie",
+            title = stringResource(R.string.tool_delete_original),
+            subtitle = stringResource(R.string.trim_delete_original_hint),
             checked = deleteSource,
             onToggle = { deleteSource = !deleteSource },
             testTag = "trim_delete_source_row"
@@ -1345,13 +1354,11 @@ private fun TrimTrackTool(
     }
 }
 
-private fun trimWarning(a: Int, b: Int): String {
-    val parts = buildList {
-        if (a > 0) add("les $a premières minutes")
-        if (b > 0) add("les $b dernières minutes")
-    }
-    val what = parts.joinToString(" et ").replaceFirstChar { it.uppercase() }
-    return "$what ne seront pas dans la copie. Si l'original est supprimé, elles seront perdues définitivement."
+@Composable
+private fun trimWarning(a: Int, b: Int): String = when {
+    a > 0 && b > 0 -> stringResource(R.string.trim_warning_both, formatMinutes(a), formatMinutes(b))
+    a > 0 -> stringResource(R.string.trim_warning_start, formatMinutes(a))
+    else -> stringResource(R.string.trim_warning_end, formatMinutes(b))
 }
 
 @Composable
@@ -1365,7 +1372,7 @@ private fun TrimSliderCard(label: String, minutes: Int, value: Float, onValueCha
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp), modifier = Modifier.weight(1f))
-            Text("$minutes min", style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp))
+            Text(formatMinutes(minutes), style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp))
         }
         MpSlider(
             value = value,
@@ -1416,7 +1423,7 @@ private fun KeptDurationBar(totalSeconds: Long, dropStartMinutes: Int, dropEndMi
             hatch(size.width * (1f - endFraction), size.width * endFraction)
         }
         Text(
-            if (keptSeconds > 0) "${FormatUtils.formatDurationShort(keptSeconds)} conservées" else "Rien ne resterait",
+            if (keptSeconds > 0) stringResource(R.string.trim_kept_label, FormatUtils.formatDurationShort(keptSeconds)) else stringResource(R.string.trim_nothing_left),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = colors.onPrimary

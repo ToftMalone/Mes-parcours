@@ -1,5 +1,6 @@
 package com.example.util
 
+import com.example.R
 import android.content.Context
 import android.net.Uri
 import android.util.Xml
@@ -71,7 +72,10 @@ object Importer {
 
     // RuntimeException et non Exception : Room.runInTransaction() ré-emballe les
     // exceptions vérifiées dans une RuntimeException, ce qui masquerait le message.
-    class ImportException(message: String) : RuntimeException(message)
+    class ImportException(
+        @androidx.annotation.StringRes override val messageRes: Int,
+        override val messageArgs: List<Any> = emptyList()
+    ) : RuntimeException("string resource #$messageRes"), UserFacing
 
     /** Statistiques du parcours, calculées pendant le parsing. */
     data class ImportSummary(
@@ -346,7 +350,7 @@ object Importer {
     // ------------------------------------------------------------- Divers
 
     private fun getFileName(context: Context, uri: Uri): String {
-        var name = "Parcours Importe"
+        var name = context.getString(R.string.import_default_name)
         try {
             context.contentResolver.query(uri, null, null, null, null)?.use {
                 if (it.moveToFirst()) {

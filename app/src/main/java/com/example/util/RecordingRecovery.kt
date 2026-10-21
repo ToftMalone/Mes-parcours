@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.MainActivity
+import com.example.R
 
 /**
  * Reprise d'un enregistrement sans que l'application soit à l'écran : après un
@@ -49,8 +50,8 @@ object RecordingRecovery {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Enregistrement interrompu", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "Quand un enregistrement n'a pas pu reprendre tout seul"
+                NotificationChannel(CHANNEL_ID, context.getString(R.string.interrupted_channel_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = context.getString(R.string.interrupted_channel_description)
                 }
             )
         }
@@ -64,8 +65,8 @@ object RecordingRecovery {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setContentTitle("Enregistrement interrompu")
-            .setContentText("Ouvre Mes parcours pour reprendre ton parcours.")
+            .setContentTitle(context.getString(R.string.interrupted_title))
+            .setContentText(context.getString(R.string.interrupted_text))
             .setContentIntent(openApp)
             .setAutoCancel(true)
             .build()

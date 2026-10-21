@@ -2,6 +2,8 @@
 
 package com.example.ui.screen
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -80,6 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.GpsStatus
 import com.example.data.model.LiveStats
 import com.example.data.model.Track
 import com.example.ui.component.CookieShape
@@ -168,18 +171,18 @@ fun TrackingTab(
             delayedGpsStatus = gpsStatus
             return@LaunchedEffect
         }
-        if (gpsStatus == "Signal trouvé") {
-            val wasLost = delayedGpsStatus.startsWith("Recherche")
-            delayedGpsStatus = "Signal trouvé"
+        if (gpsStatus == GpsStatus.FOUND) {
+            val wasLost = delayedGpsStatus == GpsStatus.SEARCHING
+            delayedGpsStatus = GpsStatus.FOUND
             if (wasLost) {
                 activeAlertState = AlertState.FOUND
             }
-        } else if (gpsStatus.startsWith("Recherche")) {
-            val wasFound = delayedGpsStatus == "Signal trouvé"
+        } else if (gpsStatus == GpsStatus.SEARCHING) {
+            val wasFound = delayedGpsStatus == GpsStatus.FOUND
             // Trois secondes de confirmation avant d'annoncer une perte : un passage
             // sous un pont ne mérite pas une alerte.
             kotlinx.coroutines.delay(3000L)
-            if (gpsStatus.startsWith("Recherche")) {
+            if (gpsStatus == GpsStatus.SEARCHING) {
                 delayedGpsStatus = gpsStatus
                 if (wasFound) {
                     activeAlertState = AlertState.LOST
@@ -194,7 +197,7 @@ fun TrackingTab(
         showStartOptions -> ControlsMode.CHOICE
         else -> ControlsMode.IDLE
     }
-    val signalFound = delayedGpsStatus == "Signal trouvé"
+    val signalFound = delayedGpsStatus == GpsStatus.FOUND
     val currentAlt = currentAltitude?.metersAboveSeaLevel
     val currentSpeed = currentUserLocation?.speed?.toDouble() ?: liveStats.currentSpeedMps
 
@@ -205,7 +208,7 @@ fun TrackingTab(
     val zoomBannerTop = with(density) { statsCardHeightPx.toDp() } + 36.dp
 
     val startNew = {
-        viewModel.startRecording(context, "Nouveau parcours", "Parcours")
+        viewModel.startRecording(context, context.getString(R.string.track_new_name), "Parcours")
         showStartOptions = false
     }
 
@@ -261,12 +264,12 @@ fun TrackingTab(
                     when (activeAlertState) {
                         AlertState.LOST -> GpsAlert(
                             lost = true,
-                            subtitle = if (isTracking) "L'enregistrement reprendra dès son retour" else "Position en attente du signal",
+                            subtitle = stringResource(if (isTracking) R.string.gps_alert_lost_resume else R.string.gps_alert_lost_waiting),
                             modifier = Modifier.matchParentSize()
                         )
                         AlertState.FOUND -> GpsAlert(
                             lost = false,
-                            subtitle = gpsAccuracy?.let { "Précision ±${it.toInt()} m" } ?: "Position retrouvée",
+                            subtitle = gpsAccuracy?.let { stringResource(R.string.gps_alert_accuracy, it.toInt()) } ?: stringResource(R.string.gps_alert_found_position),
                             modifier = Modifier.matchParentSize()
                         )
                         null -> Unit
@@ -276,7 +279,7 @@ fun TrackingTab(
         } else {
             GpsChip(
                 icon = Icons.Rounded.LocationDisabled,
-                text = "Localisation désactivée",
+                text = stringResource(R.string.gps_disabled),
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(start = 16.dp, top = 12.dp)
@@ -298,7 +301,7 @@ fun TrackingTab(
                 if (currentUserLocation != null || livePoints.isNotEmpty()) {
                     RoundButton(
                         icon = Icons.Rounded.MyLocation,
-                        description = "Recentrer",
+                        description = stringResource(R.string.action_recenter),
                         size = 56.dp,
                         iconSize = 24.dp,
                         container = if (isAutoFollowActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -340,7 +343,7 @@ fun TrackingTab(
             onDismiss = { showResumePicker = false },
             onTrackSelected = { track ->
                 viewModel.resumeTrack(context, track.id) {
-                    messenger.show("Reprise de « ${track.name} »", Icons.Rounded.PlayArrow)
+                    messenger.show(context.getString(R.string.recording_resumed, track.name), Icons.Rounded.PlayArrow)
                 }
                 showResumePicker = false
                 showStartOptions = false
@@ -385,7 +388,7 @@ private fun GpsAlert(lost: Boolean, subtitle: String, modifier: Modifier = Modif
     ) {
         Icon(if (lost) Icons.Rounded.GpsOff else Icons.Rounded.GpsFixed, contentDescription = null, tint = fg, modifier = Modifier.size(28.dp))
         Column {
-            Text(if (lost) "Signal GPS perdu" else "Signal GPS trouvé", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = fg)
+            Text(stringResource(if (lost) R.string.gps_alert_lost_title else R.string.gps_alert_found_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = fg)
             Text(subtitle, fontSize = 13.sp, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -431,9 +434,9 @@ private fun GpsDot(found: Boolean) {
 
 // ------------------------------------------------------------------ Statistiques
 
-private fun kmValue(meters: Double) = String.format(Locale.FRANCE, "%.2f", meters / 1000.0)
+private fun kmValue(meters: Double) = String.format(Locale.getDefault(), "%.2f", meters / 1000.0)
 
-private fun speedValue(mps: Double) = String.format(Locale.FRANCE, "%.1f", (mps * 3.6).coerceAtLeast(0.0))
+private fun speedValue(mps: Double) = String.format(Locale.getDefault(), "%.1f", (mps * 3.6).coerceAtLeast(0.0))
 
 private fun altitudeValue(meters: Double?) = meters?.let { Math.round(it).toString() } ?: "—"
 
@@ -512,12 +515,12 @@ private fun StatsCard(
             )
             // Distance, vitesse, altitude : les trois chiffres du bandeau d'avant. La
             // durée n'y figure pas, à la demande de l'auteur.
-            CompactStat("Distance", kmValue(stats.distanceMeters), "km", value, Modifier.weight(1f))
-            CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
-            CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
+            CompactStat(stringResource(R.string.stat_distance), kmValue(stats.distanceMeters), "km", value, Modifier.weight(1f))
+            CompactStat(stringResource(R.string.stat_speed), speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
+            CompactStat(stringResource(R.string.stat_altitude), altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
         } else {
-            CompactStat("Vitesse", speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
-            CompactStat("Altitude", altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
+            CompactStat(stringResource(R.string.stat_speed), speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
+            CompactStat(stringResource(R.string.stat_altitude), altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
         }
         Box(modifier = Modifier.padding(start = 6.dp)) { gpsIndicator() }
     }
@@ -646,7 +649,7 @@ private fun RecordingControls(
             ControlsMode.CHOICE -> {
                 key("cancel") {
                     PoppingRoundButton(
-                        Icons.Rounded.Close, "Annuler", 48.dp, 20.dp,
+                        Icons.Rounded.Close, stringResource(R.string.common_cancel), 48.dp, 20.dp,
                         colors.surfaceContainerHighest, colors.onSurfaceVariant,
                         "cancel_start_options_fab", onCancelChoice
                     )
@@ -654,7 +657,7 @@ private fun RecordingControls(
                 if (canResumeExisting) {
                     key("resume_existing") {
                         PoppingRoundButton(
-                            Icons.Rounded.Route, "Reprendre une trace existante", 56.dp, 24.dp,
+                            Icons.Rounded.Route, stringResource(R.string.action_resume_existing), 56.dp, 24.dp,
                             colors.secondaryContainer, colors.onSecondaryContainer,
                             "resume_existing_track_fab", onResumeExisting
                         )
@@ -666,7 +669,7 @@ private fun RecordingControls(
                 key("pause_resume") {
                     PoppingRoundButton(
                         if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                        if (paused) "Reprendre" else "Pause",
+                        stringResource(if (paused) R.string.action_resume else R.string.action_pause),
                         56.dp, 28.dp,
                         if (paused) colors.primary else colors.tertiaryContainer,
                         if (paused) colors.onPrimary else colors.onTertiaryContainer,
@@ -680,9 +683,9 @@ private fun RecordingControls(
         // Le bouton principal : un seul composant, qui change de couleur et d'icône
         // d'un état à l'autre plutôt que d'être remplacé.
         val main = when (mode) {
-            ControlsMode.IDLE -> MainButton(Icons.Rounded.RadioButtonChecked, "Démarrer", colors.primary, colors.onPrimary, "action_fab", onStart)
-            ControlsMode.CHOICE -> MainButton(Icons.Rounded.AddLocationAlt, "Nouveau parcours", colors.primary, colors.onPrimary, "start_new_track_fab", onNewTrack)
-            else -> MainButton(Icons.Rounded.CropSquare, "Arrêter", colors.errorContainer, colors.onErrorContainer, "stop_fab", onStop)
+            ControlsMode.IDLE -> MainButton(Icons.Rounded.RadioButtonChecked, stringResource(R.string.action_start), colors.primary, colors.onPrimary, "action_fab", onStart)
+            ControlsMode.CHOICE -> MainButton(Icons.Rounded.AddLocationAlt, stringResource(R.string.action_new_track), colors.primary, colors.onPrimary, "start_new_track_fab", onNewTrack)
+            else -> MainButton(Icons.Rounded.CropSquare, stringResource(R.string.action_stop), colors.errorContainer, colors.onErrorContainer, "stop_fab", onStop)
         }
         RoundButton(main.icon, main.description, 72.dp, 34.dp, main.container, main.content, main.testTag, main.onClick)
     }
@@ -697,7 +700,7 @@ private fun ResumeTrackPickerSheet(
     onTrackSelected: (Track) -> Unit
 ) {
     MpSheet(onDismissRequest = onDismiss) {
-        SheetHeader("Reprendre une trace", "L'enregistrement continuera le parcours choisi.")
+        SheetHeader(stringResource(R.string.resume_picker_title), stringResource(R.string.resume_picker_subtitle))
         Spacer(modifier = Modifier.height(14.dp))
         Column(
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -710,9 +713,9 @@ private fun ResumeTrackPickerSheet(
                     TrackStylePreferences.resolveTrackColor(track.displayColor, track.sourceColor, track.isImported, track.isMerged)
                 )
                 val category = when {
-                    track.isMerged -> "Fusionné"
-                    track.isImported -> "Importé"
-                    else -> "Enregistré"
+                    track.isMerged -> stringResource(R.string.track_kind_merged)
+                    track.isImported -> stringResource(R.string.track_kind_imported)
+                    else -> stringResource(R.string.track_kind_recorded)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -756,7 +759,7 @@ private fun ResumeTrackPickerSheet(
                 .clickable(onClick = onDismiss)
                 .testTag("resume_picker_cancel")
         ) {
-            Text("Annuler", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.common_cancel), fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -792,7 +795,7 @@ private fun PermissionDeniedOverlay(onGrantClick: () -> Unit) {
             iconSize = 52.dp
         )
         Text(
-            "Sans localisation, pas de parcours",
+            stringResource(R.string.permission_denied_title),
             fontFamily = DisplayFontFamily,
             fontSize = 26.sp,
             lineHeight = 30.sp,
@@ -801,8 +804,7 @@ private fun PermissionDeniedOverlay(onGrantClick: () -> Unit) {
             modifier = Modifier.padding(top = 20.dp)
         )
         Text(
-            "Mes parcours a besoin de votre position pour afficher la carte et mesurer " +
-                "distance, vitesse et dénivelé. Elle ne quitte jamais votre téléphone.",
+            stringResource(R.string.permission_denied_body),
             fontSize = 15.sp,
             lineHeight = 22.sp,
             color = colors.onSurfaceVariant,
@@ -822,7 +824,7 @@ private fun PermissionDeniedOverlay(onGrantClick: () -> Unit) {
                 .testTag("grant_permission_button")
         ) {
             Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(22.dp))
-            Text("Accorder les permissions", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.onPrimary)
+            Text(stringResource(R.string.permission_grant), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.onPrimary)
         }
     }
 }

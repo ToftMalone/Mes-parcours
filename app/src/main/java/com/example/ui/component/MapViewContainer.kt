@@ -1,5 +1,7 @@
 package com.example.ui.component
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import android.content.Context
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -363,14 +365,18 @@ private fun createDotIcon(context: Context, fill: Int, sizeDp: Float, ringDp: Fl
     return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }
 
-private val GOOGLE_SATELLITE_TILE_SOURCE = object : OnlineTileSourceBase(
+// `lazy` : la langue des libellés suit celle de l'appareil au premier usage, sans
+// reconstruire une source de tuiles (et son identité) à chaque recomposition.
+private val GOOGLE_SATELLITE_TILE_SOURCE: OnlineTileSourceBase by lazy {
+    val hl = java.util.Locale.getDefault().language.ifEmpty { "en" }
+    object : OnlineTileSourceBase(
     "GoogleSatellite",
     0, 20, 256, "",
     arrayOf(
-        "https://mt0.google.com/vt/lyrs=y&hl=fr",
-        "https://mt1.google.com/vt/lyrs=y&hl=fr",
-        "https://mt2.google.com/vt/lyrs=y&hl=fr",
-        "https://mt3.google.com/vt/lyrs=y&hl=fr"
+        "https://mt0.google.com/vt/lyrs=y&hl=$hl",
+        "https://mt1.google.com/vt/lyrs=y&hl=$hl",
+        "https://mt2.google.com/vt/lyrs=y&hl=$hl",
+        "https://mt3.google.com/vt/lyrs=y&hl=$hl"
     )
 ) {
     override fun getTileURLString(pMapTileIndex: Long): String {
@@ -378,6 +384,7 @@ private val GOOGLE_SATELLITE_TILE_SOURCE = object : OnlineTileSourceBase(
         val x = MapTileIndex.getX(pMapTileIndex)
         val y = MapTileIndex.getY(pMapTileIndex)
         return getBaseUrl() + "&x=" + x + "&y=" + y + "&z=" + zoom
+    }
     }
 }
 
@@ -611,11 +618,10 @@ fun MapViewContainer(
                         iconSize = 28.dp
                     )
                 },
-                title = "Forcer l'affichage ?",
-                body = "Afficher tous les tracés à ce niveau de zoom peut ralentir la carte, " +
-                    "vider la batterie plus vite et faire chauffer le téléphone.",
-                dismissLabel = "Annuler",
-                confirmLabel = "Forcer quand même",
+                title = stringResource(R.string.zoom_force_title),
+                body = stringResource(R.string.zoom_force_body),
+                dismissLabel = stringResource(R.string.common_cancel),
+                confirmLabel = stringResource(R.string.zoom_force_confirm),
                 confirmContainerColor = MaterialTheme.colorScheme.tertiary,
                 confirmContentColor = MaterialTheme.colorScheme.onTertiary,
                 confirmTestTag = "confirm_bypass_zoom_button",
@@ -636,15 +642,15 @@ fun MapViewContainer(
             when {
                 bypassZoomThreshold -> MapPill(
                     icon = Icons.Rounded.Visibility,
-                    text = "Tracés affichés",
-                    actionLabel = "Masquer",
+                    text = stringResource(R.string.zoom_tracks_shown),
+                    actionLabel = stringResource(R.string.zoom_hide),
                     onClick = { onBypassZoomThresholdChanged(false) },
                     testTag = "hide_zoom_button",
                     modifier = bannerModifier
                 )
                 bannerCollapsed -> MapPill(
                     icon = Icons.Rounded.VisibilityOff,
-                    text = "Tracés masqués",
+                    text = stringResource(R.string.zoom_tracks_hidden),
                     actionLabel = null,
                     onClick = { bannerCollapsed = false },
                     testTag = "zoom_banner_pill",
@@ -957,7 +963,7 @@ private fun drawMarkers(map: MapView, state: MapState) {
         val startPoint = geoPoints.first()
         val startMarker = Marker(map).apply {
             position = startPoint
-            title = "Départ"
+            title = map.context.getString(R.string.marker_start)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = markerIcon(map.context, state, colors?.start ?: Color.parseColor("#1F6A4F"), 20f)
         }
@@ -970,7 +976,7 @@ private fun drawMarkers(map: MapView, state: MapState) {
             } else {
                 lastPoint
             }
-            title = if (state.isCurrentTracking) "Position actuelle" else "Arrivée"
+            title = map.context.getString(if (state.isCurrentTracking) R.string.marker_current else R.string.marker_end)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = if (state.isCurrentTracking) {
                 blueDotIcon(map.context, state)
@@ -983,7 +989,7 @@ private fun drawMarkers(map: MapView, state: MapState) {
         val currentPoint = GeoPoint(state.currentUserLocation!!.latitude, state.currentUserLocation!!.longitude)
         val currentMarker = Marker(map).apply {
             position = currentPoint
-            title = "Ma position"
+            title = map.context.getString(R.string.marker_me)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = blueDotIcon(map.context, state)
         }
@@ -1269,14 +1275,14 @@ private fun HeavyTracksBanner(onForce: () -> Unit, onDismiss: () -> Unit, modifi
             Icon(Icons.Rounded.VisibilityOff, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(24.dp))
             Column {
                 Text(
-                    "Tracés masqués à ce niveau de zoom",
+                    stringResource(R.string.zoom_banner_title),
                     fontSize = 15.sp,
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.onTertiaryContainer
                 )
                 Text(
-                    "Les tracés très détaillés ralentiraient la carte. Rapprochez-vous pour les revoir.",
+                    stringResource(R.string.zoom_banner_body),
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     color = colors.onTertiaryContainer,
@@ -1295,7 +1301,7 @@ private fun HeavyTracksBanner(onForce: () -> Unit, onDismiss: () -> Unit, modifi
                     .padding(horizontal = 16.dp)
                     .testTag("bypass_zoom_button")
             ) {
-                Text("Forcer l'affichage", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiary)
+                Text(stringResource(R.string.zoom_force_display), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiary)
             }
             Box(
                 contentAlignment = Alignment.Center,
@@ -1307,7 +1313,7 @@ private fun HeavyTracksBanner(onForce: () -> Unit, onDismiss: () -> Unit, modifi
                     .padding(horizontal = 14.dp)
                     .testTag("dismiss_zoom_banner_button")
             ) {
-                Text("Laisser masqués", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiaryContainer)
+                Text(stringResource(R.string.zoom_keep_hidden), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onTertiaryContainer)
             }
         }
     }

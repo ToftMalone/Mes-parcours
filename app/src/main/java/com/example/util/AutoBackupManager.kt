@@ -1,5 +1,6 @@
 package com.example.util
 
+import com.example.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -85,7 +86,7 @@ object AutoBackupManager {
 
                 if (localSuccess) {
                     val formatsStr = formatsList.joinToString(", ")
-                    val summaryMsg = "Sauvegarde auto : $formatsStr → Stockage local"
+                    val summaryMsg = context.getString(R.string.autobackup_summary, formatsStr)
                     Log.d(TAG, summaryMsg)
 
                     withContext(Dispatchers.Main) {
@@ -124,17 +125,17 @@ object AutoBackupManager {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
-                    "Sauvegarde automatique",
+                    context.getString(R.string.autobackup_channel_name),
                     NotificationManager.IMPORTANCE_LOW
                 ).apply {
-                    description = "Notifications de confirmation de sauvegarde automatique"
+                    description = context.getString(R.string.autobackup_channel_description)
                 }
                 notificationManager.createNotificationChannel(channel)
             }
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_save)
-                .setContentTitle("Sauvegarde automatique réussie")
+                .setContentTitle(context.getString(R.string.autobackup_done_title))
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setAutoCancel(true)

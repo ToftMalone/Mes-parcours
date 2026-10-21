@@ -16,6 +16,8 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.example.BuildConfig
 import com.example.MainActivity
+import com.example.R
+import com.example.data.model.GpsStatus
 import com.example.data.model.LiveStats
 import com.example.data.model.TrackPoint
 import com.example.data.repository.TrackRepository
@@ -231,7 +233,7 @@ class TrackingService : Service() {
 
         when (intent.action) {
             ACTION_START -> {
-                val name = intent.getStringExtra(EXTRA_TRACK_NAME) ?: "Parcours sans titre"
+                val name = intent.getStringExtra(EXTRA_TRACK_NAME) ?: getString(R.string.track_untitled)
                 val activityType = intent.getStringExtra(EXTRA_ACTIVITY_TYPE) ?: "Randonnée"
                 val existingTrackId = intent.getLongExtra(EXTRA_TRACK_ID, -1L)
                 
@@ -474,7 +476,7 @@ class TrackingService : Service() {
         // aux accumulateurs que le traitement des points fait vivre.
         pointScope.launch {
             if (trackId <= 0) {
-                attachToOrRestoreActiveTrack("Parcours sans titre", "Randonnée")
+                attachToOrRestoreActiveTrack(getString(R.string.track_untitled), "Randonnée")
             }
             withContext(Dispatchers.Main) { applyState() }
         }
@@ -520,7 +522,7 @@ class TrackingService : Service() {
             if (BuildConfig.DEBUG) {
                 if (simulationJob?.isActive != true) startGPSCoordinateSimulation()
             } else {
-                repository.updateGpsStatus("Localisation désactivée")
+                repository.updateGpsStatus(GpsStatus.DISABLED)
             }
             return
         }
@@ -640,7 +642,7 @@ class TrackingService : Service() {
                     timestamp = location.time,
                     isDiscontinuous = false
                 )
-                repository.updateGpsStatus("Signal trouvé")
+                repository.updateGpsStatus(GpsStatus.FOUND)
                 repository.updateGpsAccuracy(location.accuracy)
                 repository.updateUserLocation(point)
 
@@ -697,7 +699,7 @@ class TrackingService : Service() {
             repository.insertPoint(point)
 
             // Also update shared GPS/location stats in repository so UI updates in real-time
-            repository.updateGpsStatus("Signal trouvé")
+            repository.updateGpsStatus(GpsStatus.FOUND)
             repository.updateGpsAccuracy(location.accuracy)
             repository.updateUserLocation(point)
 
@@ -763,8 +765,8 @@ class TrackingService : Service() {
             String.format("%02d:%02d", minutes, seconds)
         }
 
-        val pausePrefix = if (isPaused) "En pause · " else ""
-        val notificationString = "${pausePrefix}Distance: $formattedKm | Temps: $formattedTime"
+        val pausePrefix = if (isPaused) getString(R.string.notif_paused_prefix) else ""
+        val notificationString = pausePrefix + getString(R.string.notif_stats, formattedKm, formattedTime)
 
         // Le minuteur et l'arrivée d'un point GPS appellent tous deux cette fonction,
         // chacun à environ une fois par seconde : la moitié des mises à jour
@@ -829,7 +831,7 @@ class TrackingService : Service() {
     }
 
     private fun startForegroundServiceNotification() {
-        val notification = buildNotification("Enregistrement démarré...")
+        val notification = buildNotification(getString(R.string.notif_recording_starting))
         
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -882,7 +884,7 @@ class TrackingService : Service() {
         )
 
         NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Mes parcours : Enregistrement actif")
+            .setContentTitle(getString(R.string.notif_recording_title))
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -892,7 +894,7 @@ class TrackingService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Arrêter l'enregistrement",
+                getString(R.string.notif_stop_action),
                 stopPendingIntent
             )
             .setOnlyAlertOnce(true)
@@ -908,10 +910,10 @@ class TrackingService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "Mes parcours : Service GPS",
+                getString(R.string.notif_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Notification persistante de suivi de trajet GPS"
+                description = getString(R.string.notif_channel_description)
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)

@@ -1,5 +1,7 @@
 package com.example.ui.component
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,11 +54,12 @@ import androidx.compose.ui.unit.sp
 import com.example.util.TrackStylePreferences
 import java.util.Locale
 
-/** "3,5" plutôt que "3.5" ; et "6" plutôt que "6,0". */
+/** "3,5" plutôt que "3.5" (séparateur de la langue) ; et "6" plutôt que "6,0". */
 private fun formatThicknessDp(value: Float): String {
     val rounded = Math.round(value * 10) / 10f
     return if (rounded % 1f == 0f) rounded.toInt().toString()
-    else String.format(Locale.US, "%.1f", rounded).replace('.', ',')
+    else String.format(Locale.US, "%.1f", rounded)
+        .replace('.', java.text.DecimalFormatSymbols.getInstance().decimalSeparator)
 }
 
 /** Pas du bouton « − / + » : un demi-dp, la plus petite différence visible. */
@@ -88,7 +91,7 @@ fun TrackThicknessControl(value: Float, onValueChange: (Float) -> Unit, modifier
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Épaisseur du trait", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.thickness_title), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -98,7 +101,7 @@ fun TrackThicknessControl(value: Float, onValueChange: (Float) -> Unit, modifier
                     .background(colors.surfaceContainerHigh)
                     .padding(horizontal = 4.dp)
             ) {
-                StepperButton(Icons.Rounded.Remove, "Affiner", "track_thickness_minus") {
+                StepperButton(Icons.Rounded.Remove, stringResource(R.string.thickness_thinner), "track_thickness_minus") {
                     onValueChange(clamp(value - THICKNESS_STEP_DP))
                 }
                 BasicTextField(
@@ -130,7 +133,7 @@ fun TrackThicknessControl(value: Float, onValueChange: (Float) -> Unit, modifier
                         .testTag("track_thickness_field")
                 )
                 Text("dp", fontSize = 12.sp, color = colors.onSurfaceVariant)
-                StepperButton(Icons.Rounded.Add, "Épaissir", "track_thickness_plus") {
+                StepperButton(Icons.Rounded.Add, stringResource(R.string.thickness_thicker), "track_thickness_plus") {
                     onValueChange(clamp(value + THICKNESS_STEP_DP))
                 }
             }

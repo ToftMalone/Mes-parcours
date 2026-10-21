@@ -1,5 +1,8 @@
 package com.example.ui.screen
 
+import androidx.annotation.StringRes
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
@@ -99,10 +102,10 @@ import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.delay
 
 /** Les trois catégories de l'historique, qui ne se recouvrent pas. */
-private enum class HistoryCategory(val label: String) {
-    RECORDED("Enregistrés"),
-    IMPORTED("Importés"),
-    MERGED("Fusionnés")
+private enum class HistoryCategory(@StringRes val labelRes: Int) {
+    RECORDED(R.string.history_recorded),
+    IMPORTED(R.string.history_imported),
+    MERGED(R.string.history_merged)
 }
 
 @Composable
@@ -140,7 +143,7 @@ fun HistoryTab(
                 context = context,
                 uri = it,
                 onSuccess = { trackId ->
-                    messenger.show("Parcours importé.", Icons.Rounded.TaskAlt)
+                    messenger.show(context.getString(R.string.track_imported_toast), Icons.Rounded.TaskAlt)
                     viewModel.selectTrack(trackId)
                     onNavigateToDetails(trackId)
                 },
@@ -172,7 +175,7 @@ fun HistoryTab(
             refusedTrackId = track.id
         } else {
             viewModel.resumeTrack(context, track.id) {
-                messenger.show("Reprise de « ${track.name} »", Icons.Rounded.Polyline)
+                messenger.show(context.getString(R.string.recording_resumed, track.name), Icons.Rounded.Polyline)
                 onResumeTrack(track.id)
             }
         }
@@ -186,7 +189,7 @@ fun HistoryTab(
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(contentPadding.calculateTopPadding()))
             Text(
-                text = "Historique",
+                text = stringResource(R.string.history_title),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(start = 20.dp, top = 20.dp)
@@ -201,7 +204,9 @@ fun HistoryTab(
             ) {
                 HistoryCategory.entries.forEach { category ->
                     CategoryChip(
-                        label = category.label,
+                        // Identifiant stable : le libellé change avec la langue.
+                        tag = category.name,
+                        label = stringResource(category.labelRes),
                         count = byCategory.getValue(category).size,
                         selected = category == selectedCategory,
                         onClick = { selectedCategory = category },
@@ -307,8 +312,8 @@ fun HistoryTab(
             onConfirm = {
                 deleteTrackId = null
                 viewModel.deleteTrack(track.id) { deleted ->
-                    if (deleted) messenger.show("Parcours supprimé.", Icons.Rounded.Delete)
-                    else messenger.show(RECORDING_DELETE_REFUSED, Icons.Rounded.Error, isError = true)
+                    if (deleted) messenger.show(context.getString(R.string.track_deleted_toast), Icons.Rounded.Delete)
+                    else messenger.show(context.getString(R.string.delete_refused_recording), Icons.Rounded.Error, isError = true)
                 }
             }
         )
@@ -404,6 +409,7 @@ private fun trackDisplayColor(track: Track): Int =
  */
 @Composable
 private fun CategoryChip(
+    tag: String,
     label: String,
     count: Int,
     selected: Boolean,
@@ -422,7 +428,7 @@ private fun CategoryChip(
             .clip(RoundedCornerShape(radius))
             .background(container)
             .clickable(onClick = onClick)
-            .testTag("history_category_$label")
+            .testTag("history_category_$tag")
     ) {
         Text(
             text = label,
@@ -509,7 +515,7 @@ fun TrackHistoryCard(
                 // Un parcours qui porte encore la couleur de son fichier le dit : c'est
                 // la seule origine possible d'une couleur de fichier ici.
                 if (track.sourceColor != null && track.displayColor == null) {
-                    OutlinedTag("Google Earth")
+                    OutlinedTag(stringResource(R.string.tag_google_earth))
                 }
             }
             Text(
@@ -544,7 +550,7 @@ fun TrackHistoryCard(
         ) {
             Icon(
                 imageVector = if (isSelectedForMap) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                contentDescription = if (isSelectedForMap) "Masquer de la carte" else "Afficher sur la carte",
+                contentDescription = stringResource(if (isSelectedForMap) R.string.track_hide_from_map else R.string.track_show_on_map),
                 tint = if (isSelectedForMap) colors.onPrimaryContainer else colors.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )
@@ -561,7 +567,7 @@ fun TrackHistoryCard(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "Actions",
+                    contentDescription = stringResource(R.string.track_actions),
                     tint = colors.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
@@ -571,9 +577,10 @@ fun TrackHistoryCard(
 }
 
 /** Date, ou provenance pour un parcours importé ou fusionné. */
+@Composable
 private fun trackSubtitle(track: Track): String = when {
-    track.isMerged -> "Fusionné · " + FormatUtils.formatShortDate(track.startTime)
-    track.isImported -> "Importé · " + FormatUtils.formatShortDate(track.startTime)
+    track.isMerged -> stringResource(R.string.track_subtitle_merged, FormatUtils.formatShortDate(track.startTime))
+    track.isImported -> stringResource(R.string.track_subtitle_imported, FormatUtils.formatShortDate(track.startTime))
     else -> FormatUtils.formatDayDate(track.startTime)
 }
 
@@ -628,7 +635,7 @@ private fun ImportFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 .padding(start = 18.dp, end = 22.dp)
         ) {
             Icon(Icons.Rounded.UploadFile, contentDescription = null, modifier = Modifier.size(24.dp))
-            Text("Importer GPX / KML", style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp))
+            Text(stringResource(R.string.history_import_fab), style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp))
         }
     }
 }
@@ -654,21 +661,21 @@ private fun CategoryEmptyState(
     val e = when (category) {
         HistoryCategory.RECORDED -> Empty(
             Icons.Rounded.Hiking, colors.primaryContainer, colors.onPrimaryContainer, CookieShape,
-            "Votre première sortie vous attend",
-            "Lancez un enregistrement : distance, vitesse et dénivelé s'afficheront ici dès votre retour.",
-            "Démarrer un enregistrement", Icons.Rounded.RadioButtonChecked
+            stringResource(R.string.empty_recorded_title),
+            stringResource(R.string.empty_recorded_body),
+            stringResource(R.string.empty_recorded_button), Icons.Rounded.RadioButtonChecked
         )
         HistoryCategory.IMPORTED -> Empty(
             Icons.Rounded.UploadFile, colors.tertiaryContainer, colors.onTertiaryContainer, SunShape,
-            "Rien d'importé pour l'instant",
-            "Ajoutez des fichiers GPX ou KML : anciennes sorties, traces partagées ou dessinées dans Google Earth.",
-            "Importer un fichier", Icons.Rounded.UploadFile
+            stringResource(R.string.empty_imported_title),
+            stringResource(R.string.empty_imported_body),
+            stringResource(R.string.empty_imported_button), Icons.Rounded.UploadFile
         )
         HistoryCategory.MERGED -> Empty(
             Icons.Rounded.Merge, colors.secondaryContainer, colors.onSecondaryContainer, RoundedCornerShape(44.dp),
-            "Aucune fusion",
-            "Réunissez plusieurs sorties, par exemple les étapes d'un week-end, en un seul parcours.",
-            "Ouvrir les outils", Icons.Rounded.Handyman
+            stringResource(R.string.empty_merged_title),
+            stringResource(R.string.empty_merged_body),
+            stringResource(R.string.empty_merged_button), Icons.Rounded.Handyman
         )
     }
     Column(
@@ -725,9 +732,6 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
 
 // ------------------------------------------------------------------ Feuilles
 
-/** Refus de supprimer le parcours en cours, partagé avec la fiche détail. */
-internal const val RECORDING_DELETE_REFUSED = "Arrête l'enregistrement avant de supprimer ce parcours."
-
 /** Feuille d'actions d'un parcours : carte, couleur, reprise, suppression. */
 @Composable
 private fun TrackActionsSheet(
@@ -761,10 +765,10 @@ private fun TrackActionsSheet(
             verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier.clip(RoundedCornerShape(24.dp))
         ) {
-            SheetRow(Icons.Rounded.Visibility, "Afficher sur la carte", onClick = onToggleMap, testTag = "action_toggle_map") {
+            SheetRow(Icons.Rounded.Visibility, stringResource(R.string.sheet_show_on_map), onClick = onToggleMap, testTag = "action_toggle_map") {
                 MpSwitch(checked = track.isSelectedForMap, onCheckedChange = { onToggleMap() })
             }
-            SheetRow(Icons.Rounded.Palette, "Changer la couleur", onClick = onChangeColor, testTag = "action_change_color") {
+            SheetRow(Icons.Rounded.Palette, stringResource(R.string.sheet_change_color), onClick = onChangeColor, testTag = "action_change_color") {
                 Box(
                     modifier = Modifier
                         .size(24.dp)
@@ -772,10 +776,10 @@ private fun TrackActionsSheet(
                         .background(trackColor)
                 )
             }
-            SheetRow(Icons.Rounded.Polyline, "Reprendre la trace", onClick = onResume, testTag = "resume_track_card_button_${track.id}")
+            SheetRow(Icons.Rounded.Polyline, stringResource(R.string.sheet_resume_track), onClick = onResume, testTag = "resume_track_card_button_${track.id}")
             if (onDelete != null) {
                 SheetRow(
-                    Icons.Rounded.Delete, "Supprimer", onClick = onDelete,
+                    Icons.Rounded.Delete, stringResource(R.string.common_delete), onClick = onDelete,
                     color = MaterialTheme.colorScheme.error,
                     testTag = "delete_track_button_${track.id}"
                 )
@@ -843,7 +847,7 @@ private fun TrackColorSheet(
     val previewColor = if (keepFileColor) track.sourceColor ?: pending else pending
 
     MpSheet(onDismissRequest = onDismiss) {
-        SheetHeader("Apparence du tracé", track.name)
+        SheetHeader(stringResource(R.string.style_title), track.name)
         Spacer(modifier = Modifier.height(14.dp))
         TrackColorPreview(color = Color(previewColor), widthDp = pendingWidth)
 
@@ -862,9 +866,9 @@ private fun TrackColorSheet(
             ) {
                 Icon(Icons.Rounded.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Garder la couleur Google Earth", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.style_keep_file_color), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Définie dans le fichier KML d'origine",
+                        stringResource(R.string.style_file_color_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -904,9 +908,9 @@ private fun TrackColorSheet(
 
         Spacer(modifier = Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-            MpTextButton("Annuler", onDismiss)
+            MpTextButton(stringResource(R.string.common_cancel), onDismiss)
             MpFilledButton(
-                text = "Appliquer",
+                text = stringResource(R.string.common_apply),
                 onClick = { onApply(if (keepFileColor) null else pending, pendingWidth) },
                 modifier = Modifier.testTag("color_apply_button")
             )
@@ -935,7 +939,7 @@ private fun ColorSwatch(
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         if (selected) {
-            Icon(Icons.Rounded.Check, contentDescription = "Couleur choisie", tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.style_color_chosen), tint = Color.White, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -979,10 +983,10 @@ fun DeleteTrackDialog(trackName: String, onDismiss: () -> Unit, onConfirm: () ->
                 shape = RoundedCornerShape(22.dp)
             )
         },
-        title = "Supprimer ce parcours ?",
-        body = "« $trackName » sera effacé définitivement de votre téléphone. Cette action est irréversible.",
-        dismissLabel = "Annuler",
-        confirmLabel = "Supprimer",
+        title = stringResource(R.string.delete_dialog_title),
+        body = stringResource(R.string.delete_dialog_body, trackName),
+        dismissLabel = stringResource(R.string.common_cancel),
+        confirmLabel = stringResource(R.string.common_delete),
         onConfirm = onConfirm,
         confirmContainerColor = MaterialTheme.colorScheme.error,
         confirmContentColor = MaterialTheme.colorScheme.onError,
@@ -1003,10 +1007,10 @@ fun ResumeRefusedDialog(trackName: String, onDismiss: () -> Unit, onOpenRecordin
                 shape = CircleShape
             )
         },
-        title = "Un enregistrement est en cours",
-        body = "Arrêtez-le avant de reprendre « $trackName ». On ne peut enregistrer qu'une trace à la fois.",
-        dismissLabel = "OK",
-        confirmLabel = "Voir l'enregistrement",
+        title = stringResource(R.string.resume_refused_title),
+        body = stringResource(R.string.resume_refused_body, trackName),
+        dismissLabel = stringResource(R.string.common_ok),
+        confirmLabel = stringResource(R.string.resume_refused_confirm),
         onConfirm = onOpenRecording
     )
 }

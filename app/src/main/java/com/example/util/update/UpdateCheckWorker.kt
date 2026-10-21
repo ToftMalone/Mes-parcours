@@ -1,5 +1,6 @@
 package com.example.util.update
 
+import com.example.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -59,10 +60,10 @@ class UpdateCheckWorker(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Mises à jour disponibles",
+                applicationContext.getString(R.string.update_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Signale une nouvelle version de Mes parcours à installer"
+                description = applicationContext.getString(R.string.update_channel_description)
             }
             manager.createNotificationChannel(channel)
         }
@@ -79,8 +80,8 @@ class UpdateCheckWorker(
 
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("Mise à jour disponible")
-            .setContentText("La version ${update.versionName} de Mes parcours est prête à être installée.")
+            .setContentTitle(applicationContext.getString(R.string.update_available_title))
+            .setContentText(applicationContext.getString(R.string.update_notification_text, update.versionName))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

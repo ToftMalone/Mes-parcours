@@ -1,5 +1,7 @@
 package com.example.ui.screen
 
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -52,6 +54,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.example.BuildConfig
+import com.example.data.model.GpsStatus
 import com.example.data.model.TrackPoint
 import com.example.util.EnvironmentUtils
 
@@ -225,7 +228,7 @@ fun MainScreen(
                     // sur un vrai appareil. En version publiée, l'utilisateur y verrait
                     // sa position remplacée par une position inventée.
                     if (BuildConfig.DEBUG && (EnvironmentUtils.isEmulatorOrCloud(context) || hasNoProvider)) {
-                        viewModel.updateGpsStatus("Simulation GPS")
+                        viewModel.updateGpsStatus(GpsStatus.SIMULATION)
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
                             var simLat = 48.8566
                             var simLng = 2.3522
@@ -257,7 +260,7 @@ fun MainScreen(
                     // Aucun fournisseur actif : on le signale, plutôt que d'afficher
                     // une position que l'appareil n'a pas.
                     if (hasNoProvider) {
-                        viewModel.updateGpsStatus("Localisation désactivée")
+                        viewModel.updateGpsStatus(GpsStatus.DISABLED)
                         return@LifecycleEventObserver
                     }
 
@@ -274,7 +277,7 @@ fun MainScreen(
                         override fun onLocationResult(locationResult: LocationResult) {
                             val location = locationResult.lastLocation
                             if (location != null) {
-                                viewModel.updateGpsStatus("Signal trouvé")
+                                viewModel.updateGpsStatus(GpsStatus.FOUND)
                                 viewModel.updateGpsAccuracy(location.accuracy)
                                 val locPoint = TrackPoint(
                                     trackId = -1,
@@ -297,7 +300,7 @@ fun MainScreen(
                                     }
                                 }
                             } else {
-                                viewModel.updateGpsStatus("Recherche de signal...")
+                                viewModel.updateGpsStatus(GpsStatus.SEARCHING)
                             }
                         }
                     }
@@ -541,12 +544,10 @@ fun MainScreen(
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 },
-                title = "Enregistrer écran éteint",
-                body = "Pour que l'enregistrement continue quand l'écran est éteint ou que " +
-                    "vous changez d'app, choisissez « Autoriser tout le temps » dans les " +
-                    "réglages de localisation.",
-                dismissLabel = "Plus tard",
-                confirmLabel = "Autoriser",
+                title = stringResource(R.string.bg_rationale_title),
+                body = stringResource(R.string.bg_rationale_body),
+                dismissLabel = stringResource(R.string.common_later),
+                confirmLabel = stringResource(R.string.common_allow),
                 onConfirm = {
                     showBackgroundRationaleDialog = false
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
