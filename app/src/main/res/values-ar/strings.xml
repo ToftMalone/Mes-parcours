@@ -336,4 +336,6 @@
     <string name="rel_1_1_a">تحميل الخريطة أسرع بكثير، خاصة في عرض الأقمار الصناعية</string>
     <string name="rel_1_1_b">تمت إزالة أداة التحويل إلى CSV</string>
     <string name="rel_1_0_a">أول إصدار مستقر</string>
+    <string name="rel_2_1_0_a">يتبع التطبيق الآن لغة الهاتف، بـ 11 لغة</string>
+    <string name="rel_2_1_0_b">تظهر ملاحظات الإصدار بلغتك</string>
 </resources>

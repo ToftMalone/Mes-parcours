@@ -13,7 +13,7 @@ stays on the device.
   `ExampleRobolectricTest`). Formerly "Sillage". The name is a brand: it is not translated.
 - `applicationId`: `com.toche.mesparcours` — Kotlin `namespace`: `com.example`
 - License: GPL-3.0 (`LICENSE`, the full official text of the Free Software Foundation).
-- Current version: `2.0.3` (`versionCode` 42). It is written only once, in
+- Current version: `2.1.0` (`versionCode` 43). It is written only once, in
   `app/build.gradle.kts`; the "About" screen reads it through `BuildConfig.VERSION_NAME`.
   The `-thierry` suffix was dropped from `0.9.15` on.
 - **Changelog ("What's new")**: the `RELEASES` list in `SettingsTab.kt`. Each entry lists

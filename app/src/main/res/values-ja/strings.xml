@@ -336,4 +336,6 @@
     <string name="rel_1_1_a">地図の読み込みが大幅に高速化（特に衛星表示）</string>
     <string name="rel_1_1_b">CSV 変換ツールを削除</string>
     <string name="rel_1_0_a">最初の安定版</string>
+    <string name="rel_2_1_0_a">アプリがスマートフォンの言語に合わせて表示されます（11 言語対応）</string>
+    <string name="rel_2_1_0_b">リリースノートが使用中の言語で表示されます</string>
 </resources>

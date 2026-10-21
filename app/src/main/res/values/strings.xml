@@ -337,4 +337,6 @@
     <string name="rel_1_1_a">Map loading is much faster, especially in satellite view</string>
     <string name="rel_1_1_b">The CSV conversion tool has been removed</string>
     <string name="rel_1_0_a">First stable release</string>
+    <string name="rel_2_1_0_a">The app now follows your phone\'s language, in 11 languages</string>
+    <string name="rel_2_1_0_b">Release notes are shown in your language</string>
 </resources>

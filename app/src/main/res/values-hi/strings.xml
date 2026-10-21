@@ -336,4 +336,6 @@
     <string name="rel_1_1_a">नक्शा काफ़ी तेज़ी से लोड होता है, खासकर सैटेलाइट व्यू में</string>
     <string name="rel_1_1_b">CSV रूपांतरण टूल हटा दिया गया</string>
     <string name="rel_1_0_a">पहला स्थिर संस्करण</string>
+    <string name="rel_2_1_0_a">ऐप अब फ़ोन की भाषा के अनुसार चलता है, 11 भाषाओं में</string>
+    <string name="rel_2_1_0_b">संस्करण के नोट्स आपकी भाषा में दिखते हैं</string>
 </resources>

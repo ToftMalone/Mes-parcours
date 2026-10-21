@@ -336,4 +336,6 @@
     <string name="rel_1_1_a">Carregamento do mapa bem mais rápido, principalmente na vista de satélite</string>
     <string name="rel_1_1_b">A ferramenta de conversão para CSV foi removida</string>
     <string name="rel_1_0_a">Primeira versão estável</string>
+    <string name="rel_2_1_0_a">O aplicativo agora segue o idioma do celular, em 11 idiomas</string>
+    <string name="rel_2_1_0_b">As notas de versão aparecem no seu idioma</string>
 </resources>

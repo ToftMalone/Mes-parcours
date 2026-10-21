@@ -336,4 +336,6 @@
     <string name="rel_1_1_a">地图加载明显更快，卫星视图尤其明显</string>
     <string name="rel_1_1_b">已移除 CSV 转换工具</string>
     <string name="rel_1_0_a">首个稳定版本</string>
+    <string name="rel_2_1_0_a">应用现在跟随手机语言，支持 11 种语言</string>
+    <string name="rel_2_1_0_b">版本说明以你的语言显示</string>
 </resources>

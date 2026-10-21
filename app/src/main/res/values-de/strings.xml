@@ -336,4 +336,6 @@
     <string name="rel_1_1_a">Deutlich schnelleres Laden der Karte, besonders in der Satellitenansicht</string>
     <string name="rel_1_1_b">Das CSV-Konvertierungswerkzeug wurde entfernt</string>
     <string name="rel_1_0_a">Erste stabile Version</string>
+    <string name="rel_2_1_0_a">Die App folgt jetzt der Sprache des Handys, in 11 Sprachen</string>
+    <string name="rel_2_1_0_b">Versionshinweise werden in deiner Sprache angezeigt</string>
 </resources>
