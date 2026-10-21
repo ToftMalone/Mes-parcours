@@ -1,11 +1,11 @@
 package com.example.data.model
 
 /**
- * Effectif et emprise géographique des points d'une trace.
+ * Count and geographic extent of a track's points.
  *
- * Sert à calibrer l'affichage par fenêtre de vue sans jamais charger la trace
- * entière. Les champs sont nullables car les agrégats SQL valent NULL pour une
- * trace sans aucun point.
+ * Used to calibrate the viewport-based display without ever loading the whole
+ * track. The fields are nullable because SQL aggregates are NULL for a
+ * track with no points at all.
  */
 data class TrackPointMeta(
     val minId: Long?,

@@ -1,40 +1,41 @@
 # Mes parcours
 
-Traqueur GPS Android privé pour activités de plein air : enregistrement de parcours,
-carte OSM, statistiques en direct, import/export GPX & KML, fusion de parcours.
+Private Android GPS tracker for outdoor activities: track recording, OSM map, live
+statistics, GPX & KML import/export, track merging.
 
-Application personnelle (dédiée « à mon père Thierry »), sans compte ni serveur :
-toutes les données restent sur l'appareil.
+Personal app (dedicated "to my father Thierry"), with no account and no server: all data
+stays on the device.
 
-- Nom affiché : « Mes parcours » (`app_name` dans `res/values/strings.xml`, garde-fou
-  dans `ExampleRobolectricTest`). Anciennement « Sillage ».
-- `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
-- Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `2.0.3` (`versionCode` 42). Elle n'est écrite qu'une fois,
-  dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
-  Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
-- **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
-  - Jusqu'à la `1.0` **exclue** : une seule entrée, celle de la version
-    courante, dont on remplace le contenu à chaque version. Les versions de
-    développement se succèdent trop vite pour qu'un historique serve.
-  - À partir de la `1.0` : **ajouter** une entrée en tête au lieu de
-    remplacer. L'affichage sait déjà présenter plusieurs versions, séparateurs et
-    pastille « actuelle » compris — vérifié en publiant la 1.0 elle-même, qui reste
-    pour l'instant l'entrée unique : la bascule en ajout ne se voit qu'à la
-    prochaine version.
-  - La mention « actuelle » se déduit de `BuildConfig.VERSION_NAME` et ne s'affiche
-    qu'à partir de deux entrées ; elle n'est jamais à déplacer à la main.
-- Le projet est né d'un échafaudage Google AI Studio, entièrement retiré depuis
-  (métadonnées, plugin `secrets`, `GEMINI_API_KEY`, BOM Firebase, README d'origine,
-  ancien `applicationId`). Voir « Identifiant de paquet » plus bas.
+- **The repository is in English**: code, comments, tests, workflows, documentation and
+  release notes. The *app* is translated into several languages and follows the phone's
+  language — see "Interface languages". Commit messages are in English too.
+- Displayed name: "Mes parcours" (`app_name` in `res/values/strings.xml`, guarded in
+  `ExampleRobolectricTest`). Formerly "Sillage". The name is a brand: it is not translated.
+- `applicationId`: `com.toche.mesparcours` — Kotlin `namespace`: `com.example`
+- License: GPL-3.0 (`LICENSE`, the full official text of the Free Software Foundation).
+- Current version: `2.0.3` (`versionCode` 42). It is written only once, in
+  `app/build.gradle.kts`; the "About" screen reads it through `BuildConfig.VERSION_NAME`.
+  The `-thierry` suffix was dropped from `0.9.15` on.
+- **Changelog ("What's new")**: the `RELEASES` list in `SettingsTab.kt`. Each entry lists
+  string resources (`rel_<version>_<letter>`), translated in every language.
+  - Up to `1.0` **excluded**: a single entry, that of the current version, whose content
+    was replaced at each version. Development versions followed one another too fast for
+    a history to be useful.
+  - From `1.0`: **add** an entry at the top instead of replacing. The display already
+    knows how to present several versions, separators and "current" chip included.
+  - The "current" mention is deduced from `BuildConfig.VERSION_NAME` and only shows from
+    two entries on; it is never to be moved by hand.
+- The project was born from a Google AI Studio scaffold, entirely removed since (metadata,
+  `secrets` plugin, `GEMINI_API_KEY`, Firebase BOM, original README, former
+  `applicationId`). See "Frozen identity" below.
 
-## Pile technique
+## Technical stack
 
-Kotlin 2.2.10 · Jetpack Compose + Material 3 (palette fixe, voir « Refonte de l'interface ») ·
+Kotlin 2.2.10 · Jetpack Compose + Material 3 (fixed palette, see "Interface redesign") ·
 Room 2.7 (KSP) · osmdroid · play-services-location · AGP 9.1.1 · Java 11 ·
 minSdk 24 / targetSdk 36 / compileSdk 36.1
 
-## Commandes
+## Commands
 
 ```bash
 ./gradlew assembleDebug
@@ -44,1032 +45,961 @@ minSdk 24 / targetSdk 36 / compileSdk 36.1
 ./gradlew testDebugUnitTest
 ```
 
-Le SDK Android est indiqué par `local.properties` (non versionné). La variante
-`release` exige les variables d'environnement `KEYSTORE_PATH`, `STORE_PASSWORD` et
-`KEY_PASSWORD` ; la clé (`my-upload-key.jks`) n'est pas dans le dépôt.
+The Android SDK is indicated by `local.properties` (not versioned). The `release` variant
+requires the environment variables `KEYSTORE_PATH`, `STORE_PASSWORD` and `KEY_PASSWORD`;
+the key (`my-upload-key.jks`) is not in the repository.
 
-Sur Windows, préférer `.\gradlew.bat` ; `--offline` accélère nettement les
-itérations une fois les dépendances en cache.
+On Windows, prefer `.\gradlew.bat`; `--offline` speeds up iterations noticeably once the
+dependencies are cached.
 
-**Compiler depuis Claude Code sur le web.** Le workflow `debug-apk.yml` a été
-supprimé à la demande de l'auteur : l'APK de debug se compile désormais dans la
-session elle-même. Le SDK s'y installe quand `dl.google.com` est joignable (ce qui
-n'a pas toujours été le cas) : télécharger `commandlinetools-linux-*_latest.zip`,
-rendre `cmdline-tools/latest/bin/*` exécutable (`chmod -R +x`), accepter les licences,
-installer `platforms;android-36` et `build-tools;36.0.0`, écrire `sdk.dir=…` dans
-`local.properties` (ignoré par git), puis `./gradlew assembleDebug --no-daemon`.
-Maven Central répond parfois 429 : relancer avec une pause, Gradle garde en cache ce
-qu'il a déjà obtenu. Les publications restent faites par `release.yml`.
+**Building from Claude Code on the web.** The `debug-apk.yml` workflow was removed at the
+author's request: the debug APK is now built in the session itself. The SDK installs there
+when `dl.google.com` is reachable (which has not always been the case): download
+`commandlinetools-linux-*_latest.zip`, make `cmdline-tools/latest/bin/*` executable
+(`chmod -R +x`), accept the licenses, install `platforms;android-36` and
+`build-tools;36.0.0`, write `sdk.dir=…` in `local.properties` (ignored by git), then
+`./gradlew assembleDebug --no-daemon`. Maven Central sometimes answers 429: retry after a
+pause, Gradle keeps in cache what it already obtained. Releases are still made by
+`release.yml`. Lint cannot run in that environment (its own dependencies hit the same 429).
 
-Les APK versés sur `main` sous `app/build/outputs/apk/` ne sont donc plus mis à jour
-automatiquement : ils datent du dernier passage de l'ancien workflow (2.0.1).
+The APKs committed on `main` under `app/build/outputs/apk/` are therefore no longer updated
+automatically: they date from the last run of the old workflow (2.0.1). A debug build
+modifies that tracked file: copy the result elsewhere and `git checkout` the tracked copy.
 
-**Le build type `debug` porte son propre `applicationId`** (suffixe `.debug`, donc
-`com.toche.mesparcours.debug`) **et son propre `versionName`** (suffixe `-debug`,
-donc par exemple `0.9.16-debug`). Deux conséquences voulues :
+**The `debug` build type carries its own `applicationId`** (suffix `.debug`, i.e.
+`com.toche.mesparcours.debug`) **and its own `versionName`** (suffix `-debug`, for example
+`0.9.16-debug`). Two intended consequences:
 
-- Un APK de debug s'installe **à côté** de la version release, jamais par-dessus :
-  Android les traite comme deux applications distinctes. Plus besoin de désinstaller
-  la release pour essayer un debug, ni l'inverse.
-- L'écran « À propos » d'un APK de debug affiche sans ambiguïté qu'il n'est pas la
-  version release, même une fois installé.
+- A debug APK installs **next to** the release version, never over it: Android treats them
+  as two distinct apps. No more need to uninstall the release to try a debug, or the reverse.
+- The "About" screen of a debug APK says unambiguously that it is not the release
+  version, even once installed.
 
-**Attention à la clé de debug de l'APK produit en CI.** `debug.keystore` n'étant pas
-versionné, le runner n'en a pas et AGP en fabrique un neuf **à chaque exécution**.
-Deux APK de debug issus de deux exécutions ne portent donc pas la même signature, et
-aucun ne porte celle de la machine de l'auteur : les installer l'un par-dessus
-l'autre échoue avec « package signatures do not match », et il faut désinstaller —
-donc perdre les parcours enregistrés **du debug** (la release, application distincte,
-n'est jamais concernée). Un APK de CI sert à essayer une version, pas à mettre à jour
-une installation existante. Verser un `debug.keystore` fixe au dépôt lèverait la
-limite (une clé de debug n'est pas un secret), au prix de la règle actuelle qui le
-garde dehors.
+**Beware of the debug key of the APK produced in CI.** `debug.keystore` not being
+versioned, the runner has none and AGP makes up a new one **at each run**. Two debug APKs
+from two runs therefore do not carry the same signature, and neither carries the one of the
+author's machine: installing one over the other fails with "package signatures do not
+match", and one must uninstall — thus lose the recorded tracks **of the debug app** (the
+release, a distinct app, is never concerned). A CI APK serves to try a version, not to
+update an existing installation. Committing a fixed `debug.keystore` would lift the limit (a
+debug key is not a secret), at the price of the current rule that keeps it out.
 
-## Carte du code
+## Code map
 
 ```
-MainActivity ──> MainScreen ──> 4 onglets : TrackingTab · HistoryTab · ToolsTab · SettingsTab
-                     └────────> DetailView (recouvre les onglets quand un parcours est ouvert)
+MainActivity ──> MainScreen ──> 4 tabs: TrackingTab · HistoryTab · ToolsTab · SettingsTab
+                     └────────> DetailView (covers the tabs when a track is open)
 
-TrackViewModel (unique, créé par TrackViewModel.Factory)
+TrackViewModel (single, created by TrackViewModel.Factory)
      │
      ▼
-TrackRepository (singleton) ◄──── TrackingService (service de premier plan GPS)
-     │                       ◄──── BootReceiver (reprise après redémarrage/crash)
+TrackRepository (singleton) ◄──── TrackingService (GPS foreground service)
+     │                       ◄──── BootReceiver (resume after reboot/crash)
      ▼
-AppDatabase / TrackDao  ──  entités Track + TrackPoint
+AppDatabase / TrackDao  ──  entities Track + TrackPoint
 ```
 
-- `data/` — modèles, `TrackDao`, `AppDatabase`, `TrackRepository`
-- `service/TrackingService` — acquisition GPS, accumulateurs de statistiques, notification
-- `ui/component/MapViewContainer` — pont osmdroid ↔ Compose (le plus gros fichier)
+- `data/` — models, `TrackDao`, `AppDatabase`, `TrackRepository`
+- `service/TrackingService` — GPS acquisition, statistics accumulators, notification
+- `ui/component/MapViewContainer` — osmdroid ↔ Compose bridge (the biggest file)
 - `util/` — `Importer`, `Exporter`, `MediaStoreExporter`, `AutoBackupManager`,
   `SolarTimes`, `TunnelDetector`, `Altitude`, `ElevationAccumulator`, `FormatUtils`,
-  `KmlColor`, préférences de style
+  `KmlColor`, `UserFacing`, style preferences
 
-## Couleur d'un parcours
+## Color of a track
 
-**La couleur appartient au parcours, pas à la catégorie** (depuis la `0.13.0`). Elle
-est enregistrée dans `Track.displayColor` et se choisit en appuyant sur la pastille
-colorée du parcours, dans l'historique. Les trois couleurs par catégorie qui vivaient
-en préférences, l'appui long sur les onglets et l'interrupteur global « garder les
-couleurs des fichiers » ont tous disparu avec ce changement.
+**The color belongs to the track, not to the category** (since `0.13.0`). It is stored in
+`Track.displayColor` and chosen by tapping the track's colored chip, in the history. The
+three per-category colors that lived in preferences, the long press on tabs and the global
+"keep file colors" switch all disappeared with this change.
 
-`TrackStylePreferences.resolveTrackColor` est le seul endroit qui tranche, dans cet
-ordre :
+`TrackStylePreferences.resolveTrackColor` is the only place that decides, in this order:
 
-1. `displayColor` — le choix explicite de l'utilisateur pour ce parcours ;
-2. `sourceColor` — la couleur que portait son fichier ;
-3. la couleur par défaut de sa catégorie (`defaultColorFor`).
+1. `displayColor` — the user's explicit choice for this track;
+2. `sourceColor` — the color its file carried;
+3. the default color of its category (`defaultColorFor`).
 
-Le choix explicite passe **devant** la couleur du fichier, et c'est voulu : sans cela,
-choisir une couleur franche sur un KML coloré ne changerait rien à l'écran, la pastille
-se cochant sans effet visible. Symétriquement, « couleur d'origine » se dit en remettant
-`displayColor` à null — d'où le choix d'une colonne nullable plutôt qu'un drapeau à part.
+The explicit choice comes **before** the file's color, and that is deliberate: otherwise,
+choosing a bold color on a colored KML would change nothing on screen, the chip getting
+checked with no visible effect. Symmetrically, "original color" is expressed by setting
+`displayColor` back to null — hence the choice of a nullable column rather than a separate
+flag.
 
-`displayColor` prime aussi sur `TrackPoint.segmentColor` au dessin : une couleur
-demandée à la main vaut pour le parcours entier, tronçons compris.
+`displayColor` also takes precedence over `TrackPoint.segmentColor` when drawing: a color
+requested by hand applies to the whole track, segments included.
 
-**L'épaisseur du trait appartient elle aussi au parcours** (`Track.displayWidthDp`,
-migration 8→9), à la demande de l'auteur : elle se règle dans la même feuille que la
-couleur (« Apparence du tracé », pastille du parcours dans l'historique), et le réglage
-général a quitté les Paramètres. À null, le parcours garde l'épaisseur générale d'avant
-(`pref_track_thickness_dp`, que plus aucun écran n'écrit) : rien ne change à l'écran à
-la mise à jour, sans reprise à écrire. Cette valeur générale sert aussi à la trace en
-cours d'enregistrement. `TrackStylePreferences.resolveThicknessDp` tranche ; chaque
-tracé superposé est dessiné à sa propre épaisseur. Découpage et rognage la transmettent
-aux morceaux, comme la couleur.
+**Line thickness belongs to the track too** (`Track.displayWidthDp`, migration 8→9), at the
+author's request: it is set in the same sheet as the color ("Track appearance", the track's
+chip in the history), and the general setting left the Settings screen. At null, the track
+keeps the former general thickness (`pref_track_thickness_dp`, which no screen writes any
+more): nothing changes on screen at update, no backfill to write. This general value also
+serves for the track being recorded. `TrackStylePreferences.resolveThicknessDp` decides;
+each overlaid line is drawn at its own thickness. Splitting and trimming pass it on to the
+pieces, like the color.
 
-**La reprise des couleurs existantes est obligatoire.** La migration 7→8 ne peut pas
-remplir `displayColor` elle-même : la valeur à écrire vivait dans les préférences, que
-le SQL d'une migration ne sait pas lire. `TrackRepository.backfillDisplayColors`, appelé
-au démarrage depuis `TrackApplication` et gardé par une préférence, écrit donc à chaque
-parcours existant la couleur qu'il affichait avant la mise à jour. Sans elle, tout
-l'historique d'un utilisateur ayant réglé ses couleurs changerait d'apparence sans qu'il
-ait rien demandé. Elle tient en un seul `UPDATE … WHERE displayColor IS NULL`, donc
-rejouable et sans charger un parcours en mémoire.
+**The backfill of existing colors is mandatory.** Migration 7→8 cannot fill `displayColor`
+itself: the value to write lived in preferences, which a migration's SQL cannot read.
+`TrackRepository.backfillDisplayColors`, called at startup from `TrackApplication` and
+guarded by a preference, therefore writes to every existing track the color it displayed
+before the update. Without it, the whole history of a user who had set their colors would
+change appearance without their having asked for anything. It fits in a single
+`UPDATE … WHERE displayColor IS NULL`, hence replayable and without loading a track into
+memory.
 
-## Couleurs lues dans les fichiers importés
+## Colors read from imported files
 
-Un KML porte la couleur de chaque tracé, que l'application conserve (voir l'ordre de
-résolution ci-dessus).
+A KML carries the color of each line, which the app keeps (see the resolution order above).
 
-Trois pièges, chacun visible à l'écran s'il n'était pas traité :
+Three traps, each visible on screen if left unhandled:
 
-- **KML note ses couleurs en AABBGGRR**, Android attend ARGB. Recopier la valeur
-  échange le rouge et le bleu. `KmlColor.parse` convertit, `KmlColorTest` verrouille.
-- **La couleur appartient au point, pas au parcours** (`TrackPoint.segmentColor`). Un
-  export Google Earth réunit couramment des dizaines de voyages dans un seul fichier :
-  une couleur par parcours les peindrait tous pareil.
-- **Le style se résout, il ne se devine pas.** Un `<Placemark>` renvoie à un `<Style>`
-  par identifiant, éventuellement via un `<StyleMap>` qui distingue l'apparence au
-  repos de celle au survol. Prendre le premier `<LineStyle>` venu ramène parfois la
-  couleur de survol, que l'utilisateur ne voit jamais. `KmlStyleTable` fait la
-  résolution, avec une profondeur bornée contre les renvois circulaires.
+- **KML writes its colors as AABBGGRR**, Android expects ARGB. Copying the value swaps red
+  and blue. `KmlColor.parse` converts, `KmlColorTest` locks it.
+- **The color belongs to the point, not to the track** (`TrackPoint.segmentColor`). A
+  Google Earth export commonly gathers dozens of trips in a single file: one color per
+  track would paint them all the same.
+- **The style is resolved, not guessed.** A `<Placemark>` refers to a `<Style>` by
+  identifier, possibly through a `<StyleMap>` that distinguishes the resting appearance
+  from the hover one. Taking the first `<LineStyle>` at hand sometimes brings back the
+  hover color, which the user never sees. `KmlStyleTable` does the resolution, with a depth
+  bounded against circular references.
 
-Le répertoire des styles est relevé par une **première lecture du fichier**, avant les
-points : un style déclaré après le trajet qui l'utilise arriverait sinon trop tard,
-les points étant déjà écrits en base. Cette passe ignore les `<coordinates>`, son
-empreinte reste donc de quelques dizaines d'entrées quelle que soit la taille du
-fichier.
+The style directory is collected by a **first read of the file**, before the points: a style
+declared after the trip that uses it would otherwise arrive too late, the points being
+already written to the database. This pass ignores the `<coordinates>`, so its footprint
+stays at a few dozen entries whatever the file size.
 
-Un tracé sans couleur — tous les GPX, et les KML sans style de ligne — retombe sur
-la couleur de la palette. Sans ce repli il serait dessiné en noir, donc invisible sur
-le fond de carte sombre. Une couleur totalement transparente est refusée pour la même
-raison.
+A line with no color — every GPX, and KMLs without a line style — falls back on the palette
+color. Without this fallback it would be drawn in black, hence invisible on the dark map
+background. A fully transparent color is refused for the same reason.
 
-Corollaire à l'affichage : `buildSegmentsFromPoints` coupe aussi sur **changement de
-couleur**, une polyligne osmdroid n'en portant qu'une.
+Corollary at display: `buildSegmentsFromPoints` also cuts on a **color change**, an osmdroid
+polyline carrying only one.
 
-`TrackRepository` est la **source de vérité** de l'état en direct (`isTracking`,
-`livePoints`, `liveStats`, `gpsStatus`…). Le service écrit, l'interface lit.
+`TrackRepository` is the **source of truth** of the live state (`isTracking`, `livePoints`,
+`liveStats`, `gpsStatus`…). The service writes, the interface reads.
 
-## Outils
+## Tools
 
-`ui/screen/ToolsTab.kt` centralise les opérations qui portent sur un ou plusieurs
-parcours déjà enregistrés. Chaque outil suit le même gabarit : une carte de sélection
-de parcours (`SingleTrackRow` pour un seul, `MergeTrackRow` pour plusieurs), un ou
-deux réglages, un bouton de confirmation.
+`ui/screen/ToolsTab.kt` centralizes the operations that apply to one or several tracks
+already recorded. Each tool follows the same template: a track selection card
+(`SingleTrackRow` for one, `MergeTrackRow` for several), one or two settings, a
+confirmation button.
 
-- **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
-  aucun point ne transite par la mémoire.
-- **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
-- **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
-  ci-dessous.
+- **Merge tracks** — see invariant 5: merging happens in SQLite, no point goes through
+  memory.
+- **Split a track** — the inverse of merging, described below.
+- **Trim a track** — remove its first and last minutes, described below.
 
-**« Supprimer les points immobiles » a été retiré** avant la 1.0, à la demande de
-l'auteur (voir « Poids mort »). **La conversion CSV** a suivi le même sort en 1.1
-(voir « Poids mort »).
+**"Remove stationary points" was removed** before 1.0, at the author's request (see "Dead
+weight"). **CSV conversion** followed the same fate in 1.1 (see "Dead weight").
 
-### Découper un parcours
+### Splitting a track
 
-`TrackRepository.splitTrack` sépare un parcours en plusieurs, selon `SplitMode` :
+`TrackRepository.splitTrack` separates a track into several, according to `SplitMode`:
 
-- `SEGMENT_BREAKS` — à chaque `TrackPoint.isDiscontinuous`. C'est le mode qui traite
-  le cas courant du fichier importé réunissant des dizaines de voyages, chacun dans
-  son propre `<coordinates>`.
-- `TIME_GAP` — dès qu'un intervalle dépasse un seuil choisi. **Sans effet sur un GPX
-  sans `<time>` ni sur un KML** : l'import leur donne un horodatage synthétique
-  régulier, il n'y a donc aucun trou à trouver. Le découpage le signale au lieu
-  d'échouer, et l'interface oriente vers le bon mode par ses sous-titres.
+- `SEGMENT_BREAKS` — at each `TrackPoint.isDiscontinuous`. This is the mode that handles
+  the common case of an imported file gathering dozens of trips, each in its own
+  `<coordinates>`.
+- `TIME_GAP` — as soon as an interval exceeds a chosen threshold. **No effect on a GPX
+  without `<time>` or on a KML**: import gives them a regular synthetic timestamp, so there
+  is no gap to find. Splitting reports it instead of failing, and the interface points to
+  the right mode through its subtitles.
 
-Quatre points structurent l'implémentation, et chacun a sa raison :
+Four points structure the implementation, each with its reason:
 
-1. **Une seule lecture, hors transaction.** Le parcours est relu page par page pour
-   repérer les coupures ; seule la page courante est en mémoire, donc un parcours de
-   plusieurs millions de points passe. Cette lecture est longue : la tenir dans une
-   transaction bloquerait la base en écriture pendant toute sa durée. Les bornes
-   relevées sont des **identifiants de points**, ce qui rend la suite indépendante de
-   ce qui a été lu.
-2. **Les statistiques sont cumulées pendant cette même passe**, par
-   `TrackStatsAccumulator`. Sans cela il faudrait relire chaque morceau après
-   l'avoir créé — soit deux fois le parcours — ou reprendre les statistiques du
-   parent, ce qui donnerait à chaque morceau la distance du trajet entier.
-3. **L'écriture tient dans une transaction unique** : création des parcours, puis
-   `copyPointRangeInto` qui laisse SQLite recopier chaque tranche (invariant 5, même
-   `ORDER BY id` indispensable). Une interruption ne laisse jamais un découpage à
-   moitié fait.
-4. **`clearFirstPointDiscontinuity` sur chaque morceau.** Le premier point d'une
-   tranche est précisément celui qui ouvrait un nouveau tronçon ; dans son parcours
-   neuf, il ne fait qu'ouvrir le tracé. Garder la marque ferait dessiner un tronçon
-   vide avant lui.
+1. **A single read, outside a transaction.** The track is reread page by page to locate the
+   cuts; only the current page is in memory, so a track of several million points goes
+   through. This read is long: holding it in a transaction would block the database for
+   writing throughout. The bounds noted are **point identifiers**, which makes what follows
+   independent of what was read.
+2. **Statistics are accumulated during that same pass**, by `TrackStatsAccumulator`.
+   Without that, each piece would have to be reread after creation — twice the track — or
+   the parent's statistics reused, which would give each piece the distance of the whole
+   trip.
+3. **Writing fits in a single transaction**: creation of the tracks, then
+   `copyPointRangeInto`, which lets SQLite copy each slice (invariant 5, same `ORDER BY id`
+   essential). An interruption never leaves a half-done split.
+4. **`clearFirstPointDiscontinuity` on each piece.** The first point of a slice is precisely
+   the one that opened a new segment; in its new track, it only opens the line. Keeping the
+   mark would draw an empty segment before it.
 
-Le parcours d'origine n'est **jamais modifié**, et n'est supprimé que si l'utilisateur
-coche la case — les morceaux contiennent alors exactement les mêmes points. Chacun
-hérite de la provenance (`isImported`, `isMerged`) et de l'apparence (`sourceColor`,
-`displayColor`) du parent, mais jamais de `isSelectedForMap` : un découpage en trente
-morceaux les allumerait tous d'un coup sur la carte.
+The original track is **never modified**, and is only deleted if the user ticks the box —
+the pieces then contain exactly the same points. Each inherits the origin (`isImported`,
+`isMerged`) and appearance (`sourceColor`, `displayColor`) of the parent, but never
+`isSelectedForMap`: a split into thirty pieces would light them all up on the map at once.
 
-Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
-qui dit lequel des deux modes n'a rien trouvé.
+Splitting into a single piece would only make a duplicate: it is refused, with a message
+saying which of the two modes found nothing.
 
-### Rogner un parcours
+### Trimming a track
 
-`TrackRepository.trimTrack` crée une copie amputée de ses premières et dernières
-minutes. C'est le besoin le plus banal d'un traqueur GPS : l'enregistrement oublié
-qui a continué sur la route du retour, ou démarré depuis le parking.
+`TrackRepository.trimTrack` creates a copy cut of its first and last minutes. It is the most
+ordinary need of a GPS tracker: the forgotten recording that kept going on the way back, or
+started from the car park.
 
-Même forme que le découpage, et pour les mêmes raisons : une seule lecture page par
-page, des bornes relevées en **identifiants de points**, les statistiques cumulées
-pendant cette même passe, puis une transaction unique où SQLite recopie la tranche
-(`copyPointRangeInto`, invariant 5).
+Same shape as splitting, and for the same reasons: a single read page by page, bounds noted
+as **point identifiers**, statistics accumulated during that same pass, then a single
+transaction where SQLite copies the slice (`copyPointRangeInto`, invariant 5).
 
-**Les bornes se comparent aux horodatages, jamais à un rang.** Sur un enregistrement
-à trous — pause, perte de signal — « retirer les cinq premières minutes » ne veut pas
-dire retirer un nombre fixe de points. `getFirstPointTimestamp` et
-`getLastPointTimestamp` donnent les deux extrémités sans charger un seul point.
+**Bounds are compared with timestamps, never with a rank.** On a recording with gaps —
+pause, signal loss — "remove the first five minutes" does not mean removing a fixed number
+of points. `getFirstPointTimestamp` and `getLastPointTimestamp` give both ends without
+loading a single point.
 
-Trois refus, chacun avec son message :
+Three refusals, each with its message:
 
-1. **Ne rien retirer** — le résultat ne serait qu'un doublon.
-2. **Retirer plus que la durée du parcours** — les deux bornes se croisent.
-3. **Ne laisser qu'un point** — ni tracé, ni distance, ni durée à en tirer. Ce
-   troisième cas n'est atteignable que sur un parcours à trous : sur des points
-   régulièrement espacés, tout rognage assez large fait d'abord se croiser les
-   bornes, et c'est le refus précédent qui se déclenche.
+1. **Removing nothing** — the result would only be a duplicate.
+2. **Removing more than the track's duration** — the two bounds cross.
+3. **Leaving a single point** — neither line, nor distance, nor duration to draw from it.
+   This third case is only reachable on a track with gaps: on evenly spaced points, any
+   trim wide enough first makes the bounds cross, and the previous refusal triggers.
 
-`clearFirstPointDiscontinuity` sur le résultat, pour la même raison que le découpage :
-le point devenu premier ouvrait peut-être un tronçon, il ne fait plus qu'ouvrir le
-tracé.
+`clearFirstPointDiscontinuity` on the result, for the same reason as splitting: the point
+that became first may have opened a segment, it now only opens the line.
 
-Le parcours d'origine n'est jamais modifié, et n'est supprimé que si l'utilisateur
-coche la case. Le résultat hérite de la provenance et de l'apparence du parent, mais
-jamais de `isSelectedForMap`.
+The original track is never modified, and is only deleted if the user ticks the box. The
+result inherits the origin and appearance of the parent, but never `isSelectedForMap`.
 
 ### `TrackStatsAccumulator`
 
-`util/TrackStats.kt` porte **le seul calcul de statistiques du projet**.
-`TrackRepository.calculateStatsFromPoints` n'en est plus qu'une enveloppe pour une
-liste déjà en mémoire. Ne pas réintroduire un second calcul pour les flux : deux
-implémentations parallèles finiraient par diverger, et le même parcours afficherait
-alors des chiffres différents selon le chemin emprunté. `SplitTrackTest` compare les
-deux voies sur les mêmes points, précisément pour verrouiller ce point.
+`util/TrackStats.kt` carries **the project's only statistics computation**.
+`TrackRepository.calculateStatsFromPoints` is now only a wrapper for a list already in
+memory. Do not reintroduce a second computation for streams: two parallel implementations
+would end up diverging, and the same track would then display different figures depending
+on the path taken. `SplitTrackTest` compares the two paths on the same points, precisely to
+lock this.
 
-Le premier point reçu n'apporte ni distance ni vitesse — il n'a pas de précédent avec
-quoi les mesurer — mais il ouvre l'altitude de référence. C'est ce que faisait déjà la
-boucle d'origine en démarrant à l'indice 1.
+The first point received brings neither distance nor speed — it has no predecessor to
+measure against — but it opens the reference altitude. That is what the original loop
+already did by starting at index 1.
 
-## Le voile noir des transitions : corrigé en 0.16
+## The black veil of transitions: fixed in 0.16
 
-Rapporté ainsi : « quand j'ouvre un parcours, l'animation d'ouverture fait un effet
-noir bizarre, et c'est pareil quand je fais retour ».
+Reported as: "when I open a track, the opening animation makes a weird black effect, and
+it is the same when I go back".
 
-**La cause.** Le `Box` qui contient l'`AnimatedContent` de `MainScreen` n'avait aucun
-fond. Or la transition superposait un glissement **et un fondu** : à mi-course, les
-deux écrans étaient à demi transparents en même temps, et l'on voyait donc au travers
-jusqu'au fond de la fenêtre — celui de `Theme.DeviceDefault`, sombre.
+**The cause.** The `Box` containing `MainScreen`'s `AnimatedContent` had no background. Yet
+the transition combined a slide **and a fade**: at mid-course, both screens were half
+transparent at the same time, so one saw through to the window background — that of
+`Theme.DeviceDefault`, dark.
 
-**Le correctif**, en deux parties qui se complètent :
+**The fix**, in two parts that complement each other:
 
-- un **fond opaque** sur le conteneur, pour qu'il n'y ait plus rien à apercevoir
-  derrière ;
-- **le fondu retiré** des deux branches à glissement. Deux écrans opaques qui
-  glissent l'un sur l'autre ne laissent jamais rien paraître entre eux : l'écran
-  sortant recule d'un cinquième de largeur quand l'entrant en parcourt une entière,
-  si bien qu'ils se recouvrent d'un bout à l'autre du mouvement. Le fondu ne rendait
-  pas la transition plus douce, il la rendait translucide.
+- an **opaque background** on the container, so there is nothing left to glimpse behind;
+- **the fade removed** from the two sliding branches. Two opaque screens sliding over each
+  other never let anything show between them: the outgoing screen recedes by a fifth of the
+  width while the incoming one travels a whole one, so they overlap from one end of the
+  movement to the other. The fade did not make the transition softer, it made it
+  translucent.
 
-Le fondu reste sur la troisième branche — le passage direct d'un parcours à un autre,
-sans glissement — où il est le seul mouvement possible ; le fond opaque lui sert
-désormais de toile.
+The fade remains on the third branch — the direct move from one track to another, with no
+slide — where it is the only possible movement; the opaque background now serves as its
+canvas.
 
-## L'ombre tranchée des cartes de l'historique : corrigé en 0.17
+## The sliced shadow of history cards: fixed in 0.17
 
-Rapporté ainsi : « pendant l'animation d'affichage des parcours, l'ombre en bas elle
-est dégueulasse », puis deux fois encore après deux correctifs qui n'y changeaient
-rien.
+Reported as: "during the track display animation, the shadow at the bottom is awful", then
+twice more after two fixes that changed nothing.
 
-**La cause, mesurée et non devinée.** `AnimatedVisibility` **rogne son contenu à ses
-propres bornes** dès qu'une transition le déplace. L'entrée était
-`slideInVertically { it / 6 }` : le contenu descendu d'un sixième de sa hauteur était
-donc tranché net en bas, coin arrondi et ombre compris, pendant toute l'animation.
+**The cause, measured and not guessed.** `AnimatedVisibility` **clips its content to its own
+bounds** as soon as a transition moves it. The entry was `slideInVertically { it / 6 }`: the
+content moved down by a sixth of its height was therefore sliced flat at the bottom, rounded
+corner and shadow included, throughout the animation.
 
-**Le correctif** : le glissement sort d'`AnimatedVisibility`, qui disparaît. Il est
-piloté à la main par un `Animatable` appliqué en `graphicsLayer` — lequel ne rogne
-rien, `clip` valant `false` par défaut. L'opacité y reste **binaire** (0 avant le tour
-de la carte, 1 ensuite) : à zéro rien n'est dessiné, il n'y a donc aucune ombre à
-trancher.
+**The fix**: the slide leaves `AnimatedVisibility`, which disappears. It is driven by hand by
+an `Animatable` applied as a `graphicsLayer` — which clips nothing, `clip` being `false` by
+default. Opacity there stays **binary** (0 before the card's turn, 1 afterwards): at zero
+nothing is drawn, so there is no shadow to slice.
 
-**Comment la cause a enfin été trouvée.** L'auteur a joint un enregistrement d'écran.
-Les images en ont été extraites et la colonne de pixels traversant la carte relevée
-une par une : pendant l'animation, la carte s'arrêtait sur un bord franc avec la
-couleur du fond immédiatement en dessous — pas un pixel d'ombre — puis le dégradé
-réapparaissait d'un coup à la dernière image. Le conteneur rognait, il ne s'agissait
-pas d'un tampon hors écran.
+**How the cause was finally found.** The author attached a screen recording. The frames were
+extracted and the column of pixels crossing the card read one by one: during the animation,
+the card stopped on a sharp edge with the background color immediately below — not one pixel
+of shadow — then the gradient reappeared all at once on the last frame. The container was
+clipping, it was not an offscreen buffer.
 
-**Les deux fondus retirés avant cela l'ont été pour une autre raison, et ils le
-restent.** Une opacité *intermédiaire* fait composer l'élément hors écran dans un
-tampon **aux dimensions exactes de la carte** : ce qui débordait — donc l'ombre — s'y
-retrouve tranché. Il y en avait deux : celui de l'`enter` d'`AnimatedVisibility`, et
-celui qu'**`animateItem()` applique de lui-même** — ses paramètres `fadeInSpec` et
-`fadeOutSpec` valent un ressort par défaut, pas `null`, ce que son nom ne laisse pas
-deviner. D'où l'appel `animateItem(fadeInSpec = null, fadeOutSpec = null)`, à garder.
+**The two fades removed before that were removed for another reason, and they stay
+removed.** An *intermediate* opacity makes the element compose offscreen in a buffer **at the
+exact dimensions of the card**: what overflowed — hence the shadow — ends up sliced there.
+There were two: that of `AnimatedVisibility`'s `enter`, and the one **`animateItem()` applies
+by itself** — its `fadeInSpec` and `fadeOutSpec` parameters default to a spring, not `null`,
+which its name does not let you guess. Hence the call
+`animateItem(fadeInSpec = null, fadeOutSpec = null)`, to be kept.
 
-**Ne réintroduire ni fondu progressif ni transition d'`AnimatedVisibility`** sur un
-élément qui porte une ombre sans lui retirer d'abord son élévation : ce sont deux
-mécaniques distinctes, et chacune suffit à trancher l'ombre.
+**Do not reintroduce a progressive fade or an `AnimatedVisibility` transition** on an
+element that carries a shadow without first removing its elevation: these are two distinct
+mechanisms, and each is enough to slice the shadow.
 
-**Leçon de méthode, et c'est la deuxième fois que le projet la paie** (voir « Le zoom
-sautait à l'appui sur "localiser" »). Deux correctifs ont été poussés en affirmant
-tenir la cause, sur la seule foi d'un mécanisme plausible. Ils étaient justes en
-eux-mêmes — les fondus tranchent bien l'ombre — mais ce n'était pas ce qui se voyait à
-l'écran. Trois minutes à extraire les images de la vidéo ont donné la réponse que deux
-compilations n'avaient pas donnée. **Devant un défaut visuel, regarder les pixels
-avant de raisonner sur le mécanisme.**
+**Lesson of method, and this is the second time the project pays for it** (see "The zoom
+jumped when pressing 'locate'"). Two fixes were pushed claiming to hold the cause, on the
+sole strength of a plausible mechanism. They were right in themselves — fades do slice the
+shadow — but it was not what showed on screen. Three minutes spent extracting the frames
+from the video gave the answer that two builds had not. **Faced with a visual defect, look
+at the pixels before reasoning about the mechanism.**
 
-## Invariants à ne pas casser
+## Invariants not to break
 
-Ces points ont chacun corrigé un bug réel ; les commentaires du code expliquent
-pourquoi. À relire avant d'y toucher.
+Each of these points fixed a real bug; the code comments explain why. Reread before
+touching them.
 
-1. **Singletons à double vérification** (`AppDatabase`, `TrackRepository`). Deux
-   instances = deux jeux de `StateFlow` et de suivis d'invalidation Room : le
-   service alimente l'une pendant que l'écran observe l'autre, et l'interface cesse
-   silencieusement de se mettre à jour.
-2. **Toutes les migrations Room sont obligatoires.** Retirer l'une des migrations
-   déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
-   (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`), `MIGRATION_7_8`
-   (`Track.displayColor`), `MIGRATION_8_9` (`Track.displayWidthDp`), `MIGRATION_9_10`
-   (`Track.isPaused`) — rendrait la base illisible pour tout utilisateur venant
-   d'une version antérieure. Toute nouvelle version de schéma doit venir avec la sienne.
-   Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
-   la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec
-   `fallbackToDestructiveMigrationOnDowngrade()` — une migration oubliée fait
-   désormais échouer l'ouverture au lieu d'effacer l'historique sans un mot ; et
-   `MigrationChainTest` vérifie que les migrations déclarées forment bien une chaîne
-   continue de la plus ancienne version rattrapable jusqu'à `DATABASE_VERSION`.
-   La version du schéma est une constante à part (`DATABASE_VERSION`) et non un
-   nombre écrit dans l'annotation : c'est ce qui la rend lisible par le test.
-   `exportSchema = true` fait écrire par Room le schéma de chaque version dans
-   `app/schemas/` (chemin fixé par `room.schemaLocation` dans `app/build.gradle.kts`,
-   sans quoi la compilation échoue). Ces fichiers **sont à verser au dépôt** : ils
-   apparaissent après la première compilation et sont ce dont aurait besoin un futur
-   test de migration réel, qui ouvre une base d'ancienne version et y applique les
-   migrations.
-   Sur `track_points`, préférer une colonne **nullable et sans valeur par défaut** :
-   SQLite se contente alors de modifier le schéma, là où une valeur par défaut
-   réécrirait toutes les lignes — plusieurs millions sur une trace importée.
-3. **Affichage par fenêtre de vue.** `getDisplayPoints()` renvoie une silhouette
-   sous-échantillonnée + le détail de la zone visible. Ces points servent
-   **uniquement à dessiner**. Ne jamais exporter depuis eux : l'export passe par
-   `forEachPoint()`, qui relit 100 % des points page par page.
-   Corollaire : **tout déplacement programmatique de la carte doit republier la zone
-   visible.** osmdroid ne produit d'événement de défilement exploitable que pour les
-   gestes de l'utilisateur ; un `controller.animateTo()` laissait donc le ViewModel
-   sur l'ancienne zone, et la partie nouvellement visible d'un tracé dense restait
-   réduite à sa silhouette jusqu'à ce qu'on fasse glisser la carte à la main. Pendant
-   le suivi automatique, la republication est périodique et non accrochée au
-   recentrage : les positions arrivent environ une fois par seconde et annuleraient un
-   effet qui en dépendrait avant la fin de l'animation.
-4. **Import et export en flux.** `Importer.PointSink` et `Exporter.GpxWriter` /
-   `KmlWriter` ne gardent jamais plus d'un lot en mémoire — une trace de plusieurs
-   millions de points doit passer. Le KML est parsé en SAX, pas en `XmlPullParser`
-   (qui reconstruirait tout le bloc `<coordinates>` en mémoire).
-   **L'analyseur SAX est durci** (`newSaxParser`) : un fichier importé vient de
-   l'extérieur et ne doit pas pouvoir déclarer d'entités XML. Sans cela, quelques
-   kilo-octets d'entités imbriquées suffisent à saturer la mémoire. Les drapeaux sont
-   posés au mieux — une implémentation qui n'en connaîtrait pas un ne doit pas
-   empêcher tout import.
-5. **La fusion se fait dans SQLite** (`INSERT … SELECT`), aucun point ne transite
-   par la mémoire. Le `ORDER BY id` de `copyPointsInto` est indispensable : sans
-   lui, le planificateur peut recopier dans l'ordre des latitudes.
-6. **`lastLocation == null` ⇒ nouveau tronçon.** C'est le seul mécanisme de
-   discontinuité (démarrage, sortie de pause, reprise). Ne jamais l'initialiser
-   avec le dernier point d'une trace reprise : cela ajouterait la distance à vol
-   d'oiseau entre l'ancien tronçon et le point de reprise.
-7. **Traitement des points GPS sérialisé** sur `pointExecutor` (un seul thread).
-   `LocationResult` livre plusieurs positions d'un coup ; en parallèle, les
-   accumulateurs partagés se corrompent.
-8. **La simulation GPS ne doit jamais s'activer en release.** Dans
-   `TrackingService`, elle est gardée par `BuildConfig.DEBUG` — sinon l'application
-   enregistrerait un trajet inventé que l'utilisateur croirait réel.
-9. **Ne jamais appeler `isSystemInDarkTheme()` ailleurs que dans `NightMode.kt`.**
-   Le thème sombre peut être piloté par le capteur de luminosité, pas seulement par
-   le réglage d'Android. `MyApplicationTheme` résout l'état une fois et le publie
-   via `LocalIsDarkTheme` : c'est ce que doit lire tout ce qui échappe à Material,
-   le filtre de tuiles de la carte en particulier.
+1. **Double-checked singletons** (`AppDatabase`, `TrackRepository`). Two instances = two
+   sets of `StateFlow`s and of Room invalidation trackers: the service feeds one while the
+   screen observes the other, and the interface silently stops updating.
+2. **All Room migrations are mandatory.** Removing one of the declared migrations —
+   `MIGRATION_4_5` (viewport index), `MIGRATION_5_6` (`Track.sourceColor`), `MIGRATION_6_7`
+   (`TrackPoint.segmentColor`), `MIGRATION_7_8` (`Track.displayColor`), `MIGRATION_8_9`
+   (`Track.displayWidthDp`), `MIGRATION_9_10` (`Track.isPaused`) — would make the database
+   unreadable for any user coming from an earlier version. Every new schema version must
+   come with its own. Two safeguards, since `0.11.2`, where the invariant rested on
+   vigilance alone: the database is no longer built with `fallbackToDestructiveMigration()`
+   but with `fallbackToDestructiveMigrationOnDowngrade()` — a forgotten migration now makes
+   opening fail instead of silently erasing the history; and `MigrationChainTest` checks
+   that the declared migrations form a continuous chain from the oldest reachable version to
+   `DATABASE_VERSION`. The schema version is a separate constant (`DATABASE_VERSION`) rather
+   than a number written in the annotation: that is what makes it readable by the test.
+   `exportSchema = true` has Room write the schema of each version to `app/schemas/` (path
+   set by `room.schemaLocation` in `app/build.gradle.kts`, without which compilation fails).
+   These files **are to be committed**: they appear after the first compilation and are what
+   a future real migration test would need, one that opens a database of an old version and
+   applies the migrations to it.
+   On `track_points`, prefer a column that is **nullable and without a default value**:
+   SQLite then only modifies the schema, where a default value would rewrite every row —
+   several million on an imported track.
+3. **Viewport-based display.** `getDisplayPoints()` returns a subsampled silhouette + the
+   detail of the visible area. These points serve **only for drawing**. Never export from
+   them: export goes through `forEachPoint()`, which rereads 100% of the points page by page.
+   Corollary: **any programmatic move of the map must republish the visible area.** osmdroid
+   only produces a usable scroll event for the user's gestures; a `controller.animateTo()`
+   therefore left the ViewModel on the old area, and the newly visible part of a dense track
+   stayed reduced to its silhouette until the map was dragged by hand. During automatic
+   following, republication is periodic and not hooked to the recentering: positions arrive
+   about once per second and would cancel an effect depending on them before the animation
+   ended.
+4. **Streaming import and export.** `Importer.PointSink` and `Exporter.GpxWriter` /
+   `KmlWriter` never keep more than one batch in memory — a track of several million points
+   must go through. KML is parsed with SAX, not `XmlPullParser` (which would rebuild the
+   whole `<coordinates>` block in memory).
+   **The SAX parser is hardened** (`newSaxParser`): an imported file comes from outside and
+   must not be able to declare XML entities. Without that, a few kilobytes of nested
+   entities are enough to exhaust memory. The flags are set on a best-effort basis — an
+   implementation that did not know one must not prevent every import.
+5. **Merging happens in SQLite** (`INSERT … SELECT`), no point goes through memory. The
+   `ORDER BY id` of `copyPointsInto` is essential: without it, the planner may copy in
+   latitude order.
+6. **`lastLocation == null` ⇒ new segment.** This is the only discontinuity mechanism
+   (start, exit from pause, resume). Never initialize it with the last point of a resumed
+   track: that would add the straight-line distance between the old segment and the resume
+   point.
+7. **GPS point processing serialized** on `pointExecutor` (a single thread).
+   `LocationResult` delivers several positions at once; in parallel, the shared accumulators
+   get corrupted.
+8. **GPS simulation must never activate in release.** In `TrackingService` it is guarded by
+   `BuildConfig.DEBUG` — otherwise the app would record an invented trip that the user would
+   take for a real one.
+9. **Never call `isSystemInDarkTheme()` anywhere but in `NightMode.kt`.** The dark theme can
+   be driven by the light sensor, not just by Android's setting. `MyApplicationTheme`
+   resolves the state once and publishes it through `LocalIsDarkTheme`: that is what
+   everything escaping Material must read, the map's tile filter in particular.
 
-## Mode nuit
+## Night mode
 
-`ui/theme/NightMode.kt` décide du thème sombre, selon `pref_night_mode_source` :
+`ui/theme/NightMode.kt` decides on the dark theme, according to `pref_night_mode_source`:
 
-- `system` — le réglage d'Android (comportement par défaut).
-- `solar` — les heures réelles du soleil, plus une bascule temporaire dans les
-  tunnels (`pref_night_mode_tunnel`, active par défaut).
+- `system` — Android's setting (default behavior).
+- `solar` — the real sun times, plus a temporary switch in tunnels
+  (`pref_night_mode_tunnel`, on by default).
 
-Deux briques pures, sans dépendance Android, donc directement testables :
+Two pure building blocks, without Android dependency, hence directly testable:
 
-**`util/SolarTimes`** calcule le lever et le coucher du soleil (équation du lever du
-soleil, formulation NOAA) à moins de deux minutes des heures publiées. Ce calcul
-remplace délibérément un appel à un service météo : il fonctionne hors ligne — en
-tunnel, en montagne — n'exige aucune clé d'API et ne transmet la position de
-l'utilisateur à personne. Les cas polaires (`PolarDay` / `PolarNight`) doivent rester
-traités explicitement : sans eux, `acos` renvoie `NaN`.
+**`util/SolarTimes`** computes sunrise and sunset (sunrise equation, NOAA formulation) to
+within two minutes of the published times. This computation deliberately replaces a call to
+a weather service: it works offline — in a tunnel, in the mountains — needs no API key and
+sends the user's position to nobody. The polar cases (`PolarDay` / `PolarNight`) must stay
+handled explicitly: without them, `acos` returns `NaN`.
 
-La position vient de `pref_last_lat` / `pref_last_lng`, déjà écrits par le ViewModel
-à chaque déplacement de carte. Le GPS n'est pas allumé pour choisir une couleur de
-fond : un degré de longitude ne décale les heures que de quatre minutes, une
-précision de quelques dizaines de kilomètres suffit largement.
+The position comes from `pref_last_lat` / `pref_last_lng`, already written by the ViewModel
+at each map move. The GPS is not turned on to choose a background color: one degree of
+longitude only shifts the times by four minutes, an accuracy of a few tens of kilometers is
+plenty.
 
-**`util/TunnelDetector`** distingue un tunnel d'un intérieur. Un seuil absolu — ce
-qu'utilisait la version précédente — confond « il fait sombre » et « je suis à
-l'intérieur en pleine journée » : un salon éclairé tourne autour de 150 lux et
-faisait basculer l'application en sombre en plein jour. Le critère retenu cumule
-donc trois conditions à l'entrée : obscurité absolue (≤ 20 lux), effondrement
-relatif à la luminosité ambiante des instants précédents (≤ 8 %), et persistance
-pendant une seconde.
+**`util/TunnelDetector`** tells a tunnel from an interior. An absolute threshold — what the
+previous version used — confuses "it is dark" with "I am indoors in broad daylight": a lit
+living room sits around 150 lux and made the app switch to dark in broad daylight. The
+retained criterion therefore combines three conditions on entry: absolute darkness
+(≤ 20 lux), relative collapse against the ambient brightness of the preceding moments
+(≤ 8%), and persistence for one second.
 
-La référence ambiante est **gelée tant que l'on est à l'intérieur**. Sans ce gel,
-elle rejoindrait le niveau du parking où l'on stationne, l'effondrement relatif
-disparaîtrait et l'affichage repasserait au clair dans le noir. Corollaire heureux :
-la tombée de la nuit, lente, est suivie par la référence et n'est jamais prise pour
-un tunnel — c'est le calcul solaire qui la traite.
+The ambient reference is **frozen while indoors**. Without that freeze, it would drift to the
+level of the car park where one is parked, the relative collapse would disappear and the
+display would go back to light in the dark. Happy corollary: nightfall, slow, is followed by
+the reference and never mistaken for a tunnel — the solar computation handles it.
 
-Le capteur n'est écouté que de jour (la nuit, le thème est déjà sombre) et l'écoute
-est liée au cycle de vie.
+The sensor is only listened to by day (at night, the theme is already dark) and listening is
+tied to the lifecycle.
 
 ## Altitude
 
-`Location.getAltitude()` renvoie une hauteur au-dessus de l'**ellipsoïde WGS84**,
-alors que toute altitude lue sur une carte ou un panneau se réfère au **géoïde**, le
-niveau moyen des mers. L'écart — de 45 à 50 m sur la France métropolitaine — est un
-biais systématique, pas du bruit. Afficher la valeur brute rendait l'altitude
-constamment trop haute d'une cinquantaine de mètres.
+`Location.getAltitude()` returns a height above the **WGS84 ellipsoid**, whereas any altitude
+read on a map or a sign refers to the **geoid**, mean sea level. The gap — 45 to 50 m over
+metropolitan France — is a systematic bias, not noise. Displaying the raw value made the
+altitude constantly about fifty meters too high.
 
-`util/Altitude.kt` regroupe toute la chaîne :
+`util/Altitude.kt` holds the whole chain:
 
-- **`AltitudeResolver`** écarte les relevés sans altitude (`getAltitude()` renvoie
-  `0.0` dans ce cas, ce qui était enregistré comme une altitude réelle), convertit
-  vers le niveau de la mer via `AltitudeConverter` — modèle de géoïde embarqué dans
-  Android 14+, hors ligne — et rejette les altitudes dont l'incertitude verticale
-  dépasse 20 m. `resolve()` fait des entrées-sorties : **jamais sur le thread
-  principal**. En deçà d'Android 14, il ne renvoie rien : mieux vaut afficher « — »
-  qu'une valeur fausse de 50 m. C'est le seul endroit où brancher un géoïde embarqué
-  si l'on veut couvrir les versions antérieures.
-- **`AltitudeSmoother`** enchaîne une médiane glissante — qui écarte une aberration
-  isolée au lieu de la moyenner — puis une moyenne exponentielle.
+- **`AltitudeResolver`** discards readings without altitude (`getAltitude()` returns `0.0` in
+  that case, which used to be recorded as a real altitude), converts to sea level through
+  `AltitudeConverter` — geoid model embedded in Android 14+, offline — and rejects altitudes
+  whose vertical uncertainty exceeds 20 m. `resolve()` does I/O: **never on the main
+  thread**. Below Android 14, it returns nothing: better to show "—" than a value wrong by
+  50 m. This is the only place to plug an embedded geoid to cover earlier versions.
+- **`AltitudeSmoother`** chains a moving median — which discards an isolated outlier instead
+  of averaging it — then an exponential average.
 
-`util/ElevationAccumulator.kt` cumule le dénivelé **par rapport à une altitude de
-référence** qui ne se déplace qu'au-delà de 3 m. Le critère précédent, un seuil de
-0,80 m entre points consécutifs, se trompait deux fois : il ratait les montées
-régulières (à 1 Hz sur une pente de 10 %, l'altitude ne progresse que de 0,14 m par
-seconde, donc rien n'était compté) et gonflait le dénivelé à l'arrêt, où le bruit
-franchit le seuil dans un sens puis dans l'autre.
+`util/ElevationAccumulator.kt` accumulates elevation **against a reference altitude** that
+only moves beyond 3 m. The previous criterion, a 0.80 m threshold between consecutive
+points, was wrong twice: it missed steady climbs (at 1 Hz on a 10% slope, altitude only
+rises by 0.14 m per second, so nothing was counted) and inflated elevation when stopped,
+where noise crosses the threshold in one direction then the other.
 
-L'altitude **enregistrée** est celle qui a été convertie et lissée : les fichiers GPX
-exportés portent donc une balise `<ele>` au-dessus du niveau de la mer, comme le veut
-le format. L'affichage lit `TrackRepository.currentAltitude`, un flux séparé de
-`currentUserLocation` parce que `TrackPoint.altitude` n'est pas nullable et ne peut
-pas distinguer « inconnue » de « nulle ».
+The **recorded** altitude is the converted and smoothed one: exported GPX files therefore
+carry an `<ele>` tag above sea level, as the format requires. The display reads
+`TrackRepository.currentAltitude`, a flow separate from `currentUserLocation` because
+`TrackPoint.altitude` is not nullable and cannot tell "unknown" from "zero".
 
-La rupture de tronçon du dénivelé se raccroche au **même signal que la discontinuité
-du tracé** (`lastLocation == null`, invariant 6), et non à un drapeau écrit depuis le
-thread principal.
+The elevation segment break hooks onto the **same signal as the line's discontinuity**
+(`lastLocation == null`, invariant 6), and not onto a flag written from the main thread.
 
-## Thème sombre de la carte
+## Dark theme of the map
 
-Les tuiles Mapnik sont assombries par `DARK_TILES_COLOR_FILTER` dans
-`MapViewContainer` : **inversion, puis rotation des teintes de 180°**. On obtient les
-couleurs de Mapnik assombries — vert foncé pour le gazon, bleu profond pour l'eau,
-fond sombre à la place du papier crème, libellés clairs donc lisibles.
+Mapnik tiles are darkened by `DARK_TILES_COLOR_FILTER` in `MapViewContainer`: **inversion,
+then a 180° hue rotation**. The result is Mapnik's colors darkened — dark green for grass,
+deep blue for water, a dark background in place of cream paper, light labels hence readable.
 
-Deux approches ont précédé celle-ci, et chacune a échoué pour une raison différente
-qu'il faut garder en tête avant d'y retoucher :
+Two approaches preceded this one, and each failed for a different reason worth keeping in
+mind before touching it again:
 
-- `TilesOverlay.INVERT_COLORS`, une inversion nue. Inverser retourne la teinte autant
-  que la clarté : les forêts devenaient magenta et l'eau brune.
-- Désaturer puis inverser. La dominante disparaissait, mais toute couleur avec elle :
-  la carte devenait un dégradé de gris, sans le repère immédiat du vert et du bleu.
+- `TilesOverlay.INVERT_COLORS`, a bare inversion. Inverting flips hue as much as lightness:
+  forests became magenta and water brown.
+- Desaturate then invert. The dominant tint disappeared, but every color with it: the map
+  became a gradient of grays, without the immediate cue of green and blue.
 
-La rotation de teinte d'un demi-tour après l'inversion remet les teintes à leur place
-et ne laisse inversée que la clarté. Chaque ligne de `HUE_ROTATE_180_MATRIX` somme
-à 1, ce qui garantit que les gris — routes, libellés — ne prennent pas de dominante.
+The half-turn hue rotation after inversion puts the hues back in place and leaves only
+lightness inverted. Each row of `HUE_ROTATE_180_MATRIX` sums to 1, which guarantees that
+grays — roads, labels — take no tint.
 
-Limite connue : le blanc pur ressort en noir pur, plus sombre que le fond (`#13100A`).
-Les petites routes blanches de Mapnik sont donc peu contrastées. C'était déjà le cas
-avec les deux approches précédentes ; corriger demanderait de comprimer la plage de
-sortie, au prix du contraste général.
+Known limit: pure white comes out pure black, darker than the background (`#13100A`). Small
+white Mapnik roads therefore have little contrast. It was already the case with the two
+previous approaches; fixing it would require compressing the output range, at the price of
+overall contrast.
 
-La vue satellite n'est jamais filtrée : une photo aérienne n'a pas de fond clair à
-inverser, et l'assombrir la rendrait illisible.
+Satellite view is never filtered: an aerial photo has no light background to invert, and
+darkening it would make it unreadable.
 
 ## Conventions
 
-- Commentaires et interface **en français**. Les commentaires expliquent *pourquoi*,
-  pas *quoi* — souvent le bug qu'ils préviennent. Garder ce registre.
-- Compose partout, pas de XML de layout. Pas de bibliothèque de navigation : la
-  navigation est un `when` sur une `String` d'onglet dans `MainScreen`.
-- Préférences via `android.preference.PreferenceManager` (déprécié mais uniforme
-  dans tout le projet — ne pas migrer à moitié).
-- `testTag` posés sur les éléments d'interface pour les tests Compose.
-- **Écran des réglages** : un groupe par sujet (`GroupLabel` + `SettingsGroup`, lignes
-  séparées de 2 dp dans un bloc aux coins de 28 dp), une ligne par réglage
-  (`SettingsRow`, `GroupItem`), et jamais deux réglages sans lien sur la même ligne.
-  Un réglage de plus ne doit coûter qu'une ligne, pas un bloc recopié. L'ordre des
-  groupes suit la fréquence d'usage, du plus courant au plus rare.
-- **Messages à l'utilisateur** : `LocalAppMessenger.current.show(…)`, pas de `Toast`,
-  dans tout ce qui est Compose. Seul `AutoBackupManager`, hors composition, garde le
-  sien.
+- **English everywhere in the repository**: code, comments, tests (including test names),
+  workflows, documentation, commit messages, release notes. Comments explain *why*, not
+  *what* — often the bug they prevent. Keep that register.
+- **User-facing text is never written in code**: it lives in string resources, translated
+  (see "Interface languages").
+- Compose everywhere, no layout XML. No navigation library: navigation is a `when` on a
+  tab `String` (`record`, `history`, `tools`, `settings`) in `MainScreen`.
+- Preferences through `android.preference.PreferenceManager` (deprecated but uniform across
+  the project — do not migrate halfway).
+- `testTag`s placed on interface elements for Compose tests. They never derive from a
+  displayed label (which changes with the language).
+- **Settings screen**: one group per subject (`GroupLabel` + `SettingsGroup`, rows
+  separated by 2 dp in a block with 28 dp corners), one row per setting (`SettingsRow`,
+  `GroupItem`), and never two unrelated settings on the same row. One more setting must
+  only cost one row, not a copied block. The order of groups follows frequency of use, from
+  most common to rarest.
+- **Messages to the user**: `LocalAppMessenger.current.show(…)`, no `Toast`, in everything
+  that is Compose. Only `AutoBackupManager`, outside composition, keeps its own.
 
-## Refonte de l'interface
+## Interface languages
 
-L'auteur a fourni une maquette complète (export HTML interactif : « Mes parcours »,
-« Écrans », « Système de design ») : 57 états d'écran, chacun en clair et en sombre,
-dans un style Material 3 Expressive. **Elle n'est pas versée au dépôt** ; une session
-qui reprend le chantier sans elle doit la redemander à l'auteur.
+The app follows the phone's language: `values/` is **English** (fallback for any unplanned
+language), `values-xx/` the translations — fr, es, pt, de, it, ru, zh, ja, ar (RTL) and hi.
+`res/xml/locales_config.xml` declares them for the "App language" picker of Android 13+;
+keep it aligned with the `values-xx` folders.
 
-**La refonte est appliquée à toute l'application.** Prévue d'abord par étapes, un APK
-à chacune, elle a finalement été faite d'un bloc à la demande de l'auteur (« fais
-tout, tu me donneras l'application de début à la fin »), après un premier APK de la
-seule étape de base qui ne ressemblait pas assez à la maquette. Choix de l'auteur qui
-tiennent toujours :
+- **No visible text hard-coded.** Compose: `stringResource(R.string.…)`; outside
+  composition: `context.getString`. **Positional** arguments (`%1$s`), and `%%` for a literal
+  percent sign in a string that has arguments. `app_name` stays "Mes parcours" everywhere
+  (`translatable="false"`).
+- **No plurals to agree**: the sentence is turned around a number ("Selected: 3") rather
+  than writing six forms per language.
+- **The data layer has no `Context`**: its errors are `UserFacingArgumentException` /
+  `UserFacingStateException` (`util/UserFacing.kt`) carrying the string's identifier; the
+  screen resolves it at display time (`Throwable.userMessage`).
+- **Never a translatable string as state**: GPS status is the `GpsStatus` enum (it used to
+  be "Signal trouvé" compared character for character).
+- **Dates and numbers**: `FormatUtils` (initialized by `TrackApplication`) uses
+  `DateFormat.getBestDateTimePattern` and `Locale.getDefault()`; no more `Locale.FRANCE`.
+- **Adding a language**: a complete `values-xx/strings.xml` folder + one line in
+  `locales_config.xml`. A missing text falls back on English.
+- Track names already recorded ("Track on … at …") stay in the language of their creation,
+  like a name typed by hand.
+- **The changelog is translated** (`rel_*` resources): a new version adds its strings in
+  **all** languages.
+- **Release notes shown in the update dialog** come from `update.json`: `notes` (English) and
+  the optional `notesI18n` (a map keyed by language code). `AvailableUpdate.notesFor(language)`
+  picks the phone's language and falls back on English. See "Publishing a release".
+- **Screenshots in another language**: `@Config(qualifiers = "de-" + RobolectricDeviceQualifiers.Pixel8)`
+  (the language goes **before** the screen qualifiers).
 
-1. **Palette fixe**, plus de couleur dynamique (Material You) sur Android 12+. Mêmes
-   couleurs quel que soit le fond d'écran.
-2. Ne pas reprendre les numéros de version 2.x de la maquette, ni ses cartes
-   dessinées : la carte reste OpenStreetMap et son filtre sombre (voir « Thème sombre
-   de la carte »).
+## Interface redesign
 
-**Où est quoi :**
+The author supplied a complete mockup (interactive HTML export: "Mes parcours", "Screens",
+"Design system"): 57 screen states, each in light and dark, in a Material 3 Expressive
+style. **It is not committed to the repository**; a session resuming the work without it
+must ask the author for it again.
 
-- `ui/theme/` — couleurs (`Color.kt`), `Theme.kt` (formes, `LocalRecordingColor`),
-  polices et échelle typographique (`Type.kt`, dont `StatXlTextStyle` et
-  `QuoteFontFamily`).
-- `ui/component/Expressive.kt` — les briques partagées : formes `CookieShape` et
-  `SunShape` (relevées point par point sur la maquette), `ShapeBadge`, `TrackTile`,
-  `MpSwitch`, boutons, `MpDialog`, `MpSheet`, `WaveProgress`, et les messages en bas
-  d'écran (`AppMessenger` / `LocalAppMessenger` / `AppMessageHost`) qui remplacent les
-  `Toast` d'Android dans l'interface Compose.
-- `ui/component/MainNavigationBar.kt` — la barre flottante. Elle s'efface quand un
-  outil ou une page de réglages (nouveautés, À propos) occupe l'écran.
-- Chaque écran a été refait dans son fichier : `HistoryTab`, `DetailView`,
-  `ToolsTab`, `SettingsTab` (avec les pages « Nouveautés » et « À propos »),
-  `UpdatePrompt` (étapes en feuilles du bas), `WelcomeScreen` (trois pages),
-  `TrackingTab` et les calques de `MapViewContainer` (repères aux couleurs du thème,
-  bandeau des tracés masqués, dialogue « Forcer l'affichage »).
+**The redesign is applied to the whole app.** First planned in stages, one APK at each, it
+was finally done in one go at the author's request ("do everything, you will give me the
+app from start to finish"), after a first APK of the base stage alone that did not resemble
+the mockup enough. Choices of the author that still hold:
 
-**Écarts volontaires à la maquette**, pour ne rien promettre que l'application ne
-fait pas :
+1. **Fixed palette**, no more dynamic color (Material You) on Android 12+. Same colors
+   whatever the wallpaper.
+2. Do not carry over the mockup's 2.x version numbers, nor its drawn maps: the map stays
+   OpenStreetMap and its dark filter (see "Dark theme of the map").
 
-- **Fusion** : la maquette dit que les originaux restent ; en réalité la fusion les
-  réunit dans le plus ancien (invariant 5, `mergeAndSaveTracks`). Les textes disent
-  ce qui se passe vraiment.
-- **Export** : la maquette écrit directement dans Téléchargements ; l'application
-  garde le sélecteur de fichier d'Android.
-- **Mise à jour** : pas de taille d'APK (inconnue avant téléchargement).
-  « Continuer en arrière-plan » range la feuille, le téléchargement se poursuit tant
-  que l'application reste ouverte, et la feuille revient d'elle-même à l'étape
-  suivante — pas de téléchargement hors de l'application.
-- **Tunnel** : la ligne « Sombre dans les tunnels » n'apparaît qu'en mode solaire,
-  seul mode où elle agit.
-- **Écran Enregistrer : disposition et tailles d'avant.** L'auteur a gardé le dessin
-  de la maquette (couleurs, polices, formes, ombres), mais voulu retrouver **la
-  place et la taille** des éléments d'avant. Un bandeau de statistiques d'une seule
-  rangée en haut (vitesse et altitude, puis distance, vitesse et altitude pendant
-  un enregistrement — **pas de durée**, à la demande de l'auteur ; point d'état du GPS à droite ; alertes de signal qui le
-  recouvrent un instant), le bandeau des tracés masqués juste en dessous. **Pas de
-  bouton de fond de carte sur cet écran**, à la demande de l'auteur : le choix se fait
-  uniquement dans les Paramètres (la maquette en proposait un, retiré). En bas à droite, des boutons ronds en colonne aux tailles
-  d'avant : Recentrer (56 dp, toujours visible, plein quand le suivi est actif), puis
-  Pause/Reprendre (56 dp) et le bouton principal (72 dp : Démarrer, Nouveau parcours
-  pendant le choix, Arrêter pendant l'enregistrement) ; pendant le choix, Annuler
-  (48 dp) et Reprendre une trace (56 dp) au-dessus. **Ne pas revenir à la carte
-  géante ni au bouton centré de la maquette.**
-- **Point de position : bleu**, pas la couleur du thème (`POSITION_DOT_BLUE` dans
-  `MapViewContainer`, #1A73E8 — le bleu de Google Maps d'avant la refonte). Demandé
-  par l'auteur : c'est ce que l'œil cherche d'abord sur la carte. Les repères de
-  départ et d'arrivée, eux, restent aux couleurs du thème.
-- **Tracés masqués** : « Laisser masqués » remplace « Masquer les tracés » dans le bandeau
-  des tracés masqués — les tracés le sont déjà, le bouton range seulement le bandeau.
+**What is where:**
 
-**Nouveautés de la maquette déjà faites** : profil d'altitude dans la fiche détail,
-accueil en trois pages, dates dans le journal des nouveautés (dates de publication
-GitHub, champ `date` de `Release`), prochaine bascule jour/nuit sous « Lever et
-coucher du soleil ». **Restent à faire** : aperçu des morceaux avant un découpage,
-date d'une mise à jour ignorée, pastille « Nouveau » sur un parcours importé, bouton
-Pause dans la notification, badge « SIMULATION » (la simulation GPS n'est pas exposée
-au ViewModel), cône de cap sous le point de position, icône d'application.
+- `ui/theme/` — colors (`Color.kt`), `Theme.kt` (shapes, `LocalRecordingColor`), fonts and
+  type scale (`Type.kt`, including `StatXlTextStyle` and `QuoteFontFamily`).
+- `ui/component/Expressive.kt` — the shared building blocks: `CookieShape` and `SunShape`
+  shapes (taken point by point from the mockup), `ShapeBadge`, `TrackTile`, `MpSwitch`,
+  buttons, `MpDialog`, `MpSheet`, `WaveProgress`, and the messages at the bottom of the
+  screen (`AppMessenger` / `LocalAppMessenger` / `AppMessageHost`) that replace Android's
+  `Toast` in the Compose interface.
+- `ui/component/MainNavigationBar.kt` — the floating bar. It fades away when a tool or a
+  settings page (what's new, About) occupies the screen.
+- Each screen was redone in its file: `HistoryTab`, `DetailView`, `ToolsTab`, `SettingsTab`
+  (with the "What's new" and "About" pages), `UpdatePrompt` (steps as bottom sheets),
+  `WelcomeScreen` (three pages), `TrackingTab` and the layers of `MapViewContainer`
+  (markers in theme colors, hidden-tracks banner, "Force display" dialog).
 
-**Polices** : Bricolage Grotesque (titres, chiffres) et Figtree (interface), fichiers
-variables officiels de Google Fonts dans `res/font`, licence SIL OFL 1.1 (textes dans
-`licenses/`). Bricolage est utilisée avec ses axes de largeur et de taille optique,
-qu'Android n'applique qu'à partir de l'API 26 : sur Android 7, la police s'affiche
-dans son instance par défaut, ni resserrée ni graissée.
+**Deliberate departures from the mockup**, so as to promise nothing the app does not do:
 
-**Regarder les pixels sans téléphone.** Lancer les tests avec
-`-Proborazzi.test.record=true` (dans la session, depuis la suppression de
-`debug-apk.yml`) : les images sont écrites dans `app/src/test/screenshots/refonte/`,
-à ne pas verser au dépôt. `ScreensScreenshotTest` peuple une base en mémoire comme la
-maquette et photographie chaque écran et ses états principaux (feuilles et dialogues
-compris, par `captureScreenRoboImage`). Robolectric y dessine l'interface Compose
-réelle — polices, couleurs, mise en page — de quoi la confronter à la maquette avant
-même d'installer l'APK. C'est l'application directe de la leçon de « L'ombre
-tranchée » : regarder avant de raisonner. Limites : pas de tuiles de carte (pas de
-réseau), ombres peu fidèles, et des nombres au format anglais (« 4.4 km/h ») là où
-`FormatUtils` suit la langue de l'appareil — un téléphone français affiche « 4,4 ».
+- **Merge**: the mockup says the originals remain; in reality merging combines them into the
+  oldest (invariant 5, `mergeAndSaveTracks`). The texts say what really happens.
+- **Export**: the mockup writes directly to Downloads; the app keeps Android's file picker.
+- **Update**: no APK size (unknown before download). "Continue in background" tucks the
+  sheet away, the download continues as long as the app stays open, and the sheet comes back
+  by itself at the next step — no download outside the app.
+- **Tunnel**: the "Dark in tunnels" row only appears in solar mode, the only mode where it
+  acts.
+- **Record screen: former layout and sizes.** The author kept the mockup's design (colors,
+  fonts, shapes, shadows), but wanted back **the place and size** of the former elements. A
+  single-row statistics banner at the top (speed and altitude, then distance, speed and
+  altitude during a recording — **no duration**, at the author's request; GPS status dot on
+  the right; signal alerts that cover it for a moment), the hidden-tracks banner just below.
+  **No map background button on this screen**, at the author's request: the choice is made
+  only in Settings (the mockup offered one, removed). At the bottom right, round buttons in a
+  column at the former sizes: Recenter (56 dp, always visible, filled when following is
+  active), then Pause/Resume (56 dp) and the main button (72 dp: Start, New track during the
+  choice, Stop during recording); during the choice, Cancel (48 dp) and Resume a track
+  (56 dp) above. **Do not go back to the giant map or the centered button of the mockup.**
+- **Position dot: blue**, not the theme color (`POSITION_DOT_BLUE` in `MapViewContainer`,
+  #1A73E8 — the Google Maps blue from before the redesign). Requested by the author: it is
+  what the eye looks for first on the map. The start and finish markers stay in theme colors.
+- **Hidden tracks**: "Keep hidden" replaces "Hide tracks" in the hidden-tracks banner — the
+  tracks already are hidden, the button only tucks the banner away.
 
-## État actuel
+**Mockup novelties already done**: elevation profile in the detail sheet, three-page welcome,
+dates in the changelog (GitHub publication dates, `date` field of `Release`), next day/night
+switch under "Sunrise and sunset". **Still to do**: preview of pieces before a split, date of
+an ignored update, "New" chip on an imported track, Pause button in the notification,
+"SIMULATION" badge (GPS simulation is not exposed to the ViewModel), heading cone under the
+position dot, app icon.
 
-- `assembleDebug` et `testDebugUnitTest` passent.
-- 195 tests unitaires en 23 suites : `ScreensScreenshotTest` (33, captures seules —
-  voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `TrimTrackTest` (14), `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
-  (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
-  `RecordingGuardsTest` (7),
+**Fonts**: Bricolage Grotesque (titles, figures) and Figtree (interface), official variable
+files from Google Fonts in `res/font`, SIL OFL 1.1 license (texts in `licenses/`). Bricolage
+is used with its width and optical-size axes, which Android only applies from API 26: on
+Android 7, the font shows in its default instance, neither condensed nor bolded.
+
+**Looking at pixels without a phone.** Run the tests with `-Proborazzi.test.record=true`
+(in the session, since `debug-apk.yml` was removed): images are written to
+`app/src/test/screenshots/refonte/`, not to be committed. `ScreensScreenshotTest` populates
+an in-memory database like the mockup and photographs every screen and its main states
+(sheets and dialogs included, through `captureScreenRoboImage`). Robolectric draws the real
+Compose interface there — fonts, colors, layout — enough to compare it with the mockup even
+before installing the APK. It is the direct application of the lesson of "The sliced
+shadow": look before reasoning. Limits: no map tiles (no network), shadows not very faithful,
+and the language is that of the test (English by default; see "Interface languages" for
+other languages — long German texts and right-to-left Arabic are worth a look after any
+layout change).
+
+## Current state
+
+- `assembleDebug` and `testDebugUnitTest` pass.
+- 196 unit tests in 23 suites: `ScreensScreenshotTest` (33, screenshots only — see
+  "Interface redesign"), `Iso8601Test` (16), `UpdateManifestTest` (17), `TrimTrackTest`
+  (14), `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest` (9), `KmlColorTest` (8),
+  `AltitudeSmootherTest` (7), `KmlExportTest` (7), `RecordingGuardsTest` (7),
   `KmlStyleTableTest` (7), `TrackSegmentsTest` (7), `CoordinateTokenizerTest` (6),
-  `DarkTilesColorFilterTest` (6), `DesignSystemScreenshotTest` (6, captures seules),
+  `DarkTilesColorFilterTest` (6), `DesignSystemScreenshotTest` (6, screenshots only),
   `ElevationAccumulatorTest` (6), `TunnelDetectorTest` (6), `MergeTracksTest` (5),
-  `MigrationChainTest` (3), plus trois tests d'échafaudage hérités
-  (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
-  Roborazzi).
-  Ce décompte s'était mis à mentir : il annonçait 72 tests pour 11 suites alors que le
-  dépôt en portait 80 pour 15, `KmlExportTest` n'y ayant jamais été ajouté. À tenir à
-  jour en même temps que les tests eux-mêmes.
-- Sous git depuis le premier commit de l'état `0.9.8-thierry`, branche `main`.
+  `MigrationChainTest` (3), plus three legacy scaffold tests (`ExampleUnitTest`,
+  `ExampleRobolectricTest`, `GreetingScreenshotTest` with Roborazzi).
+  Running the whole suite in one go fails locally because of Robolectric native-library
+  conflicts: run the suites one at a time (`--tests 'com.example.<Suite>'`). This count had
+  once come to lie; keep it up to date together with the tests themselves.
+- Under git since the first commit of the `0.9.8-thierry` state, branch `main`.
 
-## Où en est le projet
+## Where the project stands
 
-### Ce qui est en place
+### What is in place
 
-- Le dépôt existe et il est **public** : `https://github.com/ToftMalone/Mes-parcours`,
-  branche par défaut `main`. Sa visibilité n'est pas un détail — `update.json` est
-  téléchargé sans jeton, et un dépôt privé répondait 404, ce qui rendait toute la
-  recherche de mise à jour inopérante en silence.
-- **Le trousseau de signature existe** et les quatre secrets du dépôt sont renseignés.
-  `assembleRelease` produit donc un APK signé, en local comme en intégration continue.
-- **Deux versions ont été publiées** (`v0.9.9-thierry`, `v0.9.10-thierry`) : la chaîne
-  de publication a tourné en vrai, `update.json` répond à l'URL attendue, et une
-  application installée détecte désormais les versions suivantes toute seule.
+- The repository exists and is **public**: `https://github.com/ToftMalone/Mes-parcours`,
+  default branch `main`. Its visibility is not a detail — `update.json` is downloaded without
+  a token, and a private repository answered 404, which silently made the whole update search
+  inoperative.
+- **The signing keystore exists** and the repository's four secrets are filled in.
+  `assembleRelease` therefore produces a signed APK, locally as in continuous integration.
+- **Many versions have been published**: the publishing chain runs for real, `update.json`
+  answers at the expected URL, and an installed app detects following versions by itself.
 
-### En attente d'une action de l'auteur
+### Awaiting an action from the author
 
-- Rien ne bloque plus la chaîne de publication.
-- **La 1.0 est publiée**, sans attendre le mois de retours d'usage initialement
-  prévu sur la 0.15 : l'auteur a tranché. Le découpage et les deux convertisseurs
-  CSV (ajoutés en 0.14 et 0.15) avaient déjà été confirmés fonctionnels sur le
-  terrain ; les versions suivantes (rognage, écran de bienvenue, notification de
-  mise à jour en tâche de fond) partent directement en 1.0, sans un tour
-  supplémentaire en version de développement.
+- Nothing blocks the publishing chain any more.
+- **1.0 is published**, without waiting for the month of usage feedback initially planned on
+  0.15: the author decided. Splitting and both CSV converters (added in 0.14 and 0.15) had
+  already been confirmed working in the field.
 
-### Relecture de la 2.0.3 : enregistrement, pause, import
+### Review of 2.0.3: recording, pause, import
 
-Relecture « bugs, failles, choses non optimales », à la demande de l'auteur. Huit
-points corrigés ; deux autres relevés et laissés de côté par l'auteur (voir la fin).
-Journal des nouveautés volontairement réduit à « Correction de bugs » et
-« Optimisation de l'utilisation de la batterie », à sa demande.
+A "bugs, flaws, non-optimal things" review, at the author's request. Eight points fixed; two
+others noted and set aside by the author (see the end). Changelog deliberately reduced to
+"Bug fixes" and "Battery usage optimization", at their request.
 
-1. **Le parcours en cours ne se fusionne ni ne se supprime plus.** La fusion le
-   proposait, l'historique et la fiche détail offraient « Supprimer » : la ligne
-   disparaissait sous le service, qui continuait d'y écrire, et chaque point suivant
-   était refusé en silence par la clé étrangère. `TrackRepository.isBeingRecorded`
-   tranche ; `deleteTrack` renvoie false et `mergeAndSaveTracks` lève, en plus des
-   écrans qui n'offrent plus l'action.
-2. **La pause est mémorisée en base** (`Track.isPaused`, migration 9→10). Elle ne
-   vivait que dans le service : un processus tué pendant une pause, ou un téléphone
-   redémarré, reprenait l'enregistrement tout seul. `ACTION_RESTORE` (BootReceiver)
-   et la relance `START_STICKY` relisent l'état en base ; une pause reçue par un
-   service tout juste recréé (`hasSession` faux) est écrite sur le parcours resté
-   ouvert, puis le service s'arrête. `persistPauseState` relit `isPaused` sous un
-   verrou, pour qu'une écriture ancienne ne passe jamais après une plus récente.
-3. **La vitesse moyenne se prolonge après une reprise** : `ResumeState` porte la
-   somme et le nombre de vitesses retenues, que le service remettait à zéro.
-4. **L'export ouvre la destination en mode « wt »** : en « w », certains
-   fournisseurs de documents ne vident pas le fichier, et écraser un export plus
-   long laissait sa fin derrière le nouveau contenu.
-5. **Plus de reprise en arrière-plan sans l'autorisation « Toujours »**
-   (`RecordingRecovery`). Depuis Android 14, `startForeground` d'un service de
-   localisation lancé en arrière-plan lève une exception sans elle ; elle était
-   attrapée, mais Android tuait ensuite l'application faute de premier plan. On
-   prévient à la place par une notification, et le parcours attend en pause.
-6. **Pause, reprise, arrêt et chronomètre passent tous par le thread principal**
-   (`TrackingService.applyState`). Le chronomètre était démarré depuis le thread des
-   points après la préparation d'une reprise : une pause demandée pendant cette
-   préparation passait avant, et il tournait pendant la pause.
-7. **En pause et application quittée, le GPS passe en mode économe** (précision
-   réduite, une position toutes les dix secondes) au lieu de la pleine précision à
-   1 Hz. Écran ouvert, la précision reste pleine pour le point bleu. L'alerte de
-   perte de signal ignore désormais les pauses.
-8. **L'import n'est plus une seule transaction**, qui verrouillait la base en
-   écriture et figeait un enregistrement en cours jusqu'à la fin de l'import. Une
-   transaction par lot ; la ligne réservée porte `startTime =
-   Track.IMPORT_PLACEHOLDER_START_TIME`, qui la cache de l'historique, un échec la
-   supprime, et `cleanupInterruptedImports` (au démarrage) rattrape celle d'un import
-   tué avec l'application.
+1. **The track being recorded can no longer be merged or deleted.** Merging offered it, the
+   history and the detail sheet offered "Delete": the row disappeared under the service,
+   which kept writing to it, and every following point was silently refused by the foreign
+   key. `TrackRepository.isBeingRecorded` decides; `deleteTrack` returns false and
+   `mergeAndSaveTracks` throws, on top of the screens no longer offering the action.
+2. **The pause is stored in the database** (`Track.isPaused`, migration 9→10). It only lived
+   in the service: a process killed during a pause, or a phone rebooted, resumed the
+   recording by itself. `ACTION_RESTORE` (BootReceiver) and the `START_STICKY` restart
+   reread the state from the database; a pause received by a freshly recreated service
+   (`hasSession` false) is written to the track left open, then the service stops.
+   `persistPauseState` rereads `isPaused` under a lock, so that an old write never goes
+   through after a more recent one.
+3. **The average speed carries on after a resume**: `ResumeState` carries the sum and count
+   of retained speeds, which the service used to reset to zero.
+4. **Export opens the destination in "wt" mode**: in "w", some document providers do not
+   empty the file, and overwriting a longer export left its tail behind the new content.
+5. **No more background resume without the "Always" permission** (`RecordingRecovery`).
+   Since Android 14, `startForeground` of a location service launched in the background
+   throws without it; it was caught, but Android then killed the app for lack of a
+   foreground. A notification warns instead, and the track waits paused.
+6. **Pause, resume, stop and stopwatch all go through the main thread**
+   (`TrackingService.applyState`). The stopwatch used to be started from the points thread
+   after a resume's preparation: a pause requested during that preparation went first, and
+   it ran during the pause.
+7. **When paused and the app is left, the GPS goes economical** (reduced accuracy, one
+   position every ten seconds) instead of full accuracy at 1 Hz. With the screen open,
+   accuracy stays full for the blue dot. The signal-loss alert now ignores pauses.
+8. **Import is no longer a single transaction**, which locked the database for writing and
+   froze a recording in progress until the import ended. One transaction per batch; the
+   reserved row carries `startTime = Track.IMPORT_PLACEHOLDER_START_TIME`, which hides it
+   from the history, a failure deletes it, and `cleanupInterruptedImports` (at startup)
+   catches the one of an import killed along with the app.
 
-**Relevés, non traités pour l'instant :**
+**Noted, not handled for now:**
 
-- `insertPoint` suspend : le thread unique de `pointScope` sérialise les morceaux de
-  code entre deux suspensions, pas les coroutines entières. Deux positions livrées
-  ensemble liraient donc la même position précédente, et la distance serait comptée
-  A→B + A→C. À vérifier, puis corriger en avançant `lastLocation` avant l'écriture
-  ou en traitant les positions dans une file unique.
-- Le tracé en direct, recopié et reconstruit à chaque point (voir « Rapidité et
-  batterie de la 1.3 »).
+- `insertPoint` suspends: `pointScope`'s single thread serializes the pieces of code between
+  two suspensions, not entire coroutines. Two positions delivered together would therefore
+  read the same previous position, and distance would be counted A→B + A→C. To verify, then
+  fix by advancing `lastLocation` before writing or by processing positions in a single queue.
+- The live line, copied and rebuilt at every point (see "Speed and battery of 1.3").
 
-### Audit du 0.11.2
+### Audit of 0.11.2
 
-Une relecture complète du code a produit une liste de trente-deux points, dont
-vingt-deux ont été traités dans cette version (voir le journal des nouveautés et
-« Poids mort »). Les dix restants ont été écartés par l'auteur, sciemment :
+A complete code review produced a list of thirty-two points, of which twenty-two were
+handled in that version (see the changelog and "Dead weight"). The remaining ten were set
+aside by the author, knowingly:
 
-- **La vue satellite passe par les serveurs de tuiles de Google** (`mt0-3.google.com`,
-  `MapViewContainer`). La préférence porte encore le nom `usgs_sat`, hérité d'une
-  imagerie publique qui n'est plus celle utilisée. Deux conséquences : c'est un usage
-  hors conditions d'utilisation, coupable d'être coupé sans préavis, et la zone
-  consultée part chez Google — ce que la promesse « rien ne quitte l'appareil » ne
-  laisse pas attendre.
-- Le cache de tuiles osmdroid est dans `externalCacheDir` : lisible par une autre
-  application sur Android 9 et antérieur.
-- Le filtre anti-dérive `dist > 1.0` écarte les intervalles de moins d'un mètre : à
-  1 Hz, la marche lente (moins de 3,6 km/h) est structurellement sous-comptée.
-- `FLAG_KEEP_SCREEN_ON` est posé sans condition dans `MainActivity` : l'écran ne
-  s'éteint jamais tant que l'application est ouverte, même hors enregistrement.
-  **Voulu, pas un défaut** — confirmé par l'auteur lors de la relecture batterie de
-  la 1.2 : ne pas le limiter à l'enregistrement est un choix assumé, pas un oubli.
-- L'export vers Téléchargements est inopérant sur Android 9 et antérieur :
-  `MediaStoreExporter` emprunte alors le stockage public sans que
-  `WRITE_EXTERNAL_STORAGE` soit déclarée. Échec silencieux.
-- Le tracé en diagonale (voir ci-dessous) reste non corrigé, à la demande de l'auteur.
+- **Satellite view goes through Google's tile servers** (`mt0-3.google.com`,
+  `MapViewContainer`). The preference still carries the name `usgs_sat`, inherited from a
+  public imagery that is no longer the one used. Two consequences: it is a use outside the
+  terms of service, liable to be cut without notice, and the area consulted goes to Google —
+  which the "nothing leaves the device" promise does not lead one to expect.
+- The osmdroid tile cache is in `externalCacheDir`: readable by another app on Android 9 and
+  earlier.
+- The anti-drift filter `dist > 1.0` discards intervals under one meter: at 1 Hz, slow
+  walking (under 3.6 km/h) is structurally undercounted.
+- `FLAG_KEEP_SCREEN_ON` is set unconditionally in `MainActivity`: the screen never turns off
+  as long as the app is open, even outside recording. **Intended, not a defect** — confirmed
+  by the author during the 1.2 battery review: not limiting it to recording is an assumed
+  choice, not an oversight.
+- Export to Downloads does not work on Android 9 and earlier: `MediaStoreExporter` then uses
+  public storage without `WRITE_EXTERNAL_STORAGE` being declared. Silent failure.
+- The diagonal line (see below) remains unfixed, at the author's request.
 
-### Audit de sécurité d'avant la 1.0
+### Security audit before 1.0
 
-Relecture complète orientée sécurité : manifeste, chaîne de mise à jour, import et
-export, stockage, requêtes en base, workflows d'intégration continue. Neuf points
-relevés, **six corrigés**, trois laissés tels quels et documentés ci-dessous.
+Complete security-oriented review: manifest, update chain, import and export, storage,
+database queries, continuous integration workflows. Nine points noted, **six fixed**, three
+left as is and documented below.
 
-Rien de grave n'a été trouvé, et l'essentiel était déjà en place — à ne pas défaire :
-analyseur XML durci contre les entités (invariant 4), requêtes Room toutes
-paramétrées, échappement XML à l'export, noms de fichiers d'export nettoyés, trafic
-en clair refusé par défaut, `PendingIntent` tous immuables, service et FileProvider
-non exportés, et des workflows qui passent leurs entrées par l'environnement plutôt
-que de les interpoler dans un shell.
+Nothing serious was found, and most of it was already in place — not to be undone: XML
+parser hardened against entities (invariant 4), Room queries all parameterized, XML escaping
+at export, sanitized export file names, cleartext traffic refused by default, all
+`PendingIntent`s immutable, service and FileProvider not exported, and workflows that pass
+their inputs through the environment rather than interpolating them into a shell.
 
-**Corrigés :**
+**Fixed:**
 
-1. **Les préférences partaient dans la sauvegarde cloud.** `backup_rules.xml` et
-   `data_extraction_rules.xml` excluaient la base et le stockage externe, mais pas le
-   domaine `sharedpref` — où `pref_last_lat` / `pref_last_lng` conservent la dernière
-   position de carte affichée, réécrite à chaque déplacement, donc en pratique le
-   domicile. Exclure l'historique sans exclure les préférences laissait partir le
-   point le plus parlant de tous. Les deux fichiers excluent désormais `sharedpref`.
-2. **L'APK de mise à jour était déposé sur le stockage externe.** L'empreinte est
-   vérifiée pendant l'écriture, mais plusieurs secondes s'écoulent avant que
-   l'utilisateur n'appuie sur « Installer » : sur Android 9 et antérieur, que l'on
-   couvre encore, toute application ayant la permission de stockage pouvait remplacer
-   le fichier dans cet intervalle. Android refuse bien un APK signé d'une autre clé
-   **portant le même nom de paquet** — mais un APK au nom de paquet différent
-   s'installerait, validé de confiance par un utilisateur en pleine mise à jour.
-   `UpdateDownloader` écrit maintenant dans `filesDir`, inaccessible aux autres
-   applications sur toutes les versions, et `file_paths.xml` expose ce chemin par
-   `files-path` au lieu d'`external-files-path`.
-3. **L'empreinte SHA-256 est devenue obligatoire.** Voir « Mise à jour de
-   l'application » pour le raisonnement.
-4. **L'adresse de l'APK est contrainte à GitHub**, et plus seulement à HTTPS. La
-   vérification porte sur l'hôte analysé, jamais sur le texte de l'adresse :
-   `https://github.com.exemple.test/` commence bien par « https://github.com ».
-5. **La lecture du manifeste est bornée** à 65 536 caractères. Sans plafond, une
-   réponse anormale faisait grossir la mémoire jusqu'au plantage, pour une requête
-   que l'utilisateur n'a même pas demandée.
-6. **Le journal de diagnostic d'`EnvironmentUtils` est gardé par `BuildConfig.DEBUG`.**
-   Il détaillait la marque, le modèle et l'empreinte de l'appareil en version
-   distribuée, où ils ne servent personne.
+1. **Preferences went into the cloud backup.** `backup_rules.xml` and
+   `data_extraction_rules.xml` excluded the database and external storage, but not the
+   `sharedpref` domain — where `pref_last_lat` / `pref_last_lng` keep the last map position
+   displayed, rewritten at every move, hence in practice the home. Excluding the history
+   without excluding preferences let the most telling point of all leave. Both files now
+   exclude `sharedpref`.
+2. **The update APK was dropped on external storage.** The fingerprint is checked during
+   writing, but several seconds pass before the user taps "Install": on Android 9 and
+   earlier, which we still cover, any app with the storage permission could replace the file
+   in that interval. Android does refuse an APK signed with another key **bearing the same
+   package name** — but an APK with a different package name would install, trusted by a
+   user in the middle of an update. `UpdateDownloader` now writes to `filesDir`, inaccessible
+   to other apps on every version, and `file_paths.xml` exposes that path through
+   `files-path` instead of `external-files-path`.
+3. **The SHA-256 fingerprint became mandatory.** See "App update" for the reasoning.
+4. **The APK's address is constrained to GitHub**, and no longer merely to HTTPS. The check
+   is on the parsed host, never on the text of the address: `https://github.com.example.test/`
+   does start with "https://github.com".
+5. **Reading the manifest is bounded** to 65,536 characters. Without a cap, an abnormal
+   response made memory grow until a crash, for a request the user did not even ask for.
+6. **`EnvironmentUtils`' diagnostic log is guarded by `BuildConfig.DEBUG`.** It detailed the
+   brand, model and fingerprint of the device in the distributed version, where they serve
+   no one.
 
-**Écartés, sciemment :**
+**Set aside, knowingly:**
 
-- **Le récepteur de démarrage est exporté sans protection.** C'est obligatoire pour
-  recevoir `BOOT_COMPLETED` ; on ne peut donc pas le fermer. Une application tierce
-  peut lui adresser une intention explicite en imitant l'action, mais il ne fait
-  quelque chose que s'il existe déjà un enregistrement interrompu à reprendre : ni
-  fuite, ni démarrage d'enregistrement à froid.
-- **Le cache de tuiles est dans `externalCacheDir`** — déjà relevé par l'audit du
-  0.11.2. Lisible par une autre application sur Android 9 et antérieur, ce qui
-  trahit les zones consultées.
-- **La sauvegarde automatique écrit dans `Download/Mes parcours/`.** C'est la
-  fonctionnalité voulue, pas un défaut ; sur Android 9 et antérieur, toute
-  application ayant la permission de lecture accède donc à l'intégralité des
-  trajets. Arbitrage entre des fichiers faciles à récupérer et des fichiers confinés.
+- **The boot receiver is exported without protection.** It is mandatory to receive
+  `BOOT_COMPLETED`; it cannot therefore be closed. A third-party app can address it an
+  explicit intent imitating the action, but it only does something if there already is an
+  interrupted recording to resume: neither a leak, nor a cold start of a recording.
+- **The tile cache is in `externalCacheDir`** — already noted by the 0.11.2 audit. Readable
+  by another app on Android 9 and earlier, which betrays the areas consulted.
+- **Automatic backup writes to `Download/Mes parcours/`.** This is the intended feature, not
+  a defect; on Android 9 and earlier, any app with read permission therefore accesses every
+  trip. A trade-off between files that are easy to retrieve and confined files.
 
-Reste aussi la vue satellite servie par Google, déjà arbitrée dans l'audit du 0.11.2 :
-c'est le seul endroit où la promesse « rien ne quitte l'appareil » est prise en défaut.
+Also remaining is the satellite view served by Google, already arbitrated in the 0.11.2
+audit: it is the only place where the "nothing leaves the device" promise is not kept.
 
-### Audit de sécurité de la 1.1
+### Security audit of 1.1
 
-Seconde relecture orientée sécurité, à la demande de l'auteur. **Rien de grave :** le
-durcissement d'avant la 1.0 tient, et l'essentiel de ce qui suit relève du garde-fou
-plutôt que de la faille. Quatre points corrigés.
+Second security-oriented review, at the author's request. **Nothing serious:** the
+pre-1.0 hardening holds, and most of what follows is a safeguard rather than a flaw. Four
+points fixed.
 
-**Une supposition vérifiée plutôt que reconduite.** Le commentaire de `newSaxParser`
-affirmait que le chemin GPX n'a rien à durcir, kXML2 ignorant la déclaration de type
-de document. C'est exact, et la source d'AOSP le confirme : `readEntityDeclaration`
-ne range une entité dans `documentEntities` que si `FEATURE_PROCESS_DOCDECL` est
-actif — faux par défaut, jamais activé ici — et les entités externes sont mappées sur
-la chaîne vide. Ni « billion laughs » ni XXE par le GPX. **Ne pas activer ce drapeau**,
-c'est lui seul qui tient la garantie.
+**An assumption verified rather than carried over.** The comment of `newSaxParser` claimed
+that the GPX path has nothing to harden, kXML2 ignoring the document type declaration. That
+is correct, and AOSP's source confirms it: `readEntityDeclaration` only stores an entity in
+`documentEntities` if `FEATURE_PROCESS_DOCDECL` is active — false by default, never enabled
+here — and external entities are mapped to the empty string. Neither "billion laughs" nor
+XXE through GPX. **Do not enable that flag**, it alone holds the guarantee.
 
-**Corrigés :**
+**Fixed:**
 
-1. **`parseGPX` accumulait le texte sans borne.** `textBuffer.append(parser.text)`
-   n'avait aucun plafond et n'était vidé qu'au `START_TAG` suivant : un `<desc>` de
-   plusieurs dizaines de mégaoctets était recopié entier. Le chemin KML, lui, borne
-   chacun de ses tampons — c'était une asymétrie, pas un choix. Désormais tronqué à
-   [MAX_GPX_TEXT_LENGTH], et lu par `getTextCharacters` plutôt que `parser.text`, qui
-   fabriquait d'abord une copie complète. **Le tampon interne de kXML2 reste le
-   plancher** : il accumule le nœud de texte quoi qu'on fasse, et seul un passage du
-   GPX en SAX — comme le KML — le supprimerait. Le correctif divise la dépense par
-   trois environ, il ne la borne pas.
-2. **`MediaStoreExporter` n'assainissait pas le nom de fichier.** La branche Android 9
-   et antérieur faisait `File(targetDir, fileName)` sans rien vérifier : un séparateur
-   de chemin dans le nom sortait du dossier visé. Non exploitable en l'état — le seul
-   appelant restant compose son nom à partir d'une date — mais le garde-fou qu'assurait
-   `safeFileName` avait disparu avec le partage, et la conversion CSV, qui dérivait ce
-   nom du fichier choisi, venait d'être retirée. `sanitizeFileName` le tient maintenant
-   au seul endroit qui ouvre le fichier.
-3. **Les APK de mise à jour partaient dans la sauvegarde.** Ni `backup_rules.xml` ni
-   `data_extraction_rules.xml` n'excluaient le domaine `file`, et `clearDownloads`
-   n'était appelé qu'à la découverte d'une version plus récente : une vingtaine de Mio
-   restaient sur le disque entre deux publications, et dans la sauvegarde avec le
-   reste. Pas un problème de confidentialité — un APK est public et retéléchargeable —
-   mais de quoi épuiser le quota de sauvegarde et la faire échouer en silence. Le
-   dossier est exclu des deux voies, et le ménage se fait à chaque lancement, sur
-   `Dispatchers.IO` (il se faisait jusque-là sur le thread principal).
-4. **Interpolation shell dans les workflows.** `${{ }}` est remplacé avant que le
-   shell ne voie la ligne : `debug-apk.yml` et l'étape de publication de `release.yml`
-   composaient ainsi des commandes à partir du `versionName`. Exploiter cela demande
-   déjà un accès en écriture au dépôt, mais c'était la seule entorse à la règle que le
-   reste des workflows applique. Toutes ces valeurs passent désormais par
-   l'environnement.
+1. **`parseGPX` accumulated text without bound.** `textBuffer.append(parser.text)` had no
+   cap and was only emptied at the next `START_TAG`: a `<desc>` of several tens of megabytes
+   was copied whole. The KML path bounds each of its buffers — it was an asymmetry, not a
+   choice. Now truncated to [MAX_GPX_TEXT_LENGTH], and read by `getTextCharacters` rather
+   than `parser.text`, which first made a complete copy. **kXML2's internal buffer remains
+   the floor**: it accumulates the text node whatever we do, and only moving GPX to SAX —
+   like KML — would remove it. The fix divides the cost by about three, it does not bound it.
+2. **`MediaStoreExporter` did not sanitize the file name.** The Android 9 and earlier branch
+   did `File(targetDir, fileName)` without checking anything: a path separator in the name
+   escaped the target folder. Not exploitable as it stands — the only remaining caller
+   composes its name from a date — but the safeguard that `safeFileName` provided had
+   disappeared with sharing, and CSV conversion, which derived that name from the chosen
+   file, had just been removed. `sanitizeFileName` now keeps it at the single place that
+   opens the file.
+3. **Update APKs went into the backup.** Neither `backup_rules.xml` nor
+   `data_extraction_rules.xml` excluded the `file` domain, and `clearDownloads` was only
+   called on discovering a newer version: some twenty MiB stayed on disk between two
+   releases, and in the backup with the rest. Not a privacy problem — an APK is public and
+   re-downloadable — but enough to exhaust the backup quota and make it fail silently. The
+   folder is excluded from both routes, and cleanup happens at every launch, on
+   `Dispatchers.IO` (it used to run on the main thread).
+4. **Shell interpolation in workflows.** `${{ }}` is replaced before the shell sees the line:
+   `debug-apk.yml` and `release.yml`'s publish step composed commands from the `versionName`
+   this way. Exploiting that already requires write access to the repository, but it was the
+   only breach of the rule the rest of the workflows apply. All these values now go through
+   the environment.
 
-**Relevés sans suite, faute d'enjeu réel :** `isMinifyEnabled = false` en release (pas
-d'obfuscation, choix assumé) ; la base Room non chiffrée au repos, protégée par le bac
-à sable et le chiffrement de l'appareil — SQLCipher n'aurait de sens que contre une
-extraction physique sur appareil déverrouillé ; et le `versionName` du manifeste de
-mise à jour, affiché sans borne de longueur, qui ne devient trompeur que si le compte
-GitHub lui-même est compromis — cas où la clé de signature reste, elle, hors d'atteinte.
+**Noted with no follow-up, for lack of real stakes:** `isMinifyEnabled = false` in release
+(no obfuscation, assumed choice); the Room database unencrypted at rest, protected by the
+sandbox and device encryption — SQLCipher would only make sense against a physical
+extraction on an unlocked device; and the update manifest's `versionName`, displayed with no
+length bound, which only becomes misleading if the GitHub account itself is compromised —
+a case where the signing key stays out of reach.
 
-### Audit de sécurité de la 1.3
+### Security audit of 1.3
 
-Troisième relecture orientée sécurité, à la demande de l'auteur : code de
-l'application, workflows, historique git complet. **Rien de grave**, le durcissement
-des deux audits précédents tient. Trois points corrigés, un laissé de côté par l'auteur, deux
-relevés pour mémoire.
+Third security-oriented review, at the author's request: app code, workflows, complete git
+history. **Nothing serious**, the hardening of the two previous audits holds. Three points
+fixed, one left aside by the author, two noted for the record.
 
-**Vérifié sain** : aucun secret dans l'historique git (aucun trousseau n'y a jamais
-été versionné, `GEMINI_API_KEY` n'y a jamais porté de valeur réelle) ; requêtes Room
-toutes statiques ou paramétrées ; seuls le lanceur et `BootReceiver` exportés, aucun
-lien profond ; tout le trafic en HTTPS.
+**Verified sound**: no secret in the git history (no keystore was ever versioned,
+`GEMINI_API_KEY` never carried a real value there); Room queries all static or
+parameterized; only the launcher and `BootReceiver` exported, no deep link; all traffic over
+HTTPS.
 
-**Corrigés :**
+**Fixed:**
 
-1. **Les actions des workflows étaient désignées par étiquette** (`@v4`). Une
-   étiquette se déplace : son auteur, ou qui lui vole son compte, peut la faire
-   pointer sur un autre code — c'est arrivé en 2025 à `tj-actions/changed-files`.
-   L'enjeu est la clé de signature : `setup-gradle` injecte son propre code dans le
-   Gradle qui signe l'APK avec le mot de passe du trousseau, et qui détient la clé
-   peut publier une mise à jour que l'application installera comme légitime. Toutes
-   les actions sont désormais épinglées par identifiant de commit, la version lisible
-   en commentaire ; les commits retenus sont ceux sur lesquels pointaient les
-   étiquettes `v4` au moment du changement, le comportement est donc inchangé. La
-   marche à suivre pour monter de version est en tête de chaque workflow. **Ne pas
-   revenir à une étiquette.**
-2. **L'APK de mise à jour pouvait venir de n'importe quel dépôt GitHub, et n'importe
-   quel paquet était présenté à l'installateur.** Deux manques qui se cumulaient.
-   `isTrustedApkUrl` ne regardait que l'hôte, or n'importe qui peut publier un APK
-   sur `github.com` ; il contraint maintenant le chemin au préfixe des publications
-   de ce dépôt. Et l'empreinte SHA-256, qui vient du même `update.json` que
-   l'adresse, écarte un fichier abîmé mais pas un fichier substitué : ce qui protège,
-   c'est la signature, qu'Android n'oppose qu'**à un même nom de paquet**. Un APK au
-   nom différent s'installait comme une seconde application, validée de confiance par
-   un utilisateur en pleine mise à jour. `UpdateDownloader.isExpectedApk` exige donc
-   le nom de paquet de la release (`BuildConfig.UPDATE_PACKAGE_NAME`, qui reste
-   celui de la release dans le build de debug) et le `versionCode` annoncé.
-   Le certificat n'est volontairement **pas** comparé par l'application : une fois le
-   nom de paquet garanti, Android le fait lui-même, et le refaire exposait au risque
-   — invérifiable sans appareil — qu'une version d'Android ne rende pas la signature
-   d'une archive non installée, ce qui ferait refuser toutes les mises à jour.
-   Ces contrôles ne protègent que les versions qui les portent : la 1.3 déjà
-   installée accepte encore l'ancienne règle jusqu'à sa mise à jour.
-3. **Le découpeur des `<coordinates>` KML accumulait sans borne.** Le jeton en cours
-   grandissait jusqu'au prochain blanc : un bloc de plusieurs centaines de
-   mégaoctets sans espace saturait la mémoire, dès la première lecture (celle qui
-   relève les styles). C'était l'asymétrie qu'avait corrigée l'audit de la 1.1 pour
-   le texte GPX, restée ouverte ici. Le jeton est plafonné
-   (`MAX_COORDINATE_TOKEN_LENGTH`, 128 caractères, là où un point réel en fait
-   quelques dizaines) et, s'il déborde, **écarté plutôt que tronqué** : un point
-   coupé serait lu comme un autre point, ailleurs. `CoordinateTokenizerTest` verrouille
-   les deux côtés de la borne. Le plancher restant est celui d'Expat, qui garde en
-   mémoire une balise ouvrante entière avec ses attributs — comme kXML2 pour le GPX.
+1. **Workflow actions were designated by tag** (`@v4`). A tag moves: its author, or whoever
+   steals their account, can make it point at other code — it happened in 2025 to
+   `tj-actions/changed-files`. The stake is the signing key: `setup-gradle` injects its own
+   code into the Gradle that signs the APK with the keystore password, and whoever holds the
+   key can publish an update the app would install as legitimate. All actions are now pinned
+   by commit identifier, the readable version in a comment; the commits chosen are those the
+   `v4` tags pointed at when changed, so behavior is unchanged. The procedure to bump a
+   version is at the top of each workflow. **Do not go back to a tag.**
+2. **The update APK could come from any GitHub repository, and any package was presented to
+   the installer.** Two gaps that added up. `isTrustedApkUrl` only looked at the host, yet
+   anyone can publish an APK on `github.com`; it now constrains the path to the prefix of
+   this repository's releases. And the SHA-256 fingerprint, which comes from the same
+   `update.json` as the address, rules out a damaged file but not a substituted one: what
+   protects is the signature, which Android only checks **against the same package name**.
+   An APK with a different name installed as a second app, trusted by a user in the middle
+   of an update. `UpdateDownloader.isExpectedApk` therefore requires the release's package
+   name (`BuildConfig.UPDATE_PACKAGE_NAME`, which stays the release's in the debug build)
+   and the announced `versionCode`. The certificate is deliberately **not** compared by the
+   app: once the package name is guaranteed, Android does it itself, and redoing it exposed
+   to the risk — unverifiable without a device — that a version of Android does not return
+   the signature of an uninstalled archive, which would make every update be refused. These
+   checks only protect the versions that carry them: 1.3 already installed still accepts the
+   old rule until it is updated.
+3. **The KML `<coordinates>` splitter accumulated without bound.** The current token grew
+   until the next blank: a block of several hundred megabytes without a space exhausted
+   memory, from the very first read (the one that collects styles). It was the asymmetry the
+   1.1 audit had fixed for GPX text, left open here. The token is capped
+   (`MAX_COORDINATE_TOKEN_LENGTH`, 128 characters, where a real point is a few dozen) and, if
+   it overflows, **discarded rather than truncated**: a cut point would be read as another
+   point, elsewhere. `CoordinateTokenizerTest` locks both sides of the bound. The remaining
+   floor is Expat's, which keeps a whole opening tag with its attributes in memory — like
+   kXML2 for GPX.
 
-**Non retenu par l'auteur pour l'instant :** l'import accepte `NaN`, `Infinity` et des coordonnées hors
-plage — `toDoubleOrNull` de Kotlin reconnaît ces deux mots, vérifié. Une latitude
-`NaN` fait échouer l'import (SQLite l'écrit `NULL` dans une colonne `NOT NULL`) ;
-`Infinity` ou une latitude de 1000 passent, et donnent des statistiques absurdes, voire
-une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import.
+**Not retained by the author for now:** import accepts `NaN`, `Infinity` and out-of-range
+coordinates — Kotlin's `toDoubleOrNull` recognizes both words, verified. A `NaN` latitude
+makes the import fail (SQLite writes it as `NULL` in a `NOT NULL` column); `Infinity` or a
+latitude of 1000 go through, and give absurd statistics, even a derailing map. A booby-trapped
+file therefore only harms its own import.
 
-**Relevés pour mémoire :**
+**Noted for the record:**
 
-- L'APK de debug versé sur `main` est public et débogable : avec le débogage USB
-  activé, `run-as` lit sa base. À réserver aux essais ; la release pour l'usage
-  quotidien.
-- `gradle-wrapper.properties` ne porte pas de `distributionSha256Sum` : la
-  distribution Gradle est téléchargée en HTTPS mais sans vérification d'empreinte
-  (`setup-gradle` valide le JAR du wrapper, pas la distribution).
+- The debug APK committed on `main` is public and debuggable: with USB debugging on, `run-as`
+  reads its database. To be reserved for trials; the release for daily use.
+- `gradle-wrapper.properties` carries no `distributionSha256Sum`: the Gradle distribution is
+  downloaded over HTTPS but without fingerprint verification (`setup-gradle` validates the
+  wrapper JAR, not the distribution).
 
-### Audit batterie de la 1.2
+### Battery audit of 1.2
 
-Relecture ciblée consommation, à la demande de l'auteur. Deux points corrigés, un
-écarté sciemment.
+Review aimed at consumption, at the author's request. Two points fixed, one set aside
+knowingly.
 
-**Corrigés :**
+**Fixed:**
 
-1. **Une animation infinie tournait pour rien dans `MapViewContainer`.**
-   `TrackHiddenPulse` (`pulseAlpha`) animait en boucle tant que la carte était
-   composée — donc l'essentiel du temps où l'application est ouverte — pour une
-   valeur qui n'était **lue nulle part**, ni dans ce fichier ni ailleurs. Une
-   horloge d'animation active empêche le CPU de se reposer entre deux frames ; ici,
-   pour rien. Supprimée avec ses imports devenus orphelins
-   (`rememberInfiniteTransition`, `animateFloat`, `infiniteRepeatable`, `tween` non
-   qualifié, `RepeatMode`, `LinearEasing`) — `Spring`/`spring` restent, utilisés par
-   ailleurs dans le fichier.
-2. **La notification d'enregistrement se réécrivait environ une fois par seconde**,
-   y compris écran éteint. Le dédoublonnage par texte identique (voir « Notification
-   en tâche de fond ») évitait déjà les doublons stricts, mais la durée affichée
-   change chaque seconde : l'essentiel des appels à `notify()` passait quand même.
-   `TrackingService.updateStatsNotification` consulte désormais
-   `PowerManager.isInteractive` : écran allumé, comportement inchangé (dédoublonné
-   par contenu) ; écran éteint, au plus un appel par minute
-   (`SCREEN_OFF_NOTIFY_INTERVAL_MS`). Le retour à l'écran allumé republie
-   **immédiatement**, sans attendre la fin de la fenêtre — vérifié par simulation
-   (voir plus bas). `lastNotificationText` n'est délibérément pas mis à jour dans la
-   branche bloquée : la comparaison de texte, bon marché, continue de s'exécuter à
-   chaque tick ; seul l'appel à `notify()`, le coûteux, est retenu.
+1. **An infinite animation ran for nothing in `MapViewContainer`.** `TrackHiddenPulse`
+   (`pulseAlpha`) animated in a loop as long as the map was composed — hence most of the time
+   the app is open — for a value that was **read nowhere**, neither in this file nor
+   elsewhere. An active animation clock keeps the CPU from resting between frames; here, for
+   nothing. Removed together with its orphaned imports (`rememberInfiniteTransition`,
+   `animateFloat`, `infiniteRepeatable`, unqualified `tween`, `RepeatMode`, `LinearEasing`) —
+   `Spring`/`spring` stay, used elsewhere in the file.
+2. **The recording notification was rewritten about once per second**, even with the screen
+   off. Deduplication by identical text (see "Background notification") already avoided
+   strict duplicates, but the displayed duration changes every second: most calls to
+   `notify()` still went through. `TrackingService.updateStatsNotification` now consults
+   `PowerManager.isInteractive`: screen on, behavior unchanged (deduplicated by content);
+   screen off, at most one call per minute (`SCREEN_OFF_NOTIFY_INTERVAL_MS`). Returning to
+   screen on republishes **immediately**, without waiting for the end of the window —
+   verified by simulation. `lastNotificationText` is deliberately not updated in the blocked
+   branch: the cheap text comparison keeps running at every tick; only the call to
+   `notify()`, the costly one, is held back.
 
-**Écarté, sciemment :** `FLAG_KEEP_SCREEN_ON` posé sans condition dans
-`MainActivity` (relevé par l'audit du 0.11.2). Confirmé par l'auteur : voulu, pas un
-défaut — voir la note ajoutée directement dans cette section.
+**Set aside, knowingly:** `FLAG_KEEP_SCREEN_ON` set unconditionally in `MainActivity` (noted
+by the 0.11.2 audit). Confirmed by the author: intended, not a defect.
 
-**Non vérifiable en session web** : les deux correctifs touchent respectivement
-Compose (`MapViewContainer`) et un service Android (`TrackingService`), aucun des
-deux testable par les suites unitaires existantes ni compilable sans SDK Android
-disponible ici (voir « Commandes »). La logique de cadence de la notification a été
-vérifiée séparément par une simulation Java indépendante d'Android (écran allumé :
-comportement inchangé ; écran éteint dix minutes : au plus une poignée d'appels ;
-retour à l'écran allumé : republication immédiate) — la transcription elle-même, pas
-une preuve de compilation. Un APK debug reste la seule vérification qui vaille avant
-publication.
+**Not verifiable in a web session**: both fixes touch respectively Compose
+(`MapViewContainer`) and an Android service (`TrackingService`), neither testable by the
+existing unit suites. The notification cadence logic was verified separately by a Java
+simulation independent of Android (screen on: unchanged; screen off ten minutes: at most a
+handful of calls; return to screen on: immediate republication). A debug APK remains the
+only verification worth having before publishing.
 
-### Rapidité et batterie de la 1.3 : le point bleu refabriqué à chaque point GPS
+### Speed and battery of 1.3: the blue dot rebuilt at every GPS point
 
-Relecture ciblée « rapidité et batterie », à la demande de l'auteur. Un point corrigé,
-un second identifié mais laissé pour une prochaine passe.
+Review aimed at "speed and battery", at the author's request. One point fixed, a second
+identified but left for a next pass.
 
-**Corrigé :** `createBlueDotIcon` (bitmap, canvas, trois cercles dessinés) était
-appelée à chaque exécution de `drawMarkers` — donc environ une fois par seconde
-pendant tout un enregistrement, puisqu'un nouveau point GPS invalide le cache des
-polylignes qui déclenche `rebuildMapOverlays`. Rien dans cette icône ne dépend de
-l'état courant : le résultat est strictement identique d'un appel à l'autre. Mise en
-cache dans `MapState` (`blueDotIcon`, construite au premier besoin puis réutilisée),
-comme le sont déjà les polylignes.
+**Fixed:** `createBlueDotIcon` (bitmap, canvas, three circles drawn) was called at every run
+of `drawMarkers` — hence about once per second throughout a recording, since a new GPS point
+invalidates the polyline cache that triggers `rebuildMapOverlays`. Nothing in this icon
+depends on the current state: the result is strictly identical from one call to the next.
+Cached in `MapState` (`blueDotIcon`, built on first need then reused), as the polylines
+already are.
 
-**Identifié, non corrigé — la piste la plus payante des deux.** `state.points`
-(alimenté par `TrackViewModel.livePoints`, voir « Arbitré, avant la 1.0 » :
-`_livePoints.value = _livePoints.value + point`, sans borne pendant un
-enregistrement) change de référence à chaque point GPS. Comme `cachedPointsPolylines`
-est invalidé dès que `state.points != points`, **le tracé en cours est intégralement
-recalculé et recopié dans un `Polyline` neuf à chaque seconde** :
-`buildSegmentsFromPoints` repasse sur la totalité des points depuis le début, et
-`setPoints()` recopie tout. Le coût par appel grandit avec la durée déjà écoulée de
-l'enregistrement — quadratique sur une sortie entière, comme le coût déjà accepté
-pour `_livePoints` lui-même, mais ici dans la couche carte plutôt que dans le
-repository, et donc potentiellement visible à l'écran (à-coups) sur une trace déjà
-longue, pas seulement coûteux en batterie.
+**Identified, not fixed — the most rewarding lead of the two.** `state.points` (fed by
+`TrackViewModel.livePoints`, see "Arbitrated, before 1.0": `_livePoints.value =
+_livePoints.value + point`, unbounded during a recording) changes reference at every GPS
+point. As `cachedPointsPolylines` is invalidated as soon as `state.points != points`, **the
+current line is entirely recomputed and copied into a new `Polyline` every second**:
+`buildSegmentsFromPoints` goes over all the points from the start, and `setPoints()` copies
+everything. The cost per call grows with the time already elapsed in the recording —
+quadratic over a whole outing, like the cost already accepted for `_livePoints` itself, but
+here in the map layer rather than in the repository, hence potentially visible on screen
+(stutter) on an already long track, not just costly for battery.
 
-Corriger cela sans toucher à `_livePoints` (choix de l'auteur, non remis en cause) :
-étendre le `Polyline` du tronçon en cours avec le seul point nouveau plutôt que de
-reconstruire tous les segments à partir de zéro. Plus délicat que la mise en cache de
-l'icône — il faut traiter correctement le cas où le nouveau point ouvre un tronçon
-(`isDiscontinuous`), qui doit démarrer un `Polyline` séparé plutôt que prolonger
-l'existant. Laissé pour une prochaine passe, à la demande explicite de l'auteur de ne
-traiter que l'icône pour l'instant.
+Fixing this without touching `_livePoints` (author's choice, not questioned): extend the
+current segment's `Polyline` with the single new point rather than rebuilding all segments
+from scratch. Trickier than caching the icon — the case where the new point opens a segment
+(`isDiscontinuous`) must be handled correctly, which must start a separate `Polyline` rather
+than extend the existing one. Left for a next pass, at the author's explicit request to
+only handle the icon for now.
 
-**Non vérifiable en session web**, pour la même raison que l'audit batterie ci-dessus :
-Compose, aucun SDK Android disponible ici. Un APK debug reste la vérification qui
-vaille avant publication.
+**Not verifiable in a web session**, for the same reason as the battery audit above: Compose.
+A debug APK remains the verification worth having before publishing.
 
-### Le mode focus zoomait tout seul : corrigé en 0.12.0
+### Focus mode zoomed by itself: fixed in 0.12.0
 
-Rapporté ainsi : « quand je mets le mode focus parfois ça zoom ou dézoom tout seul ».
+Reported as: "when I turn on focus mode sometimes it zooms in or out by itself".
 
-**La cause** : le `LaunchedEffect(recenterTrigger, isAutoFollowActive)` de
-`MapViewContainer` qui recentre la caméra et réinitialise le zoom à
-`pref_default_zoom` avait pour garde `recenterTrigger > 0 || isAutoFollowActive`.
-`recenterTrigger` ne fait qu'augmenter (jamais remis à zéro) : dès le premier appui
-sur le bouton de recentrage dans une session, `recenterTrigger > 0` reste vrai pour
-toujours. Or `LaunchedEffect` réexécute tout son corps à **chaque changement** de
-l'une ou l'autre de ses clés — y compris quand `isAutoFollowActive` passe de `true`
-à `false`. Un simple toucher de l'écran pour désengager le mode focus (l'invariant
-existant : tout toucher appelle `onAutoFollowChanged(false)`) déclenchait donc, lui
-aussi, ce recentrage-rezoom — juste après, voire pendant, le geste manuel de
-l'utilisateur. La carte semblait alors annuler son propre zoom ou son propre
-recentrage tout seule.
+**The cause**: the `LaunchedEffect(recenterTrigger, isAutoFollowActive)` of
+`MapViewContainer` that recenters the camera and resets the zoom to `pref_default_zoom` was
+guarded by `recenterTrigger > 0 || isAutoFollowActive`. `recenterTrigger` only increases
+(never reset to zero): from the first tap on the recenter button in a session,
+`recenterTrigger > 0` stays true forever. Yet `LaunchedEffect` reruns its whole body at
+**each change** of either of its keys — including when `isAutoFollowActive` goes from `true`
+to `false`. A simple touch of the screen to disengage focus mode (the existing invariant:
+any touch calls `onAutoFollowChanged(false)`) therefore triggered this recenter-rezoom too —
+right after, even during, the user's manual gesture. The map then seemed to cancel its own
+zoom or recentering by itself.
 
-**Le correctif** : la garde ne porte plus que sur la valeur actuelle de
-`isAutoFollowActive`. `recenterTrigger` reste dans les clés (pour forcer une
-nouvelle exécution quand on retape sur le bouton alors que le mode focus est déjà
-actif, cas où sa valeur seule ne changerait pas), mais ne fait plus partie de la
-condition d'exécution. Le recentrage-rezoom ne se déclenche donc plus que lorsque le
-mode focus est effectivement actif — jamais au moment où il vient de s'éteindre.
+**The fix**: the guard now only depends on the current value of `isAutoFollowActive`.
+`recenterTrigger` stays among the keys (to force a new run when tapping the button again
+while focus mode is already active, a case where its value alone would not change), but no
+longer takes part in the run condition. The recenter-rezoom therefore only triggers when
+focus mode is actually active — never at the moment it has just turned off.
 
-**Ce correctif n'a pas suffi**, l'essai sur le terrain l'a montré : la vraie cause
-était ailleurs, et celle-ci n'en était qu'une aggravation. Voir la section suivante.
+**This fix was not enough**, the field test showed it: the real cause was elsewhere, and this
+one was only an aggravation. See the next section.
 
-### La cause réelle du zoom intempestif : le contrôleur multi-touch, recréé sans cesse
+### The real cause of the unwanted zoom: the multi-touch controller, recreated endlessly
 
-Symptôme inchangé après le correctif ci-dessus : « ça zoom ou dézoom tout seul »,
-y compris **après** avoir lâché l'écran, et seulement en mode focus.
+Symptom unchanged after the fix above: "it zooms in or out by itself", including **after**
+letting go of the screen, and only in focus mode.
 
-`MapViewContainer` appelait `map.setMultiTouchControls(isInteractivityEnabled)` dans
-le bloc `update` de l'`AndroidView`, donc à **chaque recomposition**. Or, dans
-osmdroid, ce n'est pas un réglage idempotent :
+`MapViewContainer` called `map.setMultiTouchControls(isInteractivityEnabled)` in the
+`AndroidView`'s `update` block, hence at **every recomposition**. Yet, in osmdroid, this is
+not an idempotent setting:
 
 ```java
 public void setMultiTouchControls(final boolean on) {
@@ -1077,577 +1007,507 @@ public void setMultiTouchControls(final boolean on) {
 }
 ```
 
-Chaque appel **jette le contrôleur en cours et en fabrique un neuf**. Pendant un
-enregistrement en mode focus, chaque position GPS change `points` et
-`currentUserLocation`, donc recompose : le contrôleur était remplacé une à deux fois
-par seconde, forcément au milieu d'un pincement, qui dure plus longtemps que ça.
+Each call **throws away the current controller and builds a new one**. During a recording in
+focus mode, each GPS position changes `points` and `currentUserLocation`, hence recomposes:
+the controller was replaced once or twice a second, necessarily in the middle of a pinch,
+which lasts longer than that.
 
-Pourquoi c'est le zoom qui trinque : osmdroid pilote le **vrai** niveau de zoom
-pendant un pincement, relativement au zoom relevé à l'ouverture du geste —
-`setMultiTouchScale(échelle)` fait `setZoomLevel(log2(échelle) + mStartAnimationZoom)`.
-Et il ne remet le point d'ancrage à null que dans le `selectObject` de **fin** de
-geste. Un contrôleur remplacé en cours de route ne reçoit jamais cette fin :
-`mMultiTouchScaleCurrentPoint` reste renseigné pour toujours, et `getProjection()`
-continue d'y recaler chaque projection (`adjustOffsets`) à chaque image dessinée.
-D'où un déréglage qui **survit au geste** et se voit tout seul, sans que l'on touche
-l'écran.
+Why it is the zoom that suffers: osmdroid drives the **real** zoom level during a pinch,
+relative to the zoom noted when the gesture opened — `setMultiTouchScale(scale)` does
+`setZoomLevel(log2(scale) + mStartAnimationZoom)`. And it only resets the anchor point to
+null in the **end-of-gesture** `selectObject`. A controller replaced midway never receives
+that end: `mMultiTouchScaleCurrentPoint` stays set forever, and `getProjection()` keeps
+readjusting every projection to it (`adjustOffsets`) at each frame drawn. Hence a
+misadjustment that **outlives the gesture** and shows by itself, without touching the screen.
 
-Le mode focus aggravait encore : `getDraggableObjectAtPoint` renvoie `null` tant que
-`isAnimating()` est vrai, et `animateTo` est relancé à chaque position GPS pour une
-animation d'une seconde — les pincements y étaient donc souvent refusés puis
-raccrochés à contretemps, sur une référence de zoom périmée.
+Focus mode aggravated it further: `getDraggableObjectAtPoint` returns `null` as long as
+`isAnimating()` is true, and `animateTo` is relaunched at each GPS position for a one-second
+animation — pinches were therefore often refused then picked up again at the wrong moment,
+on a stale zoom reference.
 
-Le correctif tient en une garde : n'appeler `setMultiTouchControls` que lorsque la
-valeur change réellement (`MapState.appliedMultiTouch`, volontairement nullable pour
-distinguer « jamais appelé » de « appelé avec false »). C'est la discipline que le
-fichier appliquait déjà juste au-dessus à la source de tuiles et à `mapOrientation` ;
-elle avait seulement été oubliée ici.
+The fix fits in a guard: only call `setMultiTouchControls` when the value really changes
+(`MapState.appliedMultiTouch`, deliberately nullable to tell "never called" from "called with
+false"). It is the discipline the file already applied just above to the tile source and
+`mapOrientation`; it had only been forgotten here.
 
-**À retenir pour tout le bloc `update`** : il s'exécute à chaque recomposition, donc
-plusieurs fois par seconde pendant un enregistrement. Tout ce qu'on y appelle doit
-être soit idempotent et gratuit, soit gardé par une comparaison. Un setter qui
-*alloue* quelque chose n'a rien à y faire sans garde.
+**To remember for the whole `update` block**: it runs at every recomposition, hence several
+times per second during a recording. Anything called in it must be either idempotent and
+free, or guarded by a comparison. A setter that *allocates* something has no business there
+without a guard.
 
-Ce correctif est réel et gardé — mais **ce n'était toujours pas le défaut rapporté**.
-Voir la section suivante.
+This fix is real and kept — but **it was still not the reported defect**. See the next
+section.
 
-### Le zoom sautait à l'appui sur « localiser » : la vraie cause, enfin
+### The zoom jumped when pressing "locate": the real cause, at last
 
-Précision décisive de l'auteur, après deux diagnostics à côté : « quand j'appuie sur
-le bouton localiser pour passer en focus, ça zoome tout seul ou dézoome — **au moment
-où je clique** ». Pas pendant un pincement, pas pendant le trajet : à l'appui.
+Decisive precision from the author, after two diagnoses off target: "when I press the locate
+button to go into focus, it zooms in or out by itself — **at the moment I click**". Not
+during a pinch, not during the trip: at the press.
 
-Le recentrage faisait simplement, en plus de centrer la carte :
+The recentering simply did, besides centering the map:
 
 ```kotlin
 val zoomLevelToSet = prefs.getFloat("pref_default_zoom", 16.5f).toDouble()
 mapView.controller.setZoom(zoomLevelToSet)
 ```
 
-Deux erreurs superposées :
+Two superimposed errors:
 
-- **`pref_default_zoom` n'est pas un réglage**, malgré son nom. Aucun écran ne l'écrit
-  (voir « En attente d'arbitrage » : la préférence impériale a le même travers) ; il
-  est alimenté par `TrackViewModel.lastMapZoom`, donc par le dernier zoom mémorisé de
-  la carte. Or `persistMapStateThrottled` borne cette mémorisation à une fois par
-  seconde **sans rattrapage de la dernière valeur** : le zoom final d'un geste n'est
-  quasiment jamais celui qui finit en préférence, c'est un zoom relevé au milieu du
-  geste précédent. Le bouton y ramenait la carte, d'où un saut en avant ou en arrière
-  sans rapport avec quoi que ce soit de visible.
-- **Même exacte, cette valeur n'avait pas à s'imposer.** « Localiser » veut dire
-  « centre-toi sur moi », pas « change mon échelle ». Recentrer et rezoomer sont deux
-  actions distinctes ; une seule était demandée.
+- **`pref_default_zoom` is not a setting**, despite its name. No screen writes it (see
+  "Awaiting arbitration": the imperial preference has the same flaw); it is fed by
+  `TrackViewModel.lastMapZoom`, hence by the last stored zoom of the map. Yet
+  `persistMapStateThrottled` bounds that storing to once per second **with no catch-up of the
+  last value**: the final zoom of a gesture almost never is the one that ends up in
+  preferences, it is a zoom noted in the middle of the previous gesture. The button brought
+  the map back to it, hence a jump forward or backward unrelated to anything visible.
+- **Even exact, that value had no right to be imposed.** "Locate" means "center on me", not
+  "change my scale". Recentering and rezooming are two distinct actions; only one was asked.
 
-Le zoom courant est désormais conservé. Seule exception gardée : si la carte est
-dézoomée au point que les tracés ne sont plus dessinés (`ZOOM_THRESHOLD`), on
-rapproche — sans quoi « localiser » laisserait l'utilisateur centré sur lui-même mais
-à l'échelle d'un pays.
+The current zoom is now kept. Only exception kept: if the map is zoomed out so far that
+tracks are no longer drawn (`ZOOM_THRESHOLD`), we zoom in — otherwise "locate" would leave
+the user centered on themselves but at the scale of a country.
 
-**Leçon de méthode, celle qui vaut le plus ici.** Trois versions ont visé à côté sur
-ce seul défaut, et les deux premières ont été poussées en affirmant « c'est la vraie
-cause ». Les deux correctifs sont justes en eux-mêmes et sont conservés — mais ils
-répondaient à un symptôme que l'auteur n'avait jamais décrit. La formulation initiale
-(« parfois ça zoom ou dézoom tout seul ») avait été lue comme « à un moment
-imprévisible », alors qu'elle voulait dire « sans que je le demande ». **Demander
-quand exactement le défaut se produit coûte une question ; le deviner a coûté trois
-compilations et deux diagnostics faux.**
+**Lesson of method, the one that is worth the most here.** Three versions missed on this
+single defect, and the first two were pushed claiming "this is the real cause". Both fixes
+are right in themselves and are kept — but they answered a symptom the author had never
+described. The initial wording ("sometimes it zooms in or out by itself") had been read as
+"at an unpredictable moment", whereas it meant "without my asking". **Asking when exactly
+the defect happens costs one question; guessing it cost three builds and two wrong
+diagnoses.**
 
-### Le mode 3D pivotait sans arrêt : corrigé en 0.11.6
+### 3D mode spun constantly: fixed in 0.11.6
 
-Mesuré sur une vidéo d'un trajet réel : la carte basculait d'environ 100°, revenait,
-et recommençait deux à trois fois par seconde — trente-quatre changements de sens en
-quatorze secondes.
+Measured on a video of a real trip: the map flipped by about 100°, came back, and started
+again two to three times a second — thirty-four changes of direction in fourteen seconds.
 
-**La cause n'était pas le bruit du GPS**, contrairement à ce que cette section
-supposait. `computeCurrentBearing` se rabattait sur les points du tracé affiché dès
-que la position GPS n'avait pas changé depuis le passage précédent. Or l'écran était
-consulté **avec l'enregistrement en pause** : `livePoints` ne bouge plus dans ce cas
-et conserve indéfiniment le cap qu'on avait au moment de la pause. La carte alternait
-donc entre le cap réel et ce cap fossilisé, à la cadence des recompositions.
+**The cause was not GPS noise**, contrary to what this section had assumed.
+`computeCurrentBearing` fell back on the points of the displayed track as soon as the GPS
+position had not changed since the previous pass. Yet the screen was consulted **with the
+recording paused**: `livePoints` no longer moves in that case and keeps forever the bearing
+it had at the time of the pause. The map therefore alternated between the real bearing and
+this fossilized one, at the rate of recompositions.
 
-Le repli sur le tracé ne vaut désormais que **faute de position connue**. Quand une
-position existe mais n'a pas assez bougé, la fonction renvoie null et l'appelant garde
-le dernier cap : mieux vaut conserver le précédent qu'en inventer un autre.
+The fallback on the track now only applies **for lack of a known position**. When a position
+exists but has not moved enough, the function returns null and the caller keeps the last
+bearing: better to keep the previous one than to invent another.
 
-Le lissage recommandé ici a été ajouté dans la foulée (`smoothedBearing`,
-`BEARING_SMOOTHING`) : l'orientation se rapproche de la cible sur **l'arc le plus
-court**, ce qui supprime le tour complet au passage par le nord et remplace les
-à-coups par une rotation continue. `BearingTest` verrouille les deux points.
+The smoothing recommended here was added right after (`smoothedBearing`,
+`BEARING_SMOOTHING`): the orientation approaches the target along the **shortest arc**,
+which removes the full turn when crossing north and replaces jolts with a continuous
+rotation. `BearingTest` locks both points.
 
-Leçon à garder : ce défaut a été rendu visible par le passage à `sample` en 0.11.5,
-qui fait réévaluer l'affichage deux fois par seconde au lieu d'une fois par position
-GPS. Le piège était là depuis toujours ; il ne se déclenchait simplement pas assez
-souvent pour se voir.
+Lesson to keep: this defect was made visible by the move to `sample` in 0.11.5, which makes
+the display reevaluate twice a second instead of once per GPS position. The trap had always
+been there; it just did not trigger often enough to be seen.
 
-### Chargement des tracés pendant le suivi automatique : la cause, trouvée en 0.11.5
+### Loading tracks during automatic following: the cause, found in 0.11.5
 
-**Symptôme exact, tel que rapporté** : en voiture, mode focus actif, les points déjà
-à l'écran au moment de l'activation restent corrects, mais tout ce que l'on découvre
-en avançant s'affiche en **grandes lignes droites** — la silhouette sous-échantillonnée
-au lieu du détail. Toucher la carte, zoomer ou dézoomer remet tout d'aplomb.
+**Exact symptom, as reported**: by car, focus mode active, the points already on screen when
+it was activated stay correct, but everything discovered while moving on shows as **long
+straight lines** — the subsampled silhouette instead of the detail. Touching the map, zooming
+in or out sets everything right again.
 
-**La cause.** `onScroll` republie la zone visible, et le ViewModel la filtrait avec
-`debounce`, qui n'émet qu'après un silence. Or osmdroid notifie `onScroll` **à chaque
-image de ses animations** : `MapController.onAnimationUpdate` appelle `setMapCenter`
-une soixantaine de fois par seconde, ce qui descend dans `MapView.scrollTo`, qui
-prévient les écouteurs — le commentaire d'osmdroid le dit lui-même. En suivi
-automatique, `animateTo` est relancé à chaque position GPS pour une animation d'une
-seconde : les animations s'enchaînent sans interruption, le silence n'arrive jamais,
-et `debounce` n'émet plus rien du tout. Aucun rechargement n'était déclenché tant que
-le mode restait actif. Un geste coupe le suivi (`setOnTouchListener` →
-`onAutoFollowChanged(false)`), les animations cessent, le silence passe, tout se
-recharge d'un coup.
+**The cause.** `onScroll` republishes the visible area, and the ViewModel filtered it with
+`debounce`, which only emits after a silence. Yet osmdroid notifies `onScroll` **at every
+frame of its animations**: `MapController.onAnimationUpdate` calls `setMapCenter` about sixty
+times a second, which goes down into `MapView.scrollTo`, which notifies the listeners — as
+osmdroid's own comment says. In automatic following, `animateTo` is relaunched at each GPS
+position for a one-second animation: the animations chain without interruption, the silence
+never comes, and `debounce` emits nothing at all any more. No reload was triggered as long as
+the mode stayed active. A gesture cuts following (`setOnTouchListener` →
+`onAutoFollowChanged(false)`), animations stop, the silence passes, everything reloads at once.
 
-`sample` remplace `debounce` : il émet la zone la plus récente à intervalle régulier
-tant qu'il en arrive, et laisse passer la dernière une fois le flux tari. Un flux
-continu ne peut plus l'affamer. **Ne jamais remettre `debounce` sur ce flux** : la
-source peut être continue par construction.
+`sample` replaces `debounce`: it emits the most recent area at a regular interval as long as
+some arrive, and lets the last one through once the flow dries up. A continuous flow can no
+longer starve it. **Never put `debounce` back on this flow**: the source may be continuous by
+construction.
 
-Corollaire traité en même temps : `onScroll` faisait aussi mémoriser la position de
-carte à chaque image, soit quatre écritures de préférences par image et plus de deux
-cents accès disque par seconde. Borné à une fois par seconde (`MAP_STATE_PERSIST_MS`).
+Corollary handled at the same time: `onScroll` also stored the map position at each frame,
+i.e. four preference writes per frame and over two hundred disk accesses per second. Bounded
+to once per second (`MAP_STATE_PERSIST_MS`).
 
-**Trois versions ont visé à côté avant celle-ci**, et il vaut la peine de savoir
-pourquoi pour ne pas y revenir :
+**Three versions missed before this one**, and it is worth knowing why so as not to go back:
 
-- **0.11** supposait que la caméra prenait du retard sur la position et que la zone
-  publiée n'était donc pas la bonne (`reportAutoFollowViewport`). Juste en soi, gardé,
-  sans effet sur ce défaut.
-- **0.11.3** a remplacé `flatMapLatest` par `conflate` (une lecture commencée n'est
-  plus annulée) et espacé les republications du sondage. Deux améliorations réelles,
-  mais qui portaient sur la boucle de sondage alors que le déluge venait de
-  `onScroll`. Essayé sur le terrain : aucun changement.
-- **0.11.4** a mis en cache les points des traces sous `fullLoadLimit`
-  (`fullPointsCache`), qui étaient relues intégralement à chaque republication. Gain
-  réel de performance, mais ne pouvait pas débloquer un rechargement qui n'était
-  jamais déclenché.
+- **0.11** assumed that the camera lagged behind the position and that the published area was
+  therefore wrong (`reportAutoFollowViewport`). Right in itself, kept, no effect on this
+  defect.
+- **0.11.3** replaced `flatMapLatest` with `conflate` (a started read is no longer
+  cancelled) and spaced out the polling's republications. Two real improvements, but they
+  concerned the polling loop whereas the deluge came from `onScroll`. Tried in the field: no
+  change.
+- **0.11.4** cached the points of tracks under `fullLoadLimit` (`fullPointsCache`), which were
+  fully reread at each republication. A real performance gain, but it could not unblock a
+  reload that was never triggered.
 
-Ces trois versions restent utiles, aucune n'est à défaire. La leçon est ailleurs :
-le défaut n'était pas dans le circuit de chargement, mais dans le filtre placé à son
-entrée. Ce qui suit décrit les deux premières tentatives, conservées pour mémoire.
+These three versions remain useful, none is to be undone. The lesson lies elsewhere: the
+defect was not in the loading circuit, but in the filter placed at its entrance. What follows
+describes the first two attempts, kept for the record.
 
-### Ce que les 0.11.3 et 0.11.4 avaient corrigé au passage
+### What 0.11.3 and 0.11.4 had fixed along the way
 
-Symptôme : en voiture, mode focus actif, les tracés affichés en superposition cessent
-de se charger au fil du déplacement, jusqu'à ce qu'un glissement ou un zoom manuel
-remette tout à jour d'un coup.
+Symptom: by car, focus mode active, the overlaid tracks stop loading as one moves, until a
+drag or a manual zoom sets everything right at once.
 
-**La 0.11 s'était trompée de cause.** Elle avait supposé que la caméra prenait du
-retard sur la position (`animateTo` rejeté en cours d'animation) et que la zone
-republiée n'était donc pas la bonne ; `reportAutoFollowViewport` reconstruit depuis
-la position GPS plutôt que depuis `map.boundingBox`. C'est juste en soi, et c'est
-gardé — mais ce n'était pas ce qui cassait l'affichage.
+**0.11 had got the cause wrong.** It had assumed the camera lagged behind the position
+(`animateTo` rejected during an animation) and that the republished area was therefore wrong;
+`reportAutoFollowViewport` rebuilds from the GPS position rather than from
+`map.boundingBox`. Right in itself, and kept — but it was not what broke the display.
 
-Les deux vraies causes, trouvées en 0.11.3 :
+The two real causes, found in 0.11.3:
 
-1. **`flatMapLatest` annulait la lecture en cours.** `selectedImportedPoints` et
-   `selectedTrackPoints` relancent une lecture à chaque nouvelle zone, et
-   `flatMapLatest` annule la précédente. Hors suivi, les zones n'arrivent qu'aux
-   gestes de l'utilisateur : sans conséquence. En mode focus, elles arrivaient toutes
-   les secondes (`AUTO_FOLLOW_VIEWPORT_POLL_MS`), si bien que toute lecture dépassant
-   la seconde était annulée avant d'avoir rien produit, repartait de zéro, et se
-   faisait annuler de nouveau — indéfiniment. D'où le symptôme exact : un geste manuel
-   coupe le suivi (`setOnTouchListener` → `onAutoFollowChanged(false)`), donc les
-   republications, donc la lecture aboutit enfin et tout apparaît d'un coup.
-   Corrigé par `conflate()` : une lecture commencée va toujours à son terme, les zones
-   arrivées entre-temps s'écrasent, et la plus récente est traitée ensuite.
-2. **La zone était republiée à chaque seconde pour rien.** Le sondage envoyait la
-   position à chaque tour, alors que la zone publiée déborde l'écran de
-   `VIEWPORT_MARGIN` : tant qu'on s'est déplacé de moins que cette marge, l'écran est
-   déjà couvert. Pire, `getDisplayPoints` relit intégralement les traces de moins de
-   `fullLoadLimit` points — une relecture qui ne dépend même pas de la zone. Le
-   sondage ne republie désormais qu'au-delà de `AUTO_FOLLOW_RELOAD_FRACTION` de la
-   largeur d'écran parcourue, ou sur changement de zoom (à conserver : sans ce
-   second cas, un zoom avant resterait sur la silhouette grossière).
+1. **`flatMapLatest` cancelled the read in progress.** `selectedImportedPoints` and
+   `selectedTrackPoints` start a read at each new area, and `flatMapLatest` cancels the
+   previous one. Outside following, areas only arrive on the user's gestures: harmless. In
+   focus mode, they arrived every second (`AUTO_FOLLOW_VIEWPORT_POLL_MS`), so that any read
+   exceeding a second was cancelled before having produced anything, restarted from zero, and
+   was cancelled again — indefinitely. Hence the exact symptom: a manual gesture cuts
+   following (`setOnTouchListener` → `onAutoFollowChanged(false)`), hence the republications,
+   hence the read finally succeeds and everything appears at once. Fixed by `conflate()`: a
+   started read always runs to completion, the areas that arrived meanwhile overwrite each
+   other, and the most recent is processed next.
+2. **The area was republished every second for nothing.** The polling sent the position at
+   each turn, whereas the published area overflows the screen by `VIEWPORT_MARGIN`: as long
+   as we have moved less than that margin, the screen is already covered. Worse,
+   `getDisplayPoints` fully rereads tracks under `fullLoadLimit` points — a reread that does
+   not even depend on the area. The polling now only republishes beyond
+   `AUTO_FOLLOW_RELOAD_FRACTION` of the screen width traveled, or on a zoom change (to keep:
+   without this second case, a zoom-in would stay on the coarse silhouette).
 
-Ces deux points étaient l'un des « leviers » laissés en arbitrage plus bas ; ils n'y
-figurent donc plus.
+These two points were one of the "levers" left in arbitration below; they no longer appear
+there.
 
-**Troisième cause, trouvée en 0.11.4 après un essai sur le terrain** qui rapportait
-« du mieux, mais ça bugue encore ». La branche `pointCount <= fullLoadLimit` de
-`getDisplayPoints` était la seule à ne rien mettre en cache : une trace de moins de
-60 000 points était relue intégralement en base à chaque republication de la zone,
-alors que son résultat ne dépend pas du cadrage. En suivi automatique, cela revenait
-à redemander des dizaines de milliers de lignes par trace affichée, et à reconstruire
-autant d'objets, pour un résultat identique au précédent. `fullPointsCache` corrige
-cela ; renvoyer la même instance rend en prime immédiate la comparaison de
-`MapViewContainer`, qui repassait sur chaque point pour conclure que rien n'avait
-changé. Toute écriture sur les points d'une trace passe déjà par
-`invalidatePointCaches`, le cache ne peut donc pas rester périmé.
+**Third cause, found in 0.11.4 after a field test** that reported "better, but it still
+glitches". The `pointCount <= fullLoadLimit` branch of `getDisplayPoints` was the only one to
+cache nothing: a track of fewer than 60,000 points was fully reread from the database at each
+republication of the area, whereas its result does not depend on the framing. In automatic
+following, that amounted to asking SQLite again for tens of thousands of rows per displayed
+track, and rebuilding as many objects, for a result identical to the previous one.
+`fullPointsCache` fixes that; returning the same instance also makes `MapViewContainer`'s
+comparison immediate, which used to go over every point to conclude nothing had changed.
+Every write to a track's points already goes through `invalidatePointCaches`, so the cache
+cannot stay stale.
 
-Ce qui reste possible si le défaut persiste : les traces **au-dessus** de
-`fullLoadLimit` refont à chaque republication un `countPointsInBounds` puis un
-`getDetailPointsInBounds`, ces deux-là dépendant réellement de la zone ; et
-`MapViewContainer` invalide ses polylignes en bloc, si bien qu'une seule trace dense
-qui bouge fait reconstruire celles de toutes les autres sur le thread principal. Un
-cache de polylignes par trace serait la marche suivante.
+What remains possible if the defect persists: tracks **above** `fullLoadLimit` redo a
+`countPointsInBounds` then a `getDetailPointsInBounds` at each republication, these two
+really depending on the area; and `MapViewContainer` invalidates its polylines as a block, so
+that a single dense track that moves has those of all the others rebuilt on the main thread.
+A per-track polyline cache would be the next step.
 
-### En attente d'arbitrage
+### Awaiting arbitration
 
-- `VIEWPORT_MARGIN` est passé de 0,35 à 0,60 à la demande de l'auteur. À évaluer.
-  Surveiller l'effet indirect documenté au-dessus de la constante : la zone élargie
-  sert aussi à `coversMostOfTrack`, donc l'affichage se rabat plus tôt sur la seule
-  silhouette. Si le tracé paraît plus grossier, mesurer cette couverture sur la zone
-  réellement visible plutôt que sur la zone élargie.
-- `Importer` cumule le dénivelé **sans seuil**, alors que l'enregistrement et la
-  reprise passent par `ElevationAccumulator`. À harmoniser, mais cela changerait les
-  statistiques des futurs imports.
-- `FormatUtils` sait tout formater en miles et en pieds, `MainActivity` lit
-  `pref_is_metric` au démarrage, mais **aucun écran n'écrit cette préférence** : le
-  support impérial est inatteignable. Soit ajouter un réglage, soit retirer le code.
-- Aucune coupure automatique sur saut de distance anormal. Une trace importée dont le
-  fichier ne sépare pas ses tronçons apparaît donc d'un seul tenant, sans que
-  l'application puisse le deviner.
+- `VIEWPORT_MARGIN` went from 0.35 to 0.60 at the author's request. To evaluate. Watch the
+  indirect effect documented above the constant: the widened area also serves
+  `coversMostOfTrack`, so the display falls back sooner on the silhouette alone. If the line
+  looks coarser, measure that coverage on the really visible area rather than on the widened
+  one.
+- `Importer` accumulates elevation **without threshold**, whereas recording and resuming go
+  through `ElevationAccumulator`. To harmonize, but it would change the statistics of future
+  imports.
+- `FormatUtils` can format everything in miles and feet, `MainActivity` reads `pref_is_metric`
+  at startup, but **no screen writes that preference**: imperial support is unreachable.
+  Either add a setting, or remove the code.
+- No automatic cut on an abnormal distance jump. An imported track whose file does not
+  separate its segments therefore appears in one piece, without the app being able to guess.
 
-## Poids mort : traité
+## Dead weight: handled
 
-Le ménage a été fait. Ce qui a été retiré, et qui ne doit pas revenir par
-inadvertance :
+The cleanup was done. What was removed, and must not come back by inadvertence:
 
-- Dépendances déclarées et jamais appelées, vestiges d'une sauvegarde Drive
-  abandonnée : `retrofit`, `converter-moshi`, `moshi-kotlin` (+ son processeur KSP),
-  `okhttp`, `logging-interceptor`, `credentials`, `credentials-play-services-auth`,
-  `googleid`. Elles voyageaient dans chaque APK installé sans qu'une ligne de code
-  les touche.
-  `work-runtime-ktx` avait subi le même sort, pour la même raison — elle est revenue
-  depuis avec `UpdateCheckWorker` (voir « Notification en tâche de fond »), un
-  appelant réel cette fois.
-- Code mort : `Exporter.exportToGPX` / `exportToKML` (variantes en mémoire, que les
-  writers incrémentaux remplacent), `MediaStoreExporter.saveToLocalDownloads`,
-  `TrackRepository.insertPoints`, `getPointsForTrackFlow`,
-  `getSelectedImportedPointsFlow` et leurs requêtes DAO,
-  `AutoBackupPreferences.isDestLocal` / `setDestLocal`.
-- Deuxième passe, `0.11.2`, après un audit de tout le code source :
-  - **Le partage d'un parcours en entier.** `shareGPX` / `shareKML` n'avaient plus
-    aucun appelant — le bouton avait disparu de l'interface, pas le code : avec eux
-    sont partis `shareTrack`, `shareCachedFile`, `safeFileName`, le dossier
-    `cacheDir/exports` et son entrée `<cache-path>` dans `file_paths.xml`. Ce dernier
-    point n'est pas cosmétique : tout chemin déclaré là est exposable via le
-    `FileProvider`, et un chemin sans usage est une surface offerte pour rien.
-  - Trois composables jamais appelés de `TrackingTab` : `SportRadarBackground`,
-    `StatColumn`, `GpsStatusSquare` (environ 270 lignes).
-  - `UpdatePrompt.findUpdate`, écrite pour une recherche manuelle qui n'a jamais existé.
-  - **L'allure** : `LiveStats.paceMinPerKm` était calculée en trois endroits et
-    `FormatUtils.formatPace` n'était appelée nulle part. Aucun écran ne l'affichait.
-  - `TrackRepository.getPointsForTrack` et `setLivePoints`, sans appelant.
-  - 55 imports inutilisés, surtout dans `TrackingTab` et `HistoryTab`.
-  - `OsmConfig.init` était appelé deux fois, dans `TrackApplication` puis dans
-    `MainActivity` ; le second appel ne faisait rien (garde `isInitialized`).
-- Asset jamais chargé : `france_boundary.geojson`.
-- La simulation GPS de `MainScreen` n'était pas gardée par `BuildConfig.DEBUG`,
-  contrairement à celle de `TrackingService` : sur un appareil réel dont la détection
-  heuristique d'émulateur se déclenchait à tort, ou simplement sans fournisseur de
-  position actif, un point bleu fictif tournait dans Paris. Corrigé — l'invariant 8
-  vaut pour les deux.
+- Dependencies declared and never called, remnants of an abandoned Drive backup: `retrofit`,
+  `converter-moshi`, `moshi-kotlin` (+ its KSP processor), `okhttp`, `logging-interceptor`,
+  `credentials`, `credentials-play-services-auth`, `googleid`. They traveled in every
+  installed APK without a single line of code touching them.
+  `work-runtime-ktx` had suffered the same fate, for the same reason — it has come back since
+  with `UpdateCheckWorker` (see "Background notification"), a real caller this time.
+- Dead code: `Exporter.exportToGPX` / `exportToKML` (in-memory variants, replaced by the
+  incremental writers), `MediaStoreExporter.saveToLocalDownloads`,
+  `TrackRepository.insertPoints`, `getPointsForTrackFlow`, `getSelectedImportedPointsFlow`
+  and their DAO queries, `AutoBackupPreferences.isDestLocal` / `setDestLocal`.
+- Second pass, `0.11.2`, after an audit of all the source code:
+  - **Sharing a whole track.** `shareGPX` / `shareKML` had no caller any more — the button had
+    disappeared from the interface, not the code: with them went `shareTrack`,
+    `shareCachedFile`, `safeFileName`, the `cacheDir/exports` folder and its `<cache-path>`
+    entry in `file_paths.xml`. This last point is not cosmetic: every path declared there can
+    be exposed through the `FileProvider`, and an unused path is a surface offered for
+    nothing.
+  - Three never-called composables of `TrackingTab`: `SportRadarBackground`, `StatColumn`,
+    `GpsStatusSquare` (about 270 lines).
+  - `UpdatePrompt.findUpdate`, written for a manual search that never existed.
+  - **Pace**: `LiveStats.paceMinPerKm` was computed in three places and
+    `FormatUtils.formatPace` was called nowhere. No screen displayed it.
+  - `TrackRepository.getPointsForTrack` and `setLivePoints`, with no caller.
+  - 55 unused imports, mostly in `TrackingTab` and `HistoryTab`.
+  - `OsmConfig.init` was called twice, in `TrackApplication` then in `MainActivity`; the
+    second call did nothing (`isInitialized` guard).
+- Asset never loaded: `france_boundary.geojson`.
+- `MainScreen`'s GPS simulation was not guarded by `BuildConfig.DEBUG`, unlike
+  `TrackingService`'s: on a real device whose heuristic emulator detection triggered wrongly,
+  or simply with no active location provider, a fictitious blue dot circled in Paris.
+  Fixed — invariant 8 applies to both.
 
-- Troisième passe, avant la 1.0, à la demande de l'auteur : **l'outil « Supprimer
-  les points immobiles »**. Sont partis avec lui `TrackRepository.removeStationaryPoints`,
-  `TrackViewModel.removeStationaryPoints`, les composables `RemoveStationaryPointsTool`
-  et `SingleTrackRow` (dont il était le seul appelant), `formatThreshold`, l'entrée
-  `Tool.REMOVE_STATIONARY` et `RemoveStationaryPointsTest`. `statsRecomputeLimit` et
-  `calculateStatsFromPoints` restent : `loadResumeState` s'en sert toujours.
+- Third pass, before 1.0, at the author's request: **the "Remove stationary points" tool**.
+  Gone with it: `TrackRepository.removeStationaryPoints`,
+  `TrackViewModel.removeStationaryPoints`, the composables `RemoveStationaryPointsTool` and
+  `SingleTrackRow` (of which it was the only caller), `formatThreshold`, the
+  `Tool.REMOVE_STATIONARY` entry and `RemoveStationaryPointsTest`. `statsRecomputeLimit` and
+  `calculateStatsFromPoints` stay: `loadResumeState` still uses them.
 
-- Quatrième passe, en 1.1, à la demande de l'auteur : **la conversion CSV**, les
-  deux sens. Sont partis avec elle `util/CsvConverter.kt` et `CsvConverterTest`,
-  `TrackRepository.convertGpxKmlToCsv` / `convertCsvToGpxKml`,
-  `TrackViewModel.convertGpxKmlToCsv` / `convertCsvToGpxKml`, le composable
-  `CsvConversionTool` et le `FormatCheckboxRow` propre à `ToolsTab.kt` (dont il
-  était le seul appelant — celui de `SettingsTab.kt` est une brique distincte,
-  jamais concernée), et l'entrée `Tool.CSV_CONVERT`. `MediaStoreExporter
-  .saveToLocalDownloadsStreaming` reste : la sauvegarde automatique s'en sert
-  toujours.
+- Fourth pass, in 1.1, at the author's request: **CSV conversion**, both ways. Gone with it:
+  `util/CsvConverter.kt` and `CsvConverterTest`, `TrackRepository.convertGpxKmlToCsv` /
+  `convertCsvToGpxKml`, `TrackViewModel.convertGpxKmlToCsv` / `convertCsvToGpxKml`, the
+  composable `CsvConversionTool` and `ToolsTab.kt`'s own `FormatCheckboxRow` (of which it was
+  the only caller — `SettingsTab.kt`'s is a distinct block, never concerned), and the
+  `Tool.CSV_CONVERT` entry. `MediaStoreExporter.saveToLocalDownloadsStreaming` stays: the
+  automatic backup still uses it.
 
-`Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
-« Fusionnés » de l'historique.
+`Track.isMerged` is no longer dead weight: the column again carries the history's "Merged"
+tab.
 
-### Arbitré, avant la 1.0
+### Arbitrated, before 1.0
 
-- **`TrackRepository._livePoints` grandit sans borne pendant un enregistrement**, et
-  chaque point recopie toute la liste (`_livePoints.value + point`). Le coût est donc
-  quadratique sur la durée, et la liste finit par tenir plusieurs mégaoctets. Le
-  plafond existe déjà pour la reprise (`liveTailLimit`, 20 000 points) ; l'appliquer
-  ici bornerait le coût, au prix du début du tracé qui disparaîtrait de l'écran sur un
-  enregistrement de plus de cinq heures. **Laissé tel quel, à la demande de
-  l'auteur** : le coût reste hypothétique (peu d'enregistrements dépassent cinq
-  heures), l'effet du correctif serait lui bien visible.
+- **`TrackRepository._livePoints` grows without bound during a recording**, and each point
+  copies the whole list (`_livePoints.value + point`). The cost is therefore quadratic over
+  the duration, and the list ends up weighing several megabytes. The cap already exists for
+  resuming (`liveTailLimit`, 20,000 points); applying it here would bound the cost, at the
+  price of the start of the line disappearing from screen on a recording of more than five
+  hours. **Left as is, at the author's request**: the cost remains hypothetical (few
+  recordings exceed five hours), the fix's effect would be very visible.
 
-### Reste à arbitrer
+### Left to arbitrate
 
-- Les entrées de `libs.versions.toml` correspondant aux dépendances retirées sont
-  restées : inertes à la compilation, elles documentent ce qui a existé.
+- The `libs.versions.toml` entries matching the removed dependencies stayed: inert at
+  compile time, they document what existed.
 
-## Langues de l'interface
+## Welcome screen
 
-L'application suit la langue du téléphone : `values/` est l'**anglais** (repli pour toute
-langue non prévue), `values-xx/` les traductions — fr, es, pt, de, it, ru, zh, ja, ar
-(RTL) et hi. `res/xml/locales_config.xml` les déclare pour le sélecteur « Langue de
-l'application » d'Android 13+ ; la garder alignée sur les dossiers `values-xx`.
+`ui/screen/WelcomeScreen.kt`, shown only once, on the very first launch: a short
+presentation of the app, then the permissions requested (location, notifications from
+Android 13), each explained in one sentence before being asked for. The "all the time"
+location permission is not requested there: `MainScreen` chains it right after, with the
+justification dialog that existed before this screen.
 
-- **Aucun texte visible en dur.** Compose : `stringResource(R.string.…)` ; hors
-  composition : `context.getString`. Arguments **positionnels** (`%1$s`), et `%%` pour un
-  pour-cent littéral dans une chaîne qui a des arguments. `app_name` reste « Mes parcours »
-  partout (`translatable="false"`).
-- **Pas de pluriel à accorder** : on tourne la phrase autour d'un nombre (« Sélectionnés : 3 »)
-  plutôt que d'écrire six formes par langue.
-- **Le dépôt n'a pas de `Context`** : ses erreurs sont des `UserFacingArgumentException` /
-  `UserFacingStateException` (`util/UserFacing.kt`) qui portent l'identifiant de la chaîne ;
-  l'écran la résout à l'affichage (`Throwable.userMessage`).
-- **Jamais de chaîne traduisible comme état** : le GPS est l'énumération `GpsStatus`
-  (c'était « Signal trouvé » comparé au caractère près). Un `testTag` ne se dérive pas non
-  plus d'un libellé (`history_category_IMPORTED`).
-- **Dates et nombres** : `FormatUtils` (initialisé par `TrackApplication`) utilise
-  `DateFormat.getBestDateTimePattern` et `Locale.getDefault()` ; plus de `Locale.FRANCE`.
-- **Ajouter une langue** : un dossier `values-xx/strings.xml` complet + une ligne dans
-  `locales_config.xml`. Un texte manquant retombe sur l'anglais.
-- Les noms de parcours déjà enregistrés (« Parcours du … ») restent dans la langue de leur
-  création, comme un nom saisi à la main. Le journal des nouveautés est traduit
-  (`rel_*`) : une nouvelle version ajoute ses chaînes dans **toutes** les langues.
-- Captures dans une autre langue : `@Config(qualifiers = "de-" + RobolectricDeviceQualifiers.Pixel8)`
-  (la langue passe **avant** les qualificatifs d'écran).
+`util/OnboardingPreferences` holds the single preference that decides whether to show it
+(`pref_onboarding_completed`). It is set on tapping "Get started", whether the permission
+requested at that moment is granted or refused — the user's choice is enough to close the
+welcome, they can always grant it later from the Record tab.
 
-## Écran de bienvenue
+**Mandatory backfill, like for per-track colors** (see `TrackRepository.backfillDisplayColors`):
+without it, a user who had already answered the permission requests and recorded tracks would
+see this screen once too often, at the update that introduces it.
+`OnboardingPreferences.backfillIfAlreadyUsed`, called by `TrackApplication` before any
+database access, relies on two clues: the location permission already granted, or the
+database file already present on disk. This second clue must be checked **before** opening
+the database — opening it creates it if it did not exist yet, which would skew the detection.
 
-`ui/screen/WelcomeScreen.kt`, montré une seule fois, au tout premier lancement :
-brève présentation de l'application, puis les autorisations demandées (localisation,
-notifications à partir d'Android 13), chacune expliquée en une phrase avant d'être
-sollicitée. La permission de localisation « tout le temps » n'y est pas demandée :
-`MainScreen` l'enchaîne juste après, avec le dialogue de justification qui existait
-déjà avant cet écran.
+`MainScreen` distinguishes, by means of a value frozen at composition
+(`onboardingWasAlreadyCompletedAtStart`), a user who had already passed the welcome on a
+previous launch — for whom the automatic re-request of the permission at startup keeps
+applying, as before this screen was added — from a user who has just closed it. Without that
+distinction, refusing the permission in the welcome screen immediately triggered a second
+identical request, this time without explanation: the same effect keyed on the mutable state
+fired again as soon as it turned true.
 
-`util/OnboardingPreferences` porte l'unique préférence qui décide de l'afficher
-(`pref_onboarding_completed`). Elle se pose à l'appui sur « Commencer », que la
-permission demandée à ce moment-là soit accordée ou refusée — le choix de
-l'utilisateur suffit à clore l'accueil, il pourra toujours l'accorder plus tard
-depuis l'onglet Enregistrer.
+## App update
 
-**Reprise obligatoire, comme pour les couleurs par parcours** (voir
-`TrackRepository.backfillDisplayColors`) : sans elle, un utilisateur qui a déjà
-répondu aux demandes d'autorisation et enregistré des parcours verrait apparaître cet
-écran une fois de trop, à la mise à jour qui l'introduit.
-`OnboardingPreferences.backfillIfAlreadyUsed`, appelée par `TrackApplication` avant
-tout accès à la base, se fie à deux indices : la permission de localisation déjà
-accordée, ou le fichier de base déjà présent sur le disque. Ce second indice doit
-être vérifié **avant** d'ouvrir la base — l'ouvrir la crée si elle n'existait pas
-encore, ce qui fausserait la détection.
+The app updates from **GitHub Releases**, without an app store.
 
-`MainScreen` distingue, à l'aide d'une valeur figée à la composition
-(`onboardingWasAlreadyCompletedAtStart`), un utilisateur qui avait déjà passé
-l'accueil lors d'un lancement précédent — pour qui la redemande automatique de
-permission au démarrage continue de valoir, comme avant l'ajout de cet écran — d'un
-utilisateur qui vient tout juste de le refermer. Sans cette distinction, refuser la
-permission dans l'écran de bienvenue déclenchait aussitôt une seconde demande
-identique, sans explication cette fois : le même effet keyé sur l'état mutable se
-redéclenchait dès que celui-ci passait à vrai.
-
-## Mise à jour de l'application
-
-L'application se met à jour depuis **GitHub Releases**, sans magasin d'applications.
-
-`util/update/AppUpdate.kt` lit un fichier `update.json` joint à chaque publication,
-via l'URL `https://github.com/OWNER/REPO/releases/latest/download/update.json`. Cette
-forme d'URL est stable : GitHub la redirige toujours vers la publication la plus
-récente, ce qui évite l'API GitHub, ses quotas et son jeton.
+`util/update/AppUpdate.kt` reads an `update.json` file attached to each release, through the
+URL `https://github.com/OWNER/REPO/releases/latest/download/update.json`. That URL form is
+stable: GitHub always redirects it to the most recent release, which avoids the GitHub API,
+its quotas and its token.
 
 ```json
 {
   "versionCode": 9,
-  "versionName": "0.9.9-thierry",
-  "apkUrl": "https://github.com/…/releases/download/v0.9.9-thierry/mes-parcours.apk",
-  "notes": ["Première nouveauté", "Deuxième nouveauté"]
+  "versionName": "0.9.9",
+  "apkUrl": "https://github.com/…/releases/download/v0.9.9/mes-parcours-0.9.9.apk",
+  "sha256": "3b1f…",
+  "notes": ["First change", "Second change"],
+  "notesI18n": {"fr": ["Première nouveauté", "Deuxième nouveauté"]}
 }
 ```
 
-- La comparaison porte sur **`versionCode`**, un entier. Comparer « 0.9.10 » et
-  « 0.9.9 » comme des chaînes conclurait l'inverse.
-- `apkUrl` **doit être en HTTPS et servie par `github.com`** : ce fichier va être
-  installé — c'est le seul endroit du projet où une adresse lue ailleurs décide de ce
-  qui s'exécutera sur l'appareil. Exiger HTTPS authentifie le transport ; contraindre
-  l'hôte fait qu'un manifeste altéré ne peut pas rediriger l'installation ailleurs.
-  La vérification porte sur **l'hôte analysé**, jamais sur le texte de l'adresse :
-  `https://github.com.exemple.test/` commence bien par « https://github.com » sans
-  être GitHub. `UpdateManifest.parse` rejette le reste.
-  **Le chemin est contraint aussi**, depuis l'audit de sécurité de la 1.3 : seules les
-  pièces jointes des publications de ce dépôt (`/ToftMalone/Mes-parcours/releases/download/`)
-  sont acceptées, sans encodage ni segment `..` qui permettrait de sortir du préfixe
-  une fois l'adresse résolue par le serveur.
-- Tant que `UpdateConfig.GITHUB_OWNER` ou `GITHUB_REPO` est vide, **aucune requête
-  n'est émise** et l'application se comporte comme avant.
-- Un échec de recherche est silencieux : ne pas joindre GitHub ne concerne pas
-  l'utilisateur.
-- `util/update/UpdateDownloader` télécharge dans un `.part` renommé à la fin, pour ne
-  jamais présenter un APK tronqué à l'installateur, et vérifie la taille annoncée.
-- **`sha256` : l'empreinte de l'APK, vérifiée pendant l'écriture.** Le contrôle de
-  taille ne suffit pas : `contentLength` vaut -1 quand le serveur répond en découpage
-  par blocs, et un téléchargement interrompu passe alors inaperçu. `release.yml` la
-  calcule au moment de la publication.
-  Le champ est **obligatoire depuis l'audit d'avant la 1.0**, absent comme malformé :
-  un manifeste sans empreinte exploitable ne donne plus lieu à aucune proposition.
-  Il était facultatif pour que les publications antérieures à son introduction
-  restent installables — ménagement sans objet, l'application ne consultant jamais
-  que `releases/latest`, dont toute publication produite par `release.yml` porte une
-  empreinte. Proposer une mise à jour que l'on ne saura pas vérifier est pire que ne
-  rien proposer.
-- **L'APK est téléchargé dans le stockage interne** (`filesDir/updates`), et exposé à
-  l'installateur par le FileProvider. Le stockage externe restait modifiable par une
-  autre application entre la vérification de l'empreinte et l'appui sur « Installer » :
-  voir « Audit de sécurité d'avant la 1.0 », point 2.
-- **L'APK doit porter le nom de paquet de la release et le `versionCode` annoncé**,
-  vérifiés après téléchargement (`UpdateDownloader.isExpectedApk`) ; sinon il est
-  supprimé sans être présenté. C'est ce qui rend la signature opposable : Android
-  refuse une autre clé pour un même nom de paquet, mais installerait un nom différent
-  comme une seconde application. Voir « Audit de sécurité de la 1.3 », point 2.
-- L'installation silencieuse est impossible pour une application ordinaire : le
-  système affiche toujours son écran de confirmation.
+- The comparison is on **`versionCode`**, an integer. Comparing "0.9.10" and "0.9.9" as
+  strings would conclude the opposite.
+- `notes` is English; `notesI18n` is optional and keyed by language code. The app shows the
+  notes of the phone's language and falls back on `notes`
+  (`AvailableUpdate.notesFor`). Nothing else depends on the translations.
+- `apkUrl` **must be HTTPS and served by `github.com`**: this file is going to be installed —
+  it is the only place in the project where an address read elsewhere decides what will run on
+  the device. Requiring HTTPS authenticates the transport; constraining the host means a
+  tampered manifest cannot redirect the installation elsewhere. The check is on the **parsed
+  host**, never on the text of the address: `https://github.com.example.test/` does start
+  with "https://github.com" without being GitHub. `UpdateManifest.parse` rejects the rest.
+  **The path is constrained too**, since the 1.3 security audit: only the attachments of this
+  repository's releases (`/ToftMalone/Mes-parcours/releases/download/`) are accepted, with no
+  encoding and no `..` segment that would allow leaving the prefix once the address is
+  resolved by the server.
+- As long as `UpdateConfig.GITHUB_OWNER` or `GITHUB_REPO` is empty, **no request is issued**
+  and the app behaves as before.
+- A failed search is silent: not reaching GitHub is none of the user's concern.
+- `util/update/UpdateDownloader` downloads into a `.part` renamed at the end, so as never to
+  present a truncated APK to the installer, and checks the announced size.
+- **`sha256`: the APK's fingerprint, checked during writing.** The size check is not enough:
+  `contentLength` is -1 when the server answers with chunked encoding, and an interrupted
+  download then goes unnoticed. `release.yml` computes it at publication time.
+  The field is **mandatory since the pre-1.0 audit**, absent as well as malformed: a manifest
+  without a usable fingerprint no longer leads to any proposal. It had been optional so that
+  releases predating its introduction stayed installable — a leniency without object, the app
+  only ever consulting `releases/latest`, every release produced by `release.yml` carrying a
+  fingerprint. Offering an update that cannot be verified is worse than offering nothing.
+- **The APK is downloaded to internal storage** (`filesDir/updates`), and exposed to the
+  installer by the FileProvider. External storage remained modifiable by another app between
+  the fingerprint check and the tap on "Install": see "Security audit before 1.0", point 2.
+- **The APK must carry the release's package name and the announced `versionCode`**, checked
+  after download (`UpdateDownloader.isExpectedApk`); otherwise it is deleted without being
+  presented. This is what makes the signature enforceable: Android refuses another key for
+  the same package name, but would install a different name as a second app. See "Security
+  audit of 1.3", point 2.
+- Silent installation is impossible for an ordinary app: the system always shows its
+  confirmation screen.
 
-Ignorer le bandeau (« Plus tard ») ne fait pas disparaître la mise à jour : un badge
-rouge sur l'onglet « Paramètres » et une carte en tête de cet écran restent, avec un
-bouton qui rouvre le même bandeau. `MainScreen` conserve la mise à jour détectée
-(`onUpdateAvailable`, appelé une fois par `UpdatePrompt`) et un compteur
-`updateReopenTrigger` incrémenté par ce bouton ; `UpdatePrompt` le lit pour rouvrir
-son dialogue sur la mise à jour déjà connue, sans reconsulter le réseau ni redémarrer
-l'application.
+Ignoring the banner ("Later") does not make the update disappear: a red badge on the
+"Settings" tab and a card at the top of that screen remain, with a button that reopens the
+same banner. `MainScreen` keeps the detected update (`onUpdateAvailable`, called once by
+`UpdatePrompt`) and an `updateReopenTrigger` counter incremented by that button;
+`UpdatePrompt` reads it to reopen its dialog on the already known update, without
+consulting the network again or restarting the app.
 
-### Notification en tâche de fond
+### Background notification
 
-`UpdatePrompt` ne consulte le réseau qu'à l'ouverture de l'application : une mise à
-jour publiée pendant qu'elle reste fermée plusieurs jours ne se voyait qu'au
-lancement suivant, s'il y en avait un. `util/update/UpdateCheckWorker` comble ce
-manque par une notification, sans en payer le prix en batterie.
+`UpdatePrompt` only consults the network when the app opens: an update published while it
+stays closed for several days was only seen at the next launch, if there was one.
+`util/update/UpdateCheckWorker` fills that gap with a notification, without paying for it in
+battery.
 
-- **Toutes les trois heures** (`UpdateCheckWorker.CHECK_INTERVAL_HOURS`), via une
-  tâche `WorkManager` périodique (`PeriodicWorkRequestBuilder`), programmée par
-  `TrackApplication.onCreate` et reprise à chaque démarrage sans effet si elle l'est
-  déjà (`ExistingPeriodicWorkPolicy.KEEP` — la remplacer à chaque lancement
-  reviendrait, sur une application ouverte plusieurs fois par jour, à ne jamais
-  laisser le premier délai s'écouler). WorkManager bat lui-même ce rappel dans une
-  fenêtre large et le regroupe avec les tâches d'autres applications : c'est ce qui
-  le distingue d'un minuteur maison, et ce qui répond au principal souci d'une
-  vérification périodique — vider la batterie.
-  `Constraints.setRequiresBatteryNotLow(true)` renonce même à ce battement quand
-  l'appareil est déjà en réserve.
-  Revers de `KEEP` : changer cette cadence entre deux versions ne la modifie pas
-  toute seule pour une installation qui l'avait déjà programmée avec l'ancienne —
-  la tâche existante n'est jamais remplacée. Sans conséquence tant que l'application
-  n'a pas encore été publiée avec une cadence antérieure.
-- **Une seule notification par version.** `UpdateCheckPreferences` retient le
-  `versionCode` déjà notifié ; sans cette mémoire, la même mise à jour ignorée
-  serait re-signalée à chaque passage tant qu'elle reste la plus récente publiée.
-- Réutilise directement `UpdateChecker.fetchLatest` et `UpdateManifest` :
-  aucune règle de sécurité ou de validation dupliquée, la même adresse, la même
-  empreinte obligatoire, la même contrainte d'hôte GitHub.
-- WorkManager avait été retiré du projet (voir « Poids mort ») faute d'appelant ; il
-  est revenu pour cet unique usage, dont c'est exactement le rôle : une tâche
-  périodique qui survit au redémarrage de l'application et respecte les contraintes
-  système plutôt que de les contourner.
-- **`UpdateCheckWorker.schedule` est protégé par `runCatching`.** `TrackApplication`
-  l'appelle à chaque démarrage, y compris dans les tests Robolectric — qui
-  instancient cette même application sans passer par l'initialiseur automatique de
-  WorkManager. Sans cette protection, `WorkManager.getInstance` y levait une
-  `IllegalStateException` qui faisait échouer, d'un coup, les 70 tests qui
-  démarrent l'application (tout ce qui utilise `RobolectricTestRunner`, même des
-  calculs purs sans rapport avec les mises à jour) — trouvé à la compilation de la
-  première version publiée avec cette tâche.
+- **Every three hours** (`UpdateCheckWorker.CHECK_INTERVAL_HOURS`), through a periodic
+  `WorkManager` task (`PeriodicWorkRequestBuilder`), scheduled by `TrackApplication.onCreate`
+  and taken up at each startup with no effect if it already is
+  (`ExistingPeriodicWorkPolicy.KEEP` — replacing it at each launch would amount, on an app
+  opened several times a day, to never letting the first delay elapse). WorkManager itself
+  shifts this callback within a wide window and batches it with other apps' tasks: that is
+  what sets it apart from a home-made timer, and what answers the main worry of a periodic
+  check — draining the battery. `Constraints.setRequiresBatteryNotLow(true)` even gives up
+  that beat when the device is already low.
+  Downside of `KEEP`: changing that rate between versions does not change it by itself for
+  an installation that had already scheduled it with the old one — the existing task is
+  never replaced. Harmless as long as the app has not been published with an earlier rate.
+- **A single notification per version.** `UpdateCheckPreferences` remembers the
+  `versionCode` already notified; without that memory, the same ignored update would be
+  reported again at each pass as long as it remains the most recent published.
+- Directly reuses `UpdateChecker.fetchLatest` and `UpdateManifest`: no security or validation
+  rule duplicated, the same address, the same mandatory fingerprint, the same GitHub host
+  constraint.
+- WorkManager had been removed from the project (see "Dead weight") for lack of a caller; it
+  came back for this single use, which is exactly its role: a periodic task that survives the
+  app restarting and respects system constraints rather than bypassing them.
+- **`UpdateCheckWorker.schedule` is protected by `runCatching`.** `TrackApplication` calls it
+  at each startup, including in Robolectric tests — which instantiate that same application
+  without going through WorkManager's automatic initializer. Without this protection,
+  `WorkManager.getInstance` threw an `IllegalStateException` there that made the 70 tests
+  starting the application fail at once (everything using `RobolectricTestRunner`, even pure
+  computations unrelated to updates) — found at the build of the first version published with
+  this task.
 
-## Publier une version
+## Publishing a release
 
-**Ne publier que sur demande explicite de l'auteur** (« publie », « publie la
-2.0.x »…). Une demande de corrections, même accompagnée des notes de version à
-afficher, n'est **pas** une demande de publication : la 2.0.3 a été publiée ainsi par
-déduction, sans que l'auteur l'ait demandé. Corriger, compiler, pousser et fournir
-l'APK de debug, puis attendre son feu vert.
+**Only publish on the author's explicit request** ("publish", "publish 2.0.x"…). A request
+for fixes, even accompanied by the release notes to display, is **not** a request to
+publish: 2.0.3 was published that way by deduction, without the author having asked for it.
+Fix, build, push and provide the debug APK, then wait for their go-ahead.
 
-`.github/workflows/release.yml` fait tout : tests, compilation signée, `update.json`,
-publication GitHub. Deux façons de le déclencher, pour un résultat identique.
+`.github/workflows/release.yml` does everything: tests, signed build, `update.json`, GitHub
+publication. Two ways to trigger it, for an identical result.
 
-**Par un tag annoté**, depuis un poste de développement :
+**By an annotated tag**, from a development machine:
 
 ```bash
-git tag -a v0.9.9-thierry -m "Titre" -m "Première nouveauté" -m "Deuxième"
-git push origin v0.9.9-thierry
+git tag -a v0.9.9 -m "Title" -m "First change" -m "Second change"
+git push origin v0.9.9
 ```
 
-Le corps du tag devient les notes affichées dans la boîte de dialogue de mise à jour,
-une puce par ligne. Le workflow **refuse de publier** si le tag ne correspond pas au
-`versionName` de `app/build.gradle.kts` : sans ce garde-fou, on publierait une version
-que personne ne pourrait installer par-dessus la précédente.
+The tag body becomes the notes displayed in the update dialog, one bullet per line. The
+workflow **refuses to publish** if the tag does not match the `versionName` of
+`app/build.gradle.kts`: without that safeguard, one would publish a version that nobody could
+install over the previous one.
 
-**À la main** (onglet Actions → « Publier une version » → Run workflow), en saisissant
-les notes, une par ligne. Le tag est alors déduit du `versionName` et créé par la
-publication elle-même.
+**By hand** (Actions tab → "Publish a release" → Run workflow), entering the notes, one per
+line, **in English**. The tag is then deduced from the `versionName` and created by the
+publication itself. The optional `notes_i18n` input takes translations as a JSON object keyed
+by language code (`{"fr": ["…"], "es": ["…"]}`): they end up in `update.json`'s `notesI18n`
+and the app shows the one matching the phone's language. Anything that is not a JSON object
+is ignored.
 
-Cette seconde voie n'est pas un confort : **créer un tag exige des droits d'écriture
-sur les références qu'une session Claude Code sur le web n'a pas.** Elle peut pousser
-du code sur une branche, mais `git push origin <tag>` lui revient en HTTP 403. Sans ce
-déclenchement manuel, publier exigerait une machine de développement sous la main — ce
-qui vide de son sens la possibilité de développer depuis le web.
+This second route is not a convenience: **creating a tag requires write rights on references
+that a Claude Code session on the web does not have.** It can push code to a branch, but
+`git push origin <tag>` comes back to it as HTTP 403. Without this manual trigger,
+publishing would require a development machine at hand — which defeats the point of being
+able to develop from the web.
 
-Le garde-fou tag ↔ `versionName` n'a rien à vérifier sur cette voie, le tag étant
-déduit de la version. Il est remplacé par un refus de republier une version déjà
-publiée, qui joue le même rôle : forcer l'incrément avant de repartir.
+The tag ↔ `versionName` safeguard has nothing to check on this route, the tag being deduced
+from the version. It is replaced by a refusal to republish an already published version,
+which plays the same role: forcing the increment before starting again.
 
-### Secrets du dépôt à renseigner
+### Repository secrets to fill in
 
-| Secret | Contenu |
+| Secret | Content |
 | --- | --- |
-| `KEYSTORE_BASE64` | Le trousseau `.jks` encodé en base64 |
-| `STORE_PASSWORD` | Mot de passe du trousseau |
-| `KEY_PASSWORD` | Mot de passe de la clé |
-| `KEY_ALIAS` | Alias de la clé (`upload` par défaut) |
+| `KEYSTORE_BASE64` | The `.jks` keystore encoded in base64 |
+| `STORE_PASSWORD` | Keystore password |
+| `KEY_PASSWORD` | Key password |
+| `KEY_ALIAS` | Key alias (`upload` by default) |
 
 ```bash
 base64 -w 0 my-upload-key.jks > keystore.base64.txt
 ```
 
-### Compiler une version signée en local
+### Building a signed version locally
 
-Créer à la racine un fichier `keystore.properties`, **jamais versionné** :
+Create at the root a `keystore.properties` file, **never versioned**:
 
 ```properties
-storeFile=C:/chemin/vers/my-upload-key.jks
+storeFile=C:/path/to/my-upload-key.jks
 storePassword=…
 keyAlias=upload
 keyPassword=…
 ```
 
-`app/build.gradle.kts` le lit en priorité, puis retombe sur les variables
-d'environnement — c'est cette seconde voie qu'emprunte l'intégration continue. Aucun
-mot de passe n'apparaît donc jamais dans le code ni dans l'historique git.
+`app/build.gradle.kts` reads it first, then falls back on environment variables — this
+second route is the one taken by continuous integration. No password therefore ever appears
+in the code or in the git history.
 
-### Créer le trousseau, une fois pour toutes
+### Creating the keystore, once and for all
 
 ```bash
 keytool -genkeypair -v -keystore my-upload-key.jks -keyalg RSA -keysize 4096 -validity 10000 -alias upload
 ```
 
-**À sauvegarder ailleurs que sur la machine de développement.** Le perdre rend toute
-mise à jour ultérieure impossible à installer : il faudrait repartir d'une
-désinstallation, donc de la perte des parcours des utilisateurs.
+**To be backed up somewhere other than the development machine.** Losing it makes every
+later update impossible to install: one would have to start again from an uninstall, hence
+from the loss of the users' tracks.
 
-## Identité de l'application : gelée
+## Frozen identity
 
-Le projet est passé aux **mises à jour sur place**, qui conservent les parcours de
-l'utilisateur. Trois points en découlent, et ils ne sont plus négociables :
+The project moved to **in-place updates**, which keep the user's tracks. Three points follow,
+and they are no longer negotiable:
 
-1. **`applicationId = "com.toche.mesparcours"` est définitif pour la release.** Le
-   changer ferait échouer toutes les mises à jour : Android installerait une seconde
-   application à côté, et la base de la première deviendrait inaccessible. (Il a
-   successivement valu `com.aistudio.mytracks.eaddfb`, hérité de l'échafaudage AI
-   Studio, puis `com.toche.sillage` — c'est terminé.) Le build type `debug`, lui,
-   porte volontairement un `applicationIdSuffix` différent : voir « Commandes »
-   plus haut pour la raison (installation côte à côte avec la release, jamais une
-   mise à jour l'une de l'autre).
-2. **La clé de signature est définitive.** Un APK signé par une autre clé est refusé
-   avec « package signatures do not match » et impose une désinstallation. Les
-   versions distribuées doivent donc toutes être signées avec la clé de `release`,
-   jamais avec `debug.keystore`.
-3. **Chaque changement de schéma Room exige sa migration** (invariant 2). C'était
-   théorique tant qu'on désinstallait à chaque fois ; c'est désormais vital, car
-   `fallbackToDestructiveMigration()` effacerait les parcours sans prévenir.
+1. **`applicationId = "com.toche.mesparcours"` is final for the release.** Changing it would
+   make every update fail: Android would install a second app next to the first, and the
+   first one's database would become inaccessible. (It has successively been
+   `com.aistudio.mytracks.eaddfb`, inherited from the AI Studio scaffold, then
+   `com.toche.sillage` — that is over.) The `debug` build type, for its part, deliberately
+   carries a different `applicationIdSuffix`: see "Commands" above for the reason
+   (side-by-side installation with the release, never an update of one by the other).
+2. **The signing key is final.** An APK signed by another key is refused with "package
+   signatures do not match" and forces an uninstall. Distributed versions must therefore all
+   be signed with the `release` key, never with `debug.keystore`.
+3. **Every Room schema change requires its migration** (invariant 2). It was theoretical as
+   long as we uninstalled each time; it is now vital, because `fallbackToDestructiveMigration()`
+   would erase the tracks without warning.
 
-Rien ne référence l'`applicationId` en dur : le manifeste passe par
-`${applicationId}.fileprovider` et le code Kotlin par `context.packageName`.
+Nothing references the `applicationId` in plain text: the manifest goes through
+`${applicationId}.fileprovider` and Kotlin code through `context.packageName`.
 
-Le `namespace` et le paquet Kotlin `com.example` restent, eux, ceux de
-l'échafaudage. Sans effet à l'exécution, mais les renommer toucherait chaque
-fichier source ainsi que les constantes d'action de `TrackingService`
-(`"com.example.service.action.START"`, etc.).
+The `namespace` and the Kotlin package `com.example` remain, for their part, those of the
+scaffold. No effect at runtime, but renaming them would touch every source file as well as
+`TrackingService`'s action constants (`"com.example.service.action.START"`, etc.).

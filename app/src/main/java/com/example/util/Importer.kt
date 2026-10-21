@@ -14,70 +14,70 @@ import java.util.Locale
 import java.util.TimeZone
 import javax.xml.parsers.SAXParserFactory
 
-/** Nombre de points écrits en base par lot. Borne l'empreinte mémoire de l'import. */
+/** Number of points written to the database per batch. Bounds the import's memory footprint. */
 private const val BATCH_SIZE = 1000
 
-/** Longueur maximale retenue pour le nom lu dans le fichier. */
+/** Maximum length kept for the name read from the file. */
 private const val MAX_NAME_LENGTH = 512
 
 /**
- * Longueur maximale retenue pour le texte d'un élément GPX.
+ * Maximum length kept for the text of a GPX element.
  *
- * Le nom est le plus long des champs qu'on garde ; les autres — `ele`, `time`,
- * `speed`, `type` — tiennent en quelques dizaines de caractères. Au-delà, le texte
- * est tronqué plutôt qu'accumulé : sans cette borne, un `<desc>` de plusieurs
- * dizaines de mégaoctets était recopié entier dans le tampon, et le chemin GPX
- * n'avait alors aucune des protections que le chemin KML se donne (voir
- * [MAX_COLOR_LENGTH] et [MAX_STYLE_ID_LENGTH]).
+ * The name is the longest of the fields we keep; the others — `ele`, `time`,
+ * `speed`, `type` — fit in a few dozen characters. Beyond that, the text
+ * is truncated rather than accumulated: without this bound, a `<desc>` of several
+ * tens of megabytes was copied whole into the buffer, and the GPX path
+ * then had none of the protections the KML path gives itself (see
+ * [MAX_COLOR_LENGTH] and [MAX_STYLE_ID_LENGTH]).
  */
 private const val MAX_GPX_TEXT_LENGTH = MAX_NAME_LENGTH
 
 /**
- * Longueur maximale retenue pour une couleur lue dans le fichier. Une couleur KML
- * fait huit caractères ; la marge absorbe les espaces, et la borne évite qu'un
- * fichier malformé fasse enfler le tampon.
+ * Maximum length kept for a color read from the file. A KML color
+ * is eight characters; the margin absorbs spaces, and the bound keeps a
+ * malformed file from swelling the buffer.
  */
 private const val MAX_COLOR_LENGTH = 32
 
-/** Longueur maximale retenue pour un identifiant de style ou une clé de `<Pair>`. */
+/** Maximum length kept for a style identifier or a `<Pair>` key. */
 private const val MAX_STYLE_ID_LENGTH = 256
 
 /**
- * Longueur maximale d'un point de `<coordinates>` (« lon,lat[,alt] »), en caractères.
+ * Maximum length of a `<coordinates>` point (“lon,lat[,alt]”), in characters.
  *
- * Un point réel en fait quelques dizaines, même à quinze décimales. Sans cette borne,
- * le jeton grandissait jusqu'au prochain blanc : un bloc de plusieurs centaines de
- * mégaoctets sans un seul espace était accumulé entier, deux octets par caractère,
- * jusqu'à saturer la mémoire — l'asymétrie qu'avait déjà corrigée [MAX_GPX_TEXT_LENGTH]
- * côté GPX, restée ouverte ici (audit de la 1.3). Au-delà, le jeton est ignoré.
+ * A real point is a few dozen, even with fifteen decimals. Without this bound,
+ * the token grew until the next blank: a block of several hundred
+ * megabytes without a single space was accumulated whole, two bytes per character,
+ * until memory was exhausted — the asymmetry already fixed by [MAX_GPX_TEXT_LENGTH]
+ * on the GPX side, left open here (audit of 1.3). Beyond, the token is ignored.
  */
 internal const val MAX_COORDINATE_TOKEN_LENGTH = 128
 
-/** Nom d'élément KML sans préfixe de namespace, en minuscules. */
+/** KML element name without namespace prefix, in lowercase. */
 private fun kmlTagOf(localName: String?, qName: String?): String {
     val raw = if (!localName.isNullOrEmpty()) localName else qName ?: return ""
     return raw.substringAfterLast(':').lowercase(Locale.US)
 }
 
 /**
- * Importe un GPX/KML sans jamais simplifier la trace : chaque point présent dans
- * le fichier devient un TrackPoint. Aucun sous-échantillonnage, aucun lissage.
+ * Imports a GPX/KML without ever simplifying the track: every point present in
+ * the file becomes a TrackPoint. No subsampling, no smoothing.
  *
- * Pour tenir en mémoire sur de très gros fichiers (plusieurs dizaines de Mo), le
- * parsing se fait en flux : les points sont émis par lots via `onBatch` au lieu
- * d'être accumulés dans une liste, et les statistiques du parcours sont calculées
- * au fil de l'eau.
+ * To fit in memory on very large files (several tens of MB), parsing
+ * is streamed: points are emitted in batches via `onBatch` instead of
+ * being accumulated in a list, and the track's statistics are computed
+ * on the fly.
  */
 object Importer {
 
-    // RuntimeException et non Exception : Room.runInTransaction() ré-emballe les
-    // exceptions vérifiées dans une RuntimeException, ce qui masquerait le message.
+    // RuntimeException and not Exception: Room.runInTransaction() rewraps checked
+    // exceptions in a RuntimeException, which would hide the message.
     class ImportException(
         @androidx.annotation.StringRes override val messageRes: Int,
         override val messageArgs: List<Any> = emptyList()
     ) : RuntimeException("string resource #$messageRes"), UserFacing
 
-    /** Statistiques du parcours, calculées pendant le parsing. */
+    /** Statistics of the track, computed during parsing. */
     data class ImportSummary(
         val name: String,
         val activityType: String,
@@ -90,21 +90,21 @@ object Importer {
         val elevationGain: Double,
         val elevationLoss: Double,
         val pointCount: Int,
-        /** Couleur de tracé lue dans le fichier (ARGB), null si le fichier n'en portait pas. */
+        /** Track color read from the file (ARGB), null if the file carried none. */
         val sourceColor: Int? = null
     )
 
-    /** Ce que la première lecture d'un KML relève : les styles, et le nombre de points. */
+    /** What the first read of a KML picks up: the styles, and the number of points. */
     private data class KmlPrescan(
         val styles: KmlStyleTable,
         val pointCount: Long
     )
 
     /**
-     * Parse le fichier et émet les points par lots via [onBatch]. Les points
-     * portent déjà [trackId], l'appelant n'a donc aucune copie à faire.
+     * Parses the file and emits the points in batches via [onBatch]. The points
+     * already carry [trackId], so the caller has no copy to make.
      *
-     * Retourne null si le fichier ne contient aucun point exploitable.
+     * Returns null if the file contains no usable point.
      */
     fun importFromUri(
         context: Context,
@@ -119,17 +119,17 @@ object Importer {
 
         val sink = PointSink(trackId, onBatch)
 
-        // Les styles KML sont relevés par une première lecture, avant les points.
+        // KML styles are collected by a first read, before the points.
         //
-        // Un <Placemark> désigne son style par un identifiant, et le <Style>
-        // correspondant peut être écrit plus loin dans le fichier — via un <StyleMap>
-        // qui, lui, renvoie encore ailleurs. En une seule passe, un trajet dont le
-        // style est déclaré après lui resterait sans couleur, et ses points sont déjà
-        // écrits en base quand on l'apprend : impossible de revenir dessus.
+        // A <Placemark> designates its style by an identifier, and the matching
+        // <Style> may be written further down in the file — via a <StyleMap>
+        // that itself points elsewhere. In a single pass, a trip whose
+        // style is declared after it would stay without a color, and its points are already
+        // written to the database when we learn it: impossible to go back.
         //
-        // Cette passe compte aussi les points, sans en garder aucun : c'est ce qui
-        // permet de dater le tracé exactement (voir parseKML). Son empreinte mémoire
-        // reste de quelques dizaines d'entrées, quelle que soit la taille du fichier.
+        // This pass also counts the points, without keeping any: that is what
+        // allows dating the track exactly (see parseKML). Its memory footprint
+        // stays at a few dozen entries, whatever the size of the file.
         val prescan = if (isKml) {
             context.contentResolver.openInputStream(uri)?.use { prescanKml(it) }
                 ?: KmlPrescan(KmlStyleTable(), 0L)
@@ -173,7 +173,7 @@ object Importer {
 
         var trackName = defaultName
         var nameResolved = false
-        var activityType = "Randonnée"
+        var activityType = "Hiking"
 
         var eventType = parser.eventType
         var currentLat: Double? = null
@@ -204,10 +204,10 @@ object Importer {
                     }
                 }
                 XmlPullParser.TEXT -> {
-                    // `getTextCharacters` rend le tampon interne de l'analyseur tel
-                    // quel, là où `parser.text` en fabrique d'abord une copie
-                    // complète : sur un élément démesuré, cette copie seule pesait
-                    // déjà deux octets par caractère avant même d'être tronquée.
+                    // `getTextCharacters` hands back the parser's internal buffer as
+                    // is, where `parser.text` first builds a complete copy: on an
+                    // oversized element, that copy alone already weighed
+                    // two bytes per character before even being truncated.
                     val room = MAX_GPX_TEXT_LENGTH - textBuffer.length
                     if (room > 0) {
                         val bounds = IntArray(2)
@@ -262,10 +262,10 @@ object Importer {
     // ---------------------------------------------------------------- KML
 
     /**
-     * Le KML est parsé en SAX, pas avec XmlPullParser : kXML2 fusionne le texte
-     * adjacent en un seul événement et reconstruirait donc en mémoire l'intégralité
-     * du bloc <coordinates> (plus de 100 Mo en UTF-16 pour un fichier de 50 Mo).
-     * SAX (Expat) livre les caractères par petits blocs, qu'on consomme au vol.
+     * KML is parsed with SAX, not with XmlPullParser: kXML2 merges adjacent text
+     * into a single event and would therefore rebuild in memory the whole
+     * <coordinates> block (over 100 MB in UTF-16 for a 50 MB file).
+     * SAX (Expat) delivers characters in small chunks, consumed on the fly.
      */
     private fun parseKML(
         inputStream: InputStream,
@@ -273,29 +273,29 @@ object Importer {
         prescan: KmlPrescan,
         sink: PointSink
     ): TrackMeta {
-        // Le KML ne porte pas d'horodatage : on garde la convention historique d'un
-        // point par seconde, calée pour que la trace se termine à l'instant présent.
+        // KML carries no timestamp: we keep the historical convention of one
+        // point per second, set so that the track ends at the present moment.
         //
-        // Le nombre de points vient du comptage exact fait à la première lecture, et
-        // non plus d'une estimation tirée de la taille du fichier. Cette estimation se
-        // trompait lourdement dès que le fournisseur ne savait pas annoncer la taille
-        // — le cas de Google Drive et de plusieurs gestionnaires de fichiers, qui
-        // renvoient alors zéro. Le calcul retombait sur un seul point, et un fichier
-        // de 100 000 points se datait de « maintenant » à « maintenant + 27 heures » :
-        // le parcours importé se rangeait dans le futur, donc en tête de l'historique.
+        // The number of points comes from the exact count made on the first read, and
+        // no longer from an estimate drawn from the file size. That estimate
+        // was badly wrong whenever the provider could not announce the size
+        // — the case of Google Drive and several file managers, which
+        // then return zero. The computation fell back to a single point, and a file
+        // of 100,000 points was dated from “now” to “now + 27 hours”:
+        // the imported track was filed in the future, hence at the top of the history.
         val startClock = System.currentTimeMillis() - prescan.pointCount * 1000L
         val handler = KmlHandler(sink, defaultName, startClock, prescan.styles)
 
         newSaxParser().parse(inputStream, handler)
 
-        return TrackMeta(handler.trackName, "Randonnée", handler.firstLineColor)
+        return TrackMeta(handler.trackName, "Hiking", handler.firstLineColor)
     }
 
     /**
-     * Première lecture : relève les styles et compte les points, sans en garder aucun.
+     * First read: collects the styles and counts the points, without keeping any.
      *
-     * Le comptage traverse bien les blocs `<coordinates>`, mais ne retient qu'un
-     * entier : l'empreinte mémoire ne dépend pas de la taille du fichier.
+     * The count does go through the `<coordinates>` blocks, but only retains an
+     * integer: the memory footprint does not depend on the file size.
      */
     private fun prescanKml(inputStream: InputStream): KmlPrescan {
         val handler = KmlStyleHandler()
@@ -304,24 +304,24 @@ object Importer {
     }
 
     /**
-     * Analyseur SAX durci : un fichier importé vient de l'extérieur, il ne doit pas
-     * pouvoir déclarer d'entités XML.
+     * Hardened SAX parser: an imported file comes from outside, it must not
+     * be able to declare XML entities.
      *
-     * Sans ces réglages, un `<!DOCTYPE>` contenant des entités imbriquées — l'attaque
-     * dite « billion laughs » — fait gonfler la mémoire jusqu'au plantage depuis un
-     * fichier de quelques kilo-octets ; et une entité externe pourrait faire lire un
-     * fichier local ou émettre une requête réseau à l'insu de l'utilisateur.
+     * Without these settings, a `<!DOCTYPE>` containing nested entities — the
+     * so-called “billion laughs” attack — makes memory swell until a crash from a
+     * file of a few kilobytes; and an external entity could make a local
+     * file be read or a network request be issued without the user knowing.
      *
-     * Le GPX, lui, passe par [Xml.newPullParser] : kXML2 ignore par défaut la
-     * déclaration de type de document, il n'y a donc rien à désactiver de ce côté.
+     * GPX, for its part, goes through [Xml.newPullParser]: kXML2 ignores the
+     * document type declaration by default, so there is nothing to disable on that side.
      *
-     * Vérifié sur la source d'AOSP plutôt que supposé, lors de l'audit de la 1.1 :
-     * `KXmlParser.readEntityDeclaration` ne range une entité dans `documentEntities`
-     * que si `FEATURE_PROCESS_DOCDECL` est actif — il est faux par défaut et rien
-     * ici ne l'active — si bien qu'aucune entité déclarée dans un GPX n'est jamais
-     * développée, et que « billion laughs » n'a pas de prise. Les entités externes,
-     * elles, sont mappées sur la chaîne vide : pas de lecture de fichier local ni de
-     * requête réseau par ce chemin non plus.
+     * Checked against the AOSP source rather than assumed, during the 1.1 audit:
+     * `KXmlParser.readEntityDeclaration` only stores an entity in `documentEntities`
+     * if `FEATURE_PROCESS_DOCDECL` is active — it is false by default and nothing
+     * here activates it — so that no entity declared in a GPX is ever
+     * expanded, and “billion laughs” has no hold. External entities,
+     * for their part, are mapped to the empty string: no local file read or
+     * network request through this path either.
      */
     private fun newSaxParser() = SAXParserFactory.newInstance()
         .apply {
@@ -333,21 +333,21 @@ object Importer {
         .newSAXParser()
 
     /**
-     * Pose un drapeau de sécurité s'il est reconnu.
+     * Sets a security flag if it is recognized.
      *
-     * Toutes les implémentations ne connaissent pas tous les drapeaux, et refuser
-     * d'importer parce que l'une manque serait pire que de s'en passer : le premier
-     * de la liste suffit à lui seul à écarter le cas dangereux.
+     * Not all implementations know all the flags, and refusing
+     * to import because one is missing would be worse than doing without: the first
+     * of the list is enough on its own to rule out the dangerous case.
      */
     private fun SAXParserFactory.trySetFeature(name: String, value: Boolean) {
         try {
             setFeature(name, value)
         } catch (e: Exception) {
-            // Drapeau inconnu de cette implémentation : on poursuit sans.
+            // Flag unknown to this implementation: we carry on without it.
         }
     }
 
-    // ------------------------------------------------------------- Divers
+    // ------------------------------------------------------------- Misc
 
     private fun getFileName(context: Context, uri: Uri): String {
         var name = context.getString(R.string.import_default_name)
@@ -384,12 +384,12 @@ object Importer {
 }
 
 /**
- * Analyseur de la partie date-heure, conservé par thread.
+ * Parser for the date-time part, kept per thread.
  *
- * En construire un par point coûtait l'analyse du motif à chaque ligne du fichier,
- * soit plusieurs millions de fois sur une trace dense. `SimpleDateFormat` n'étant pas
- * partageable entre threads, on en garde un exemplaire par thread plutôt qu'un seul
- * partagé.
+ * Building one per point cost the pattern analysis on every line of the file,
+ * i.e. several million times on a dense track. `SimpleDateFormat` not being
+ * shareable between threads, we keep one instance per thread rather than a single
+ * shared one.
  */
 private val iso8601DateTime = ThreadLocal.withInitial {
     SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
@@ -399,23 +399,23 @@ private val iso8601DateTime = ThreadLocal.withInitial {
 }
 
 /**
- * Horodatage ISO 8601 d'un fichier GPX, en millisecondes depuis l'époque.
+ * ISO 8601 timestamp of a GPX file, in milliseconds since the epoch.
  *
- * L'implémentation précédente ne reconnaissait que deux formes, toutes deux en UTC :
- * `2024-01-01T10:00:00Z` et `2024-01-01T10:00:00.123Z`. Or la forme la plus répandue
- * dans les fichiers réels — celle que produisent la plupart des montres et
- * applications de sport — porte un décalage horaire : `2024-01-01T10:00:00+02:00`.
- * Elle échouait, le point prenait alors l'heure de l'import, et toute la chronologie
- * du fichier était perdue : durée, vitesses et allure devenaient fausses.
+ * The previous implementation only recognized two forms, both in UTC:
+ * `2024-01-01T10:00:00Z` and `2024-01-01T10:00:00.123Z`. But the most common form
+ * in real files — the one produced by most watches and
+ * sports apps — carries a time zone offset: `2024-01-01T10:00:00+02:00`.
+ * It failed, the point then took the import time, and the whole chronology
+ * of the file was lost: duration, speeds and pace became wrong.
  *
- * Sont désormais acceptés le suffixe `Z`, les décalages `+02:00`, `+0200` et `+02`,
- * et l'absence de suffixe — comprise comme UTC, ce qu'impose la spécification GPX.
+ * The `Z` suffix, the `+02:00`, `+0200` and `+02` offsets are now accepted,
+ * and so is the absence of a suffix — understood as UTC, as the GPX specification requires.
  *
- * Fonction pure, sans dépendance Android : directement testable.
+ * Pure function, with no Android dependency: directly testable.
  */
 internal fun parseIso8601(str: String): Long? {
     val s = str.trim()
-    // « yyyy-MM-ddTHH:mm:ss » : 19 caractères, le minimum exploitable.
+    // “yyyy-MM-ddTHH:mm:ss”: 19 characters, the minimum usable.
     if (s.length < 19) return null
 
     val base = try {
@@ -426,8 +426,8 @@ internal fun parseIso8601(str: String): Long? {
 
     var rest = s.substring(19)
 
-    // Fraction de seconde éventuelle. On ne garde que les millièmes : au-delà, la
-    // précision n'a aucun sens pour une trace enregistrée au mieux à 1 Hz.
+    // Possible fraction of a second. We only keep the thousandths: beyond, the
+    // precision is meaningless for a track recorded at best at 1 Hz.
     var millis = 0L
     if (rest.startsWith('.') || rest.startsWith(',')) {
         val digits = rest.drop(1).takeWhile { it.isDigit() }
@@ -442,11 +442,11 @@ internal fun parseIso8601(str: String): Long? {
 }
 
 /**
- * Décalage horaire annoncé après l'heure, en minutes.
+ * Time zone offset announced after the time, in minutes.
  *
- * Renvoie 0 pour `Z` comme pour un suffixe absent — la spécification GPX impose UTC
- * quand rien n'est précisé — et null si le suffixe est présent mais illisible, pour
- * que l'appelant préfère rejeter l'horodatage plutôt que de le décaler au hasard.
+ * Returns 0 for `Z` as for an absent suffix — the GPX specification requires UTC
+ * when nothing is specified — and null if the suffix is present but unreadable, so
+ * that the caller prefers to reject the timestamp rather than shift it at random.
  */
 private fun parseZoneOffsetMinutes(zone: String): Int? {
     val z = zone.trim()
@@ -482,13 +482,13 @@ private fun parseZoneOffsetMinutes(zone: String): Int? {
 private data class TrackMeta(
     val name: String,
     val activityType: String,
-    /** Couleur de tracé portée par le fichier, quand il en porte une. */
+    /** Track color carried by the file, when it carries one. */
     val sourceColor: Int? = null
 )
 
 /**
- * Accumule les points par lots et calcule les statistiques au fil de l'eau.
- * L'empreinte mémoire est bornée à un lot, quelle que soit la taille du fichier.
+ * Accumulates points in batches and computes statistics on the fly.
+ * The memory footprint is bounded to one batch, whatever the size of the file.
  */
 private class PointSink(
     private val trackId: Long,
@@ -511,8 +511,8 @@ private class PointSink(
     var maxSpeed = 0.0
         private set
 
-    // Un "segment" est un <trkseg>/<trk>/<rte> GPX ou un bloc <coordinates> KML.
-    // Ni la distance ni le dénivelé ne sont cumulés par-dessus une rupture de segment.
+    // A "segment" is a GPX <trkseg>/<trk>/<rte> or a KML <coordinates> block.
+    // Neither distance nor elevation is accumulated across a segment break.
     private var segmentIndex = 0
     private var pointsInSegment = 0
 
@@ -521,7 +521,7 @@ private class PointSink(
     private var prevLon = 0.0
     private var prevAlt = 0.0
 
-    /** Ouvre un nouveau segment, sauf si le segment courant est encore vide. */
+    /** Opens a new segment, unless the current segment is still empty. */
     fun startNewSegment() {
         if (pointsInSegment > 0) {
             segmentIndex++
@@ -578,22 +578,22 @@ private class PointSink(
 }
 
 /**
- * Première lecture d'un KML : relève les `<Style>` et les `<StyleMap>` du document.
+ * First read of a KML: collects the document's `<Style>` and `<StyleMap>`.
  *
- * Ne conserve que des identifiants et des couleurs — quelques dizaines d'entrées même
- * pour un fichier de plusieurs centaines de mégaoctets, puisque les `<coordinates>`
- * sont ignorées.
+ * Only keeps identifiers and colors — a few dozen entries even
+ * for a file of several hundred megabytes, since the `<coordinates>`
+ * are ignored.
  */
 private class KmlStyleHandler : DefaultHandler() {
 
     val table = KmlStyleTable()
 
     /**
-     * Nombre de points du fichier, compté sans en garder aucun.
+     * Number of points in the file, counted without keeping any.
      *
-     * Sert à dater le tracé : le KML ne porte pas d'horodatage, et connaître l'effectif
-     * exact avant d'écrire le premier point est le seul moyen de le faire se terminer
-     * à l'instant présent plutôt que dans le futur.
+     * Used to date the track: KML carries no timestamp, and knowing the exact
+     * count before writing the first point is the only way to make it end
+     * at the present moment rather than in the future.
      */
     var pointCount = 0L
         private set
@@ -609,8 +609,8 @@ private class KmlStyleHandler : DefaultHandler() {
     private val colorBuffer = StringBuilder()
     private var styleColor: Int? = null
 
-    // Un <StyleMap> distingue l'apparence au repos de celle au survol. Seule la
-    // première nous intéresse : c'est celle que l'utilisateur voit dans Google Earth.
+    // A <StyleMap> distinguishes the resting appearance from the hover one. Only the
+    // first matters to us: it is the one the user sees in Google Earth.
     private var inPair = false
     private var inKey = false
     private var inStyleUrl = false
@@ -707,8 +707,8 @@ private class KmlHandler(
         private set
 
     /**
-     * Couleur du premier tracé rencontré. Sert de couleur représentative du fichier —
-     * la pastille de la fiche dans l'historique, qui n'a de place que pour une.
+     * Color of the first track encountered. Serves as the file's representative color —
+     * the track's chip in the history, which only has room for one.
      */
     var firstLineColor: Int? = null
         private set
@@ -719,11 +719,11 @@ private class KmlHandler(
     private val nameBuffer = StringBuilder()
 
     // ------------------------------------------------------------------
-    // Couleur du tracé en cours.
+    // Color of the current track.
     //
-    // Elle vient soit d'un <styleUrl> résolu dans le répertoire relevé à la
-    // première lecture, soit d'un <Style> écrit directement dans le <Placemark>.
-    // Le second l'emporte : un style local est plus précis qu'un renvoi.
+    // It comes either from a <styleUrl> resolved in the directory collected on the
+    // first read, or from a <Style> written directly in the <Placemark>.
+    // The second wins: a local style is more precise than a reference.
     // ------------------------------------------------------------------
 
     private var inPlacemark = false
@@ -736,7 +736,7 @@ private class KmlHandler(
     private var referencedColor: Int? = null
     private var inlineColor: Int? = null
 
-    /** Couleur retenue pour les points en cours d'émission. */
+    /** Color retained for the points being emitted. */
     private val currentColor: Int? get() = inlineColor ?: referencedColor
 
     private var clock = startClock
@@ -776,9 +776,9 @@ private class KmlHandler(
             "coordinates" -> {
                 inCoordinates = true
                 tokenizer.reset()
-                // Chaque géométrie ouvre un tronçon : deux trajets d'un même fichier
-                // ne doivent jamais être reliés par un trait, et c'est aussi ce qui
-                // permet à chacun de porter sa propre couleur.
+                // Each geometry opens a segment: two trips of the same file
+                // must never be joined by a line, and this is also what
+                // lets each carry its own color.
                 sink.startNewSegment()
             }
         }
@@ -815,8 +815,8 @@ private class KmlHandler(
             }
             "color" -> if (inLineStyleColor) {
                 inLineStyleColor = false
-                // Refusée si illisible ou transparente : on retombe alors sur la
-                // couleur de la palette plutôt que sur un tracé invisible.
+                // Rejected if unreadable or transparent: we then fall back to the
+                // palette color rather than an invisible line.
                 KmlColor.parse(colorBuffer.toString())?.let {
                     inlineColor = it
                     rememberFirstColor()
@@ -845,9 +845,9 @@ private class KmlHandler(
 }
 
 /**
- * Découpe un flux de coordonnées KML ("lon,lat[,alt]" séparés par des blancs) sans
- * jamais matérialiser le bloc entier. Tolère les espaces autour des virgules, comme
- * le faisait la normalisation par expression régulière précédente.
+ * Splits a stream of KML coordinates ("lon,lat[,alt]" separated by blanks) without
+ * ever materializing the whole block. Tolerates spaces around commas, as
+ * the previous regular-expression normalization did.
  */
 internal class CoordinateTokenizer(
     private val onPoint: (lon: Double, lat: Double, ele: Double) -> Unit
@@ -856,10 +856,10 @@ internal class CoordinateTokenizer(
     private var sawSpace = false
 
     /**
-     * Le jeton en cours a dépassé [MAX_COORDINATE_TOKEN_LENGTH] : ses caractères
-     * suivants ne sont plus retenus, et il sera écarté au lieu d'être émis. Un point
-     * tronqué ne vaut rien — « 2.35,48.8 » coupé en « 2.35,4 » placerait le point
-     * ailleurs sans que rien ne le signale.
+     * The current token has exceeded [MAX_COORDINATE_TOKEN_LENGTH]: its following
+     * characters are no longer kept, and it will be discarded instead of emitted. A
+     * truncated point is worth nothing — “2.35,48.8” cut to “2.35,4” would place the point
+     * elsewhere without anything flagging it.
      */
     private var overflowed = false
 
@@ -879,7 +879,7 @@ internal class CoordinateTokenizer(
             } else {
                 if (sawSpace) {
                     sawSpace = false
-                    // Un blanc ne sépare deux points que s'il ne borde pas une virgule.
+                    // A blank only separates two points if it does not border a comma.
                     if (c != ',' && token[token.length - 1] != ',') {
                         emit()
                     }

@@ -8,26 +8,26 @@ import java.net.URI
 import java.net.URL
 
 /**
- * Où l'application va chercher la dernière version publiée.
+ * Where the app goes to look for the latest published version.
  *
- * Tant que [GITHUB_OWNER] ou [GITHUB_REPO] est vide, la recherche est désactivée :
- * aucune requête n'est émise, et l'application se comporte exactement comme avant.
+ * As long as [GITHUB_OWNER] or [GITHUB_REPO] is empty, the search is disabled:
+ * no request is issued, and the app behaves exactly as before.
  */
 object UpdateConfig {
 
-    /** Compte GitHub hébergeant les publications. */
+    /** GitHub account hosting the releases. */
     const val GITHUB_OWNER = "ToftMalone"
 
-    /** Dépôt GitHub hébergeant les publications. */
+    /** GitHub repository hosting the releases. */
     const val GITHUB_REPO = "Mes-parcours"
 
-    /** Nom du fichier décrivant la version, joint à chaque publication. */
+    /** Name of the file describing the version, attached to each release. */
     const val MANIFEST_ASSET = "update.json"
 
     /**
-     * `releases/latest/download/<fichier>` est une URL stable : GitHub la redirige
-     * toujours vers la pièce jointe de la publication la plus récente. On évite ainsi
-     * l'API GitHub, ses quotas et son jeton d'authentification.
+     * `releases/latest/download/<file>` is a stable URL: GitHub always redirects it
+     * to the attachment of the most recent release. This avoids
+     * the GitHub API, its quotas and its authentication token.
      */
     val manifestUrl: String?
         get() = if (GITHUB_OWNER.isBlank() || GITHUB_REPO.isBlank()) {
@@ -39,42 +39,52 @@ object UpdateConfig {
     val isConfigured: Boolean get() = manifestUrl != null
 
     /**
-     * Seul chemin d'où un APK peut être téléchargé : les pièces jointes des
-     * publications de **ce** dépôt. Voir `isTrustedApkUrl`.
+     * Only path from which an APK can be downloaded: the attachments of the
+     * releases of **this** repository. See `isTrustedApkUrl`.
      */
     val releaseDownloadPathPrefix: String
         get() = "/$GITHUB_OWNER/$GITHUB_REPO/releases/download/"
 }
 
-/** Une version publiée, telle que décrite par le fichier de mise à jour. */
+/** A published version, as described by the update file. */
 data class AvailableUpdate(
     val versionCode: Int,
     val versionName: String,
     val apkUrl: String,
+    /** Release notes in English, the fallback for any language without a translation. */
     val notes: List<String>,
     /**
-     * Empreinte SHA-256 de l'APK, en hexadécimal minuscule.
+     * SHA-256 fingerprint of the APK, in lowercase hexadecimal.
      *
-     * **Obligatoire.** Le téléchargement n'est présenté à l'installateur que s'il
-     * correspond. Android refuserait de toute façon un APK signé par une autre clé,
-     * mais cette vérification-ci écarte plus tôt le cas bien plus banal du fichier
-     * tronqué ou corrompu en route — que le seul contrôle de taille laisse passer
-     * quand le serveur répond en découpage par blocs, `contentLength` valant alors -1.
+     * **Mandatory.** The download is only presented to the installer if it
+     * matches. Android would refuse an APK signed with another key anyway,
+     * but this check rules out earlier the far more common case of a file
+     * truncated or corrupted en route — which the size check alone lets through
+     * when the server answers with chunked encoding, `contentLength` then being -1.
      *
-     * Elle était facultative pour que les publications antérieures à son
-     * introduction restent installables. Ce ménagement n'a plus lieu d'être :
-     * l'application ne consulte jamais que `releases/latest`, et toute publication
-     * produite par `release.yml` porte une empreinte. Une publication qui n'en
-     * porterait pas serait donc anormale, et refuser la mise à jour vaut mieux que
-     * l'installer sans rien vérifier.
+     * It used to be optional so that releases predating its
+     * introduction stayed installable. That leniency no longer applies:
+     * the app only ever consults `releases/latest`, and every release
+     * produced by `release.yml` carries a fingerprint. A release without one
+     * would therefore be abnormal, and refusing the update is better than
+     * installing it without checking anything.
      */
-    val sha256: String
-)
+    val sha256: String,
+    /** Optional translations of [notes], keyed by language code (`fr`, `es`…). */
+    val notesI18n: Map<String, List<String>> = emptyMap()
+) {
+    /**
+     * The notes in the phone's language, falling back to the English ones: the
+     * workflow only carries the translations the author supplied for a release.
+     */
+    fun notesFor(language: String): List<String> =
+        notesI18n[language.lowercase()]?.takeIf { it.isNotEmpty() } ?: notes
+}
 
 /**
- * Lecture du fichier de mise à jour.
+ * Reading of the update file.
  *
- * Format attendu, à joindre à chaque publication GitHub sous le nom `update.json` :
+ * Expected format, to be attached to each GitHub release under the name `update.json`:
  *
  * ```json
  * {
@@ -82,15 +92,25 @@ data class AvailableUpdate(
  *   "versionName": "0.9.9-thierry",
  *   "apkUrl": "https://github.com/…/releases/download/v0.9.9-thierry/mes-parcours.apk",
  *   "sha256": "3b1f…",
- *   "notes": ["Première nouveauté", "Deuxième nouveauté"]
+ *   "notes": ["First change", "Second change"],
+ *   "notesI18n": {"fr": ["Première nouveauté", "Deuxième nouveauté"]}
  * }
  * ```
  *
- * Sans dépendance Android hors `org.json` : directement testable.
+ * No Android dependency apart from `org.json`: directly testable.
  */
 object UpdateManifest {
 
-    /** Renvoie null si le fichier est illisible ou incomplet. */
+    private fun readNotes(array: org.json.JSONArray?): List<String> = buildList {
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val line = array.optString(i)
+                if (line.isNotBlank()) add(line)
+            }
+        }
+    }
+
+    /** Returns null if the file is unreadable or incomplete. */
     fun parse(json: String): AvailableUpdate? {
         return try {
             val root = JSONObject(json)
@@ -98,60 +118,59 @@ object UpdateManifest {
             val versionName = root.optString("versionName")
             val apkUrl = root.optString("apkUrl")
 
-            // Un manifeste incomplet ne doit jamais donner lieu à une proposition de
-            // mise à jour : on préfère ne rien signaler qu'envoyer l'utilisateur vers
-            // un téléchargement inexistant.
+            // An incomplete manifest must never lead to an update proposal: we
+            // prefer reporting nothing to sending the user to a
+            // nonexistent download.
             if (versionCode <= 0 || versionName.isBlank() || apkUrl.isBlank()) return null
             if (!apkUrl.isTrustedApkUrl()) return null
 
-            val notesArray = root.optJSONArray("notes")
-            val notes = buildList {
-                if (notesArray != null) {
-                    for (i in 0 until notesArray.length()) {
-                        val line = notesArray.optString(i)
-                        if (line.isNotBlank()) add(line)
-                    }
+            val notes = readNotes(root.optJSONArray("notes"))
+            val notesI18n = buildMap {
+                val translations = root.optJSONObject("notesI18n")
+                translations?.keys()?.forEach { language ->
+                    val lines = readNotes(translations.optJSONArray(language))
+                    if (lines.isNotEmpty()) put(language.lowercase(), lines)
                 }
             }
 
-            // Empreinte obligatoire, et rejetée si elle est malformée : sans elle, le
-            // téléchargement ne serait vérifié que par sa taille — contrôle inopérant
-            // quand le serveur répond en découpage par blocs. Mieux vaut ne pas
-            // proposer la mise à jour que la proposer sans pouvoir la vérifier.
+            // Fingerprint mandatory, and rejected if malformed: without it, the
+            // download would only be checked by its size — a useless check
+            // when the server answers with chunked encoding. Better not to
+            // offer the update than to offer it without being able to verify it.
             val sha256 = root.optString("sha256").lowercase()
             if (!sha256.isValidSha256()) return null
 
-            AvailableUpdate(versionCode, versionName, apkUrl, notes, sha256)
+            AvailableUpdate(versionCode, versionName, apkUrl, notes, sha256 = sha256, notesI18n = notesI18n)
         } catch (e: Exception) {
             null
         }
     }
 }
 
-/** Une empreinte SHA-256 fait 64 caractères hexadécimaux, et rien d'autre. */
+/** A SHA-256 fingerprint is 64 hexadecimal characters, and nothing else. */
 private fun String.isValidSha256(): Boolean =
     length == 64 && all { it in '0'..'9' || it in 'a'..'f' }
 
 /**
- * L'APK doit être servi en HTTPS **et** par GitHub.
+ * The APK must be served over HTTPS **and** by GitHub.
  *
- * Ce fichier va être installé : c'est le seul endroit du projet où une adresse lue
- * ailleurs décide de ce qui s'exécutera sur l'appareil. Exiger HTTPS authentifie le
- * transport ; contraindre l'hôte fait qu'un manifeste altéré ne peut pas rediriger
- * l'installation vers un serveur quelconque.
+ * This file is going to be installed: it is the only place in the project where an address read
+ * elsewhere decides what will run on the device. Requiring HTTPS authenticates the
+ * transport; constraining the host means a tampered manifest cannot redirect
+ * the installation to an arbitrary server.
  *
- * La comparaison porte sur l'hôte analysé, jamais sur le texte de l'adresse :
- * `https://github.com.exemple.test/` commence bien par « https://github.com » sans
- * être GitHub pour autant.
+ * The comparison is on the parsed host, never on the text of the address:
+ * `https://github.com.example.test/` does start with “https://github.com” without
+ * being GitHub.
  *
- * **L'hôte ne suffit pas, le chemin est contraint aussi** (audit de la 1.3) : n'importe
- * qui peut publier un APK sur `github.com`, dans son propre dépôt. Seules les pièces
- * jointes des publications de ce dépôt-ci ([UpdateConfig.releaseDownloadPathPrefix])
- * sont acceptées. Pour que ce préfixe ne puisse pas être contourné, le chemin brut ne
- * doit porter ni encodage (`%2e%2e`, `%2f`) ni segment `.` ou `..` — sans quoi
- * `/ToftMalone/Mes-parcours/releases/download/../../../autre/…` commencerait bien par
- * le bon préfixe pour désigner, une fois résolu par le serveur, un tout autre dépôt.
- * Pour la même raison, ni identifiants dans l'adresse ni port inhabituel.
+ * **The host is not enough, the path is constrained too** (audit of 1.3): anyone
+ * can publish an APK on `github.com`, in their own repository. Only the
+ * attachments of this repository's releases ([UpdateConfig.releaseDownloadPathPrefix])
+ * are accepted. So that this prefix cannot be bypassed, the raw path must
+ * carry neither encoding (`%2e%2e`, `%2f`) nor a `.` or `..` segment — otherwise
+ * `/ToftMalone/Mes-parcours/releases/download/../../../other/…` would indeed start with
+ * the right prefix while designating, once resolved by the server, a completely different repository.
+ * For the same reason, no credentials in the address and no unusual port.
  */
 private fun String.isTrustedApkUrl(): Boolean {
     if (!startsWith("https://")) return false
@@ -169,14 +188,14 @@ private fun String.isTrustedApkUrl(): Boolean {
     val path = uri.rawPath ?: return false
     if ('%' in path) return false
     if (path.split('/').any { it == "." || it == ".." }) return false
-    // GitHub ne distingue pas la casse du compte ni du dépôt.
+    // GitHub does not distinguish the case of the account or repository.
     return path.startsWith(UpdateConfig.releaseDownloadPathPrefix, ignoreCase = true)
 }
 
 /**
- * Une mise à jour n'est proposée que si elle porte un numéro de version strictement
- * supérieur à celui installé. La comparaison se fait sur `versionCode`, un entier :
- * comparer des chaînes comme « 0.9.10 » et « 0.9.9 » se tromperait.
+ * An update is only offered if it carries a version number strictly
+ * greater than the installed one. The comparison is on `versionCode`, an integer:
+ * comparing strings like “0.9.10” and “0.9.9” would get it wrong.
  */
 fun AvailableUpdate.isNewerThan(installedVersionCode: Int): Boolean =
     versionCode > installedVersionCode
@@ -186,21 +205,21 @@ object UpdateChecker {
     private const val TIMEOUT_MS = 8_000
 
     /**
-     * Longueur maximale acceptée pour le manifeste, en caractères.
+     * Maximum length accepted for the manifest, in characters.
      *
-     * Il fait quelques centaines de caractères ; 65 536 laissent une marge large.
-     * Sans plafond, la lecture avalait ce qu'on lui servait : une réponse anormale —
-     * serveur détourné, page d'erreur volumineuse — faisait grossir la mémoire
-     * jusqu'au plantage, pour une requête que l'utilisateur n'a même pas demandée.
+     * It is a few hundred characters; 65,536 leaves a wide margin.
+     * Without a cap, the read swallowed whatever it was served: an abnormal response —
+     * hijacked server, large error page — made memory grow
+     * until a crash, for a request the user did not even ask for.
      */
     private const val MAX_MANIFEST_CHARS = 64 * 1024
 
     /**
-     * Va chercher la description de la dernière version publiée.
+     * Fetches the description of the latest published version.
      *
-     * Requête GET seule, vers une URL fixe : rien n'est transmis depuis l'appareil,
-     * ni identifiant, ni position. Renvoie null en cas d'échec réseau — une recherche
-     * de mise à jour qui échoue ne doit jamais déranger l'utilisateur.
+     * A lone GET request, to a fixed URL: nothing is sent from the device,
+     * neither identifier nor position. Returns null on network failure — an update
+     * search that fails must never bother the user.
      */
     suspend fun fetchLatest(): AvailableUpdate? = withContext(Dispatchers.IO) {
         val url = UpdateConfig.manifestUrl ?: return@withContext null
@@ -215,9 +234,9 @@ object UpdateChecker {
             }
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
 
-            // Lecture bornée : un manifeste plus gros que prévu est refusé plutôt que
-            // chargé en entier. On lit un caractère de plus que le plafond pour
-            // distinguer « pile à la limite » de « tronqué ».
+            // Bounded read: a manifest bigger than expected is refused rather than
+            // loaded in full. We read one character more than the cap to
+            // tell “exactly at the limit” from “truncated”.
             val body = connection.inputStream.bufferedReader().use { reader ->
                 val buffer = CharArray(MAX_MANIFEST_CHARS + 1)
                 var filled = 0

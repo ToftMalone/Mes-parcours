@@ -8,18 +8,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Un parcours fusionné réunit plusieurs traces en une. Le fichier exporté doit le
- * refléter : **une seule entrée**, dont la géométrie regroupe autant de
- * `<LineString>` qu'il y a de tronçons.
+ * A merged track gathers several tracks into one. The exported file must reflect
+ * it: **a single entry**, whose geometry groups as many
+ * `<LineString>`s as there are segments.
  *
- * Les deux propriétés se contredisent si on n'y prend pas garde : tout mettre dans
- * un bloc de coordonnées unique donne bien une entrée, mais relie les tronçons par
- * une ligne droite à la réimportation ; un Placemark par tronçon garde les ruptures,
- * mais présente dix entrées là où l'utilisateur venait d'en fabriquer une.
+ * The two properties contradict each other if one is not careful: putting everything in
+ * a single coordinates block does give one entry, but joins the segments with
+ * a straight line on reimport; one Placemark per segment keeps the breaks,
+ * but presents ten entries where the user had just made one.
  */
 class KmlExportTest {
 
-    private val track = Track(id = 1L, name = "Voyages", startTime = 1_000_000L)
+    private val track = Track(id = 1L, name = "Trips", startTime = 1_000_000L)
 
     private fun point(index: Int, discontinuous: Boolean = false) = TrackPoint(
         id = index.toLong(),
@@ -43,7 +43,7 @@ class KmlExportTest {
     private fun String.countOf(needle: String) = split(needle).size - 1
 
     @Test
-    fun `trois troncons donnent une entree et trois lignes`() {
+    fun `three segments give one entry and three lines`() {
         val points = listOf(
             point(1), point(2),
             point(3, discontinuous = true), point(4),
@@ -52,33 +52,33 @@ class KmlExportTest {
 
         val kml = export(points)
 
-        assertEquals("une seule entrée attendue", 1, kml.countOf("<Placemark>"))
+        assertEquals("a single entry expected", 1, kml.countOf("<Placemark>"))
         assertEquals(1, kml.countOf("<MultiGeometry>"))
-        assertEquals("un LineString par tronçon", 3, kml.countOf("<LineString>"))
+        assertEquals("one LineString per segment", 3, kml.countOf("<LineString>"))
         assertEquals(3, kml.countOf("<coordinates>"))
     }
 
     @Test
-    fun `les pauses d un enregistrement ne creent pas d entrees separees`() {
-        // Une pause, une reprise et une fusion produisent le même signal : le point
-        // suivant ouvre un tronçon. Aucun des trois ne doit donner une entrée de plus
-        // dans le fichier — un parcours enregistré en trois fois reste un parcours.
+    fun `the pauses of a recording do not create separate entries`() {
+        // A pause, a resume and a merge produce the same signal: the next point
+        // opens a segment. None of the three must give one more entry
+        // in the file — a track recorded in three goes remains one track.
         val points = listOf(
             point(1), point(2), point(3),
-            point(4, discontinuous = true), point(5),   // sortie de première pause
-            point(6, discontinuous = true), point(7)    // sortie de seconde pause
+            point(4, discontinuous = true), point(5),   // exit from the first pause
+            point(6, discontinuous = true), point(7)    // exit from the second pause
         )
 
         val kml = export(points)
 
-        assertEquals("un enregistrement reste une entrée", 1, kml.countOf("<Placemark>"))
-        assertEquals("une ligne par morceau enregistré", 3, kml.countOf("<LineString>"))
+        assertEquals("a recording stays one entry", 1, kml.countOf("<Placemark>"))
+        assertEquals("one line per recorded piece", 3, kml.countOf("<LineString>"))
     }
 
     @Test
-    fun `un troncon unique reste enveloppe de la meme facon`() {
-        // L'écriture étant incrémentale, on ne sait pas en ouvrant la géométrie
-        // combien de tronçons suivront : l'enveloppe est donc toujours la même.
+    fun `a single segment keeps the same envelope`() {
+        // Writing being incremental, we do not know when opening the geometry
+        // how many segments will follow: the envelope is therefore always the same.
         val kml = export(listOf(point(1), point(2), point(3)))
 
         assertEquals(1, kml.countOf("<Placemark>"))
@@ -87,30 +87,30 @@ class KmlExportTest {
     }
 
     @Test
-    fun `le parcours ne porte plus de noms numerotes`() {
-        // « Voyages (2) », « Voyages (3) »… trahissaient le découpage en plusieurs
-        // entrées, ce que la fusion cherchait précisément à supprimer.
+    fun `the track no longer carries numbered names`() {
+        // “Trips (2)”, “Trips (3)”… betrayed the splitting into several
+        // entries, which is precisely what the merge sought to remove.
         val kml = export(listOf(point(1), point(2, discontinuous = true)))
 
-        // Compté dans le Placemark seul : l'en-tête <Document> porte lui aussi le nom
-        // du parcours, et le compter sur le fichier entier ferait échouer un test que
-        // le code satisfait pourtant.
+        // Counted in the Placemark alone: the <Document> header also carries the
+        // track's name, and counting it over the whole file would fail a test that
+        // the code satisfies all the same.
         val placemark = kml.substringAfter("<Placemark>").substringBefore("</Placemark>")
-        assertEquals(1, placemark.countOf("<name>Voyages</name>"))
-        assertTrue("aucun nom numéroté attendu", !kml.contains("Voyages ("))
+        assertEquals(1, placemark.countOf("<name>Trips</name>"))
+        assertTrue("no numbered name expected", !kml.contains("Trips ("))
     }
 
     @Test
-    fun `les coordonnees restent en longitude latitude altitude`() {
-        // L'ordre inverse de celui qu'on lit partout ailleurs : c'est la convention
-        // KML, et l'intervertir enverrait les tracés à l'autre bout du monde.
+    fun `coordinates stay in longitude latitude altitude order`() {
+        // The reverse of the order read everywhere else: it is the KML
+        // convention, and swapping it would send the tracks to the other side of the world.
         val kml = export(listOf(point(0)))
 
         assertTrue(kml.contains("6.0,45.0,100.0"))
     }
 
     @Test
-    fun `une trace vide ne produit aucune entree`() {
+    fun `an empty track produces no entry`() {
         val kml = export(emptyList())
 
         assertEquals(0, kml.countOf("<Placemark>"))
@@ -118,9 +118,9 @@ class KmlExportTest {
     }
 
     @Test
-    fun `chaque troncon ferme sa ligne avant d ouvrir la suivante`() {
-        // Un </LineString> manquant produit un fichier que Google Earth refuse
-        // d'ouvrir — et l'erreur ne se voit qu'à l'usage, pas à l'export.
+    fun `each segment closes its line before opening the next`() {
+        // A missing </LineString> produces a file that Google Earth refuses
+        // to open — and the error only shows in use, not at export.
         val kml = export(listOf(point(1), point(2, discontinuous = true)))
 
         assertEquals(kml.countOf("<LineString>"), kml.countOf("</LineString>"))

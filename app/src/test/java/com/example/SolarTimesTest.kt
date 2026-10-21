@@ -11,13 +11,13 @@ import java.time.LocalTime
 import java.time.ZoneOffset
 
 /**
- * Le calcul solaire remplace un appel à un service météo : il doit donc être juste
- * sans filet.
+ * The solar computation replaces a call to a weather service: it must therefore be right
+ * with no safety net.
  *
- * Les assertions portent sur des propriétés physiques vérifiables (durée du jour aux
- * solstices, symétrie à l'équinoxe, jour et nuit polaires) plutôt que sur des heures
- * au dernier tour de minute, qui varient d'une source à l'autre selon les hypothèses
- * de réfraction et d'altitude.
+ * The assertions cover verifiable physical properties (day length at the
+ * solstices, symmetry at the equinox, polar day and night) rather than times
+ * down to the last minute, which vary from one source to another depending on assumptions
+ * about refraction and altitude.
  */
 class SolarTimesTest {
 
@@ -31,7 +31,7 @@ class SolarTimesTest {
 
     private fun riseAndSet(lat: Double, lng: Double, millis: Long): SolarTimes.Result.RiseAndSet {
         val result = SolarTimes.compute(lat, lng, millis)
-        assertTrue("lever et coucher attendus, obtenu $result", result is SolarTimes.Result.RiseAndSet)
+        assertTrue("sunrise and sunset expected, got $result", result is SolarTimes.Result.RiseAndSet)
         return result as SolarTimes.Result.RiseAndSet
     }
 
@@ -48,45 +48,45 @@ class SolarTimesTest {
             .toString()
 
     @Test
-    fun `le lever precede toujours le coucher`() {
+    fun `sunrise always precedes sunset`() {
         val result = riseAndSet(parisLat, parisLng, utc("2026-08-11"))
         assertTrue(result.sunriseUtcMillis < result.sunsetUtcMillis)
     }
 
     @Test
-    fun `duree du jour a Paris au solstice d ete`() {
-        // Paris culmine autour de 16 h 10 de jour au solstice de juin.
+    fun `day length in Paris at the summer solstice`() {
+        // Paris peaks at around 16 h 10 of daylight at the June solstice.
         val minutes = daylightMinutes(parisLat, parisLng, utc("2026-06-21"))
-        assertTrue("durée obtenue : $minutes min", minutes in 950..990)
+        assertTrue("duration obtained: $minutes min", minutes in 950..990)
     }
 
     @Test
-    fun `duree du jour a Paris au solstice d hiver`() {
-        // Et descend autour de 8 h 15 au solstice de décembre.
+    fun `day length in Paris at the winter solstice`() {
+        // And drops to around 8 h 15 at the December solstice.
         val minutes = daylightMinutes(parisLat, parisLng, utc("2026-12-21"))
-        assertTrue("durée obtenue : $minutes min", minutes in 480..515)
+        assertTrue("duration obtained: $minutes min", minutes in 480..515)
     }
 
     @Test
-    fun `environ douze heures de jour a l equateur a l equinoxe`() {
+    fun `about twelve hours of daylight at the equator at the equinox`() {
         val minutes = daylightMinutes(0.0, 0.0, utc("2026-03-20"))
-        assertTrue("durée obtenue : $minutes min", minutes in 715..730)
+        assertTrue("duration obtained: $minutes min", minutes in 715..730)
     }
 
     @Test
-    fun `le midi solaire se decale avec la longitude`() {
-        // Un degré de longitude vaut quatre minutes. Paris, à 2,35° est, voit donc
-        // son midi solaire environ neuf minutes avant celui de Greenwich.
+    fun `solar noon shifts with longitude`() {
+        // One degree of longitude is four minutes. Paris, at 2.35° east, therefore sees
+        // its solar noon about nine minutes before Greenwich's.
         val paris = riseAndSet(parisLat, parisLng, utc("2026-03-20"))
         val greenwich = riseAndSet(parisLat, 0.0, utc("2026-03-20"))
         val offsetMinutes = (greenwich.sunriseUtcMillis - paris.sunriseUtcMillis) / 60_000L
-        assertTrue("décalage obtenu : $offsetMinutes min", offsetMinutes in 7..11)
+        assertTrue("offset obtained: $offsetMinutes min", offsetMinutes in 7..11)
     }
 
     @Test
-    fun `le soleil de minuit et la nuit polaire sont traites`() {
-        // Au nord du cercle polaire, l'horizon n'est pas franchi aux solstices : sans
-        // traitement explicite, acos renverrait NaN.
+    fun `midnight sun and polar night are handled`() {
+        // North of the polar circle, the horizon is not crossed at the solstices: without
+        // explicit handling, acos would return NaN.
         assertEquals(
             SolarTimes.Result.PolarDay,
             SolarTimes.compute(78.0, 15.0, utc("2026-06-21"))
@@ -101,43 +101,43 @@ class SolarTimesTest {
     }
 
     @Test
-    fun `il fait jour a midi et nuit a minuit`() {
+    fun `it is day at noon and night at midnight`() {
         for (date in listOf("2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15")) {
             assertTrue(
-                "midi doit être de jour le $date",
+                "noon must be daytime on $date",
                 SolarTimes.isDaylight(parisLat, parisLng, utc(date, "12:00"))
             )
             assertTrue(
-                "minuit doit être de nuit le $date",
+                "midnight must be nighttime on $date",
                 !SolarTimes.isDaylight(parisLat, parisLng, utc(date, "00:30"))
             )
         }
     }
 
     @Test
-    fun `le jour solaire local est choisi de part et d autre de minuit UTC`() {
-        // Une requête faite après minuit UTC mais avant le lever doit rendre le lever
-        // du jour qui s'annonce, et non celui de la veille.
+    fun `the local solar day is chosen on either side of midnight UTC`() {
+        // A request made after midnight UTC but before sunrise must return the sunrise
+        // of the coming day, not of the day before.
         val justAfterMidnight = utc("2026-08-11", "01:00")
         val result = riseAndSet(parisLat, parisLng, justAfterMidnight)
         assertTrue(
-            "lever obtenu à ${hhmmUtc(result.sunriseUtcMillis)} UTC",
+            "sunrise obtained at ${hhmmUtc(result.sunriseUtcMillis)} UTC",
             result.sunriseUtcMillis > justAfterMidnight
         )
         assertTrue(!SolarTimes.isDaylight(parisLat, parisLng, justAfterMidnight))
     }
 
     @Test
-    fun `un fuseau tres a l est reste coherent`() {
-        // Auckland : le midi solaire tombe vers 00 h UTC, ce qui met à l'épreuve le
-        // choix du jour solaire local.
+    fun `a zone far to the east stays consistent`() {
+        // Auckland: solar noon falls around 00 h UTC, which puts the choice of
+        // the local solar day to the test.
         val aucklandLat = -36.8485
         val aucklandLng = 174.7633
         val result = riseAndSet(aucklandLat, aucklandLng, utc("2026-08-11", "00:00"))
         assertTrue(result.sunriseUtcMillis < result.sunsetUtcMillis)
 
         val minutes = (result.sunsetUtcMillis - result.sunriseUtcMillis) / 60_000L
-        // Mi-août dans l'hémisphère sud : fin d'hiver, un peu moins de 11 h de jour.
-        assertTrue("durée obtenue : $minutes min", minutes in 620..680)
+        // Mid-August in the southern hemisphere: end of winter, a little under 11 h of daylight.
+        assertTrue("duration obtained: $minutes min", minutes in 620..680)
     }
 }

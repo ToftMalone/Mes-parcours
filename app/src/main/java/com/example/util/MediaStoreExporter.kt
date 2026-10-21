@@ -14,31 +14,31 @@ import java.io.Writer
 object MediaStoreExporter {
     private const val TAG = "MediaStoreExporter"
     /**
-     * Sous-dossier de destination dans Téléchargements.
+     * Destination subfolder in Downloads.
      *
-     * Le renommage de l'application l'a fait changer : les sauvegardes produites
-     * avant restent dans l'ancien dossier `Sillage`, elles ne sont pas déplacées.
+     * The app's renaming changed it: backups produced
+     * before stay in the old `Sillage` folder, they are not moved.
      */
     private const val SUBFOLDER = "Mes parcours"
 
-    /** Nom de repli, si le nom demandé ne laisse rien d'exploitable une fois nettoyé. */
+    /** Fallback name, if the requested name leaves nothing usable once cleaned. */
     private const val FALLBACK_NAME = "parcours"
 
     /**
-     * Neutralise un nom de fichier avant de l'écrire.
+     * Neutralizes a file name before writing it.
      *
-     * Le seul appelant actuel compose ce nom à partir d'une date, donc sans surprise
-     * possible. Mais la fonction est publique et invite à lui passer un nom venu
-     * d'ailleurs — un nom de parcours, par exemple, qui peut avoir été lu dans un
-     * fichier importé. Sans ce nettoyage, la branche Android 9 et antérieur écrivait
-     * `File(targetDir, fileName)` sans rien vérifier : un nom portant un séparateur
-     * de chemin sortait alors du dossier visé. Le garde-fou qu'assurait
-     * `safeFileName` a disparu avec la fonction de partage ; il vaut mieux le tenir
-     * ici, au seul endroit qui ouvre le fichier, que dans chaque appelant.
+     * The only current caller composes this name from a date, so no surprise
+     * is possible. But the function is public and invites passing it a name from
+     * elsewhere — a track name, for example, which may have been read from an
+     * imported file. Without this cleaning, the Android 9 and earlier branch wrote
+     * `File(targetDir, fileName)` with no check: a name carrying a path separator
+     * then escaped the target folder. The safeguard that
+     * `safeFileName` provided disappeared with the sharing function; it is better to keep it
+     * here, at the only place that opens the file, than in each caller.
      *
-     * Sont remplacés les séparateurs et les caractères interdits par les systèmes de
-     * fichiers usuels, ainsi que les caractères de contrôle. Une fois les séparateurs
-     * partis, `..` ne désigne plus rien d'atteignable.
+     * Separators and characters forbidden by common file systems are replaced,
+     * as are control characters. Once the separators are
+     * gone, `..` designates nothing reachable.
      */
     private fun sanitizeFileName(fileName: String): String {
         val cleaned = fileName
@@ -48,7 +48,7 @@ object MediaStoreExporter {
         return if (cleaned.isEmpty() || cleaned.all { it == '.' }) FALLBACK_NAME else cleaned
     }
 
-    /** Ouvre le flux de destination dans Téléchargements/[SUBFOLDER]. */
+    /** Opens the destination stream in Downloads/[SUBFOLDER]. */
     private fun openOutput(context: Context, fileName: String, mimeType: String): OutputStream? {
         val safeName = sanitizeFileName(fileName)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -73,9 +73,9 @@ object MediaStoreExporter {
     }
 
     /**
-     * Variante en flux : [write] produit le contenu au fur et à mesure dans le Writer.
-     * Permet d'exporter une trace de plusieurs millions de points sans jamais
-     * construire le fichier entier en mémoire.
+     * Streaming variant: [write] produces the content as it goes into the Writer.
+     * Makes it possible to export a track of several million points without ever
+     * building the whole file in memory.
      */
     suspend fun saveToLocalDownloadsStreaming(
         context: Context,

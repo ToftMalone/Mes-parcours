@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 data class Track(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val activityType: String = "Randonnée", // Hiking, Cycling, Running, etc.
+    val activityType: String = "Hiking", // Hiking, Cycling, Running, etc.
     val startTime: Long,
     val endTime: Long = 0,
     val totalDistance: Double = 0.0, // in meters
@@ -22,53 +22,52 @@ data class Track(
     val isSelectedForMap: Boolean = false,
     val isMerged: Boolean = false,
     /**
-     * Couleur de tracé lue dans le fichier importé (ARGB), ou null si le fichier n'en
-     * portait pas — cas de tous les GPX, et des KML sans style de ligne.
+     * Track color read from the imported file (ARGB), or null if the file carried
+     * none — the case of every GPX, and of KMLs without a line style.
      *
-     * Nullable à dessein : il faut pouvoir distinguer « le fichier ne disait rien »
-     * de « le fichier demandait du noir ». Sans cette distinction, un parcours sans
-     * couleur se dessinerait en noir au lieu de reprendre celle de la palette.
+     * Nullable on purpose: we must be able to tell “the file said nothing”
+     * from “the file asked for black”. Without that distinction, a track without
+     * a color would be drawn in black instead of taking the palette color.
      */
     val sourceColor: Int? = null,
     /**
-     * Couleur choisie par l'utilisateur pour **ce parcours précis** (ARGB), ou null
-     * pour « automatique » : la couleur du fichier d'origine si le fichier en portait
-     * une, sinon la couleur par défaut de la catégorie.
+     * Color chosen by the user for **this very track** (ARGB), or null
+     * for “automatic”: the color of the original file if it carried one,
+     * otherwise the category's default color.
      *
-     * Nullable pour la même raison que `sourceColor` : « je n'ai rien choisi » et
-     * « j'ai choisi le noir » doivent rester distincts. Sans cette distinction, un
-     * parcours jamais colorié à la main perdrait la couleur de son fichier.
+     * Nullable for the same reason as `sourceColor`: “I chose nothing” and
+     * “I chose black” must remain distinct. Without that distinction, a track never
+     * colored by hand would lose its file's color.
      *
-     * Remplace les trois couleurs par catégorie qui existaient jusqu'ici en
-     * préférences : la couleur appartient désormais au parcours, pas à l'onglet.
+     * Replaces the three per-category colors that used to live in preferences:
+     * the color now belongs to the track, not to the tab.
      */
     val displayColor: Int? = null,
     /**
-     * Épaisseur du trait choisie pour **ce parcours précis**, en dp, ou null tant que
-     * personne n'en a choisi : il garde alors l'épaisseur générale d'avant (voir
-     * `TrackStylePreferences.resolveThicknessDp`). Se règle avec la couleur, dans la
-     * même feuille ; le réglage général a quitté les Paramètres.
+     * Line thickness chosen for **this very track**, in dp, or null as long as
+     * nobody chose one: it then keeps the former general thickness (see
+     * `TrackStylePreferences.resolveThicknessDp`). Set together with the color, in
+     * the same sheet; the general setting has left the Settings screen.
      */
     val displayWidthDp: Float? = null,
     /**
-     * Enregistrement en pause, **mémorisé en base** (migration 9→10).
+     * Recording paused, **stored in the database** (migration 9→10).
      *
-     * La pause ne vivait que dans la mémoire du service : si Android tuait
-     * l'application pendant une pause, puis la relançait — ou après un redémarrage du
-     * téléphone — l'enregistrement reprenait tout seul, et le trajet suivant
-     * s'enregistrait alors que l'utilisateur l'avait mis en pause. N'a de sens que
-     * tant que [isRecording] est vrai.
+     * The pause only lived in the service's memory: if Android killed the app
+     * during a pause and then restarted it — or after a phone reboot — recording
+     * resumed by itself, and the following trip was recorded even though the user
+     * had paused it. Only meaningful while [isRecording] is true.
      */
     @ColumnInfo(defaultValue = "0")
     val isPaused: Boolean = false
 ) {
     companion object {
         /**
-         * `startTime` de la ligne réservée pendant un import, avant que le fichier
-         * n'en donne un. L'import n'est plus une seule transaction (voir
-         * `TrackRepository.importTrackFromUri`) : cette ligne existe donc en base le
-         * temps de l'import, et c'est ce repère qui la cache de l'historique et
-         * permet de la retrouver si l'application est tuée en cours de route.
+         * `startTime` of the row reserved during an import, before the file
+         * provides one. The import is no longer a single transaction (see
+         * `TrackRepository.importTrackFromUri`): this row therefore exists in the database
+         * for the duration of the import, and this marker is what hides it from the history and
+         * lets it be found again if the app is killed midway.
          */
         const val IMPORT_PLACEHOLDER_START_TIME = -1L
     }

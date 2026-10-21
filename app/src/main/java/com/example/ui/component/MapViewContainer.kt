@@ -63,7 +63,7 @@ import org.osmdroid.util.MapTileIndex
 
 private const val ZOOM_THRESHOLD = 11.0
 
-/** Inversion : retourne la clarté, mais aussi les teintes — corrigées juste après. */
+/** Inversion: flips lightness, but also hues — corrected right after. */
 private val INVERT_MATRIX = floatArrayOf(
     -1f, 0f, 0f, 0f, 255f,
     0f, -1f, 0f, 0f, 255f,
@@ -72,10 +72,10 @@ private val INVERT_MATRIX = floatArrayOf(
 )
 
 /**
- * Rotation des teintes d'un demi-tour — formulation de la spécification des filtres
- * SVG pour un angle de 180°.
+ * Half-turn hue rotation — formulation from the SVG filters specification
+ * for an angle of 180°.
  *
- * Chaque ligne somme à 1, ce qui garantit que les gris restent neutres.
+ * Each row sums to 1, which guarantees that grays stay neutral.
  */
 private val HUE_ROTATE_180_MATRIX = floatArrayOf(
     -0.574f, 1.430f, 0.144f, 0f, 0f,
@@ -85,103 +85,103 @@ private val HUE_ROTATE_180_MATRIX = floatArrayOf(
 )
 
 /**
- * Filtre appliqué aux tuiles en thème sombre : inversion, puis rotation des teintes
- * d'un demi-tour. Le résultat, ce sont les couleurs de Mapnik assombries — vert
- * foncé pour les espaces verts, bleu profond pour l'eau, fond sombre à la place du
- * papier crème, et libellés clairs donc lisibles.
+ * Filter applied to tiles in dark theme: inversion, then a half-turn hue
+ * rotation. The result is Mapnik's colors darkened — dark green for green
+ * spaces, deep blue for water, a dark background in place of the cream
+ * paper, and light labels, hence readable.
  *
- * Deux tentatives précédentes, et pourquoi elles ne suffisaient pas :
+ * Two earlier attempts, and why they were not enough:
  *
- * - `TilesOverlay.INVERT_COLORS` est une inversion nue. Or inverser retourne à la
- *   fois la clarté *et* la teinte : le vert des forêts devenait magenta et le bleu
- *   de l'eau devenait brun.
- * - Désaturer avant d'inverser réglait la dominante, mais en effaçant toute couleur.
- *   La carte devenait un dégradé de gris, et l'on perdait la lecture immédiate que
- *   donnent le vert des espaces verts et le bleu de l'eau.
+ * - `TilesOverlay.INVERT_COLORS` is a bare inversion. But inverting flips both
+ *   lightness *and* hue: the green of forests became magenta and the blue
+ *   of water became brown.
+ * - Desaturating before inverting fixed the dominant tint, but erased every color.
+ *   The map became a gradient of grays, and we lost the immediate reading that
+ *   the green of green spaces and the blue of water give.
  *
- * Faire suivre l'inversion d'une rotation de teinte de 180° remet les teintes à leur
- * place : seule la clarté reste inversée. C'est la seule des trois approches qui
- * assombrit sans mentir sur les couleurs.
+ * Following the inversion with a 180° hue rotation puts the hues back in their
+ * place: only lightness stays inverted. It is the only one of the three approaches that
+ * darkens without lying about colors.
  */
 internal val DARK_TILES_COLOR_FILTER: ColorFilter = ColorMatrixColorFilter(
     ColorMatrix(INVERT_MATRIX).apply {
-        // postConcat s'applique *après* : on inverse, puis on rétablit les teintes.
+        // postConcat applies *after*: we invert, then restore the hues.
         postConcat(ColorMatrix(HUE_ROTATE_180_MATRIX))
     }
 )
 
 /**
- * Marge ajoutée de chaque côté de la zone visible avant d'aller chercher les points,
- * exprimée en fraction de la largeur de l'écran. Sert de zone tampon : on peut faire
- * glisser la carte de cette fraction avant d'atteindre une zone non chargée.
+ * Margin added on each side of the visible area before fetching points,
+ * expressed as a fraction of the screen width. Serves as a buffer zone: the map can be
+ * dragged by this fraction before reaching an unloaded area.
  *
- * À 0,60, la zone chargée fait 2,2 fois l'écran en largeur comme en hauteur, soit près
- * de cinq fois sa surface. C'est un compromis, pas un réglage gratuit : élargir
- * retarde le moment où il faut recharger, mais alourdit chaque requête.
+ * At 0.60, the loaded area is 2.2 times the screen in width and in height, i.e. nearly
+ * five times its surface. It is a compromise, not a free setting: widening
+ * delays the moment a reload is needed, but makes each query heavier.
  *
- * Effet indirect à garder en tête : cette zone élargie est aussi ce que
- * `TrackRepository.coversMostOfTrack` compare à l'emprise de la trace. Plus la marge
- * est large, plus tôt l'affichage se rabat sur la seule silhouette.
+ * Indirect effect to keep in mind: this widened area is also what
+ * `TrackRepository.coversMostOfTrack` compares with the track's extent. The wider the margin,
+ * the earlier the display falls back to the silhouette alone.
  */
 private const val VIEWPORT_MARGIN = 0.60
 
 /**
- * Délai laissé à un recentrage programmatique pour se terminer avant de republier la
- * zone visible. `animateTo` étant animé, `boundingBox` renverrait sinon une zone
- * intermédiaire.
+ * Time left for a programmatic recentering to finish before republishing the
+ * visible area. `animateTo` being animated, `boundingBox` would otherwise return an
+ * intermediate area.
  */
 private const val RECENTER_SETTLE_MS = 600L
 
 /**
- * Cadence de republication de la zone visible pendant le suivi automatique.
+ * Rate at which the visible area is republished during automatic following.
  *
- * Une seconde, et non deux fois par seconde comme auparavant : la carte suit des
- * positions qui n'arrivent elles-mêmes qu'à 1 Hz, et chaque republication déclenche
- * le circuit de rechargement des points. Doubler la cadence de la source ne pouvait
- * rien apprendre de neuf — cela ne faisait que réveiller le processeur pour rien
- * tant que l'écran reste allumé.
+ * One second, and not twice a second as before: the map follows
+ * positions that themselves only arrive at 1 Hz, and each republication triggers
+ * the point-reloading circuit. Doubling the source's rate could
+ * teach nothing new — it only woke the processor for nothing
+ * while the screen stays on.
  */
 private const val AUTO_FOLLOW_VIEWPORT_POLL_MS = 1000L
 
 /**
- * Distance parcourue, en fraction de la largeur de l'écran, au-delà de laquelle le
- * suivi automatique republie la zone visible.
+ * Distance traveled, as a fraction of the screen width, beyond which
+ * automatic following republishes the visible area.
  *
- * La zone publiée déborde l'écran de [VIEWPORT_MARGIN] de chaque côté : tant que l'on
- * s'est moins déplacé que cela, l'écran reste couvert par des points déjà chargés et
- * republier ne peut rien apprendre de neuf. La moitié de cette marge laisse de quoi
- * recharger avant d'en atteindre le bord.
+ * The published area overflows the screen by [VIEWPORT_MARGIN] on each side: as long as we
+ * have moved less than that, the screen stays covered by already loaded points and
+ * republishing can teach nothing new. Half of that margin leaves room to
+ * reload before reaching its edge.
  *
- * Sans ce filtre, la zone repartait à chaque seconde et relançait tout le circuit de
- * lecture — y compris, pour les traces sous `fullLoadLimit`, une relecture complète de
- * leurs points qui ne dépend pourtant pas de la zone. En voiture, cela revenait à
- * redemander plusieurs centaines de milliers de lignes par seconde pour un résultat
- * identique. À vitesse d'automobile, on republie désormais toutes les dizaines de
- * secondes au lieu de chaque seconde.
+ * Without this filter, the area went out every second and restarted the whole reading
+ * circuit — including, for tracks under `fullLoadLimit`, a complete reread of
+ * their points that does not even depend on the area. In a car, this amounted to
+ * asking again for several hundred thousand rows per second for an
+ * identical result. At car speed, we now republish every few tens of
+ * seconds instead of every second.
  */
 private const val AUTO_FOLLOW_RELOAD_FRACTION = VIEWPORT_MARGIN / 2.0
 
-/** Intervalle minimal entre deux mémorisations de la position de carte. */
+/** Minimum interval between two saves of the map position. */
 private const val MAP_STATE_PERSIST_MS = 1000L
 
 /**
- * Déplacement minimal entre deux relevés pour en tirer un cap.
+ * Minimum movement between two readings to derive a bearing from them.
  *
- * À 1 Hz, un mètre et demi correspond à environ 5 km/h : en dessous, l'écart entre
- * deux positions vient surtout de l'imprécision du GPS, et la direction qu'on en
- * déduirait tournerait au hasard.
+ * At 1 Hz, a meter and a half corresponds to about 5 km/h: below that, the gap between
+ * two positions comes mostly from GPS imprecision, and the direction
+ * deduced from it would turn at random.
  */
 private const val BEARING_MIN_DISTANCE_METERS = 1.5
 
 /**
- * Part du nouveau cap reprise à chaque mise à jour.
+ * Share of the new bearing taken at each update.
  *
- * Assez bas pour absorber le tremblement d'un relevé à l'autre, assez haut pour
- * qu'un virage soit suivi en quelques secondes plutôt qu'accompli d'un bloc.
+ * Low enough to absorb the jitter from one reading to the next, high enough
+ * for a turn to be followed in a few seconds rather than done in one go.
  */
 private const val BEARING_SMOOTHING = 0.35f
 
-/** Publie la zone visible actuelle (élargie de [VIEWPORT_MARGIN]) vers le ViewModel. */
+/** Publishes the current visible area (widened by [VIEWPORT_MARGIN]) to the ViewModel. */
 private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Unit) {
     val box = map.boundingBox ?: return
 
@@ -193,8 +193,8 @@ private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Uni
     var minLon = box.lonWest - lonSpan * VIEWPORT_MARGIN
     var maxLon = box.lonEast + lonSpan * VIEWPORT_MARGIN
 
-    // Vue à cheval sur l'antiméridien ou dégénérée : on n'essaie pas de filtrer
-    // en longitude, la sélection se fera sur la latitude seule.
+    // View straddling the antimeridian or degenerate: we do not try to filter
+    // on longitude, selection will be done on latitude alone.
     if (lonSpan <= 0.0 || minLon < -180.0 || maxLon > 180.0) {
         minLon = -180.0
         maxLon = 180.0
@@ -212,19 +212,19 @@ private fun reportViewport(map: MapView, onViewportChanged: (MapViewport) -> Uni
 }
 
 /**
- * Variante de [reportViewport] pour le sondage périodique du suivi automatique :
- * centre la zone publiée sur la position GPS connue plutôt que sur le centre
- * rapporté par la carte. Seule l'étendue (largeur/hauteur en degrés) vient encore
- * de `map.boundingBox` — elle ne dépend que du zoom, jamais d'une animation.
+ * Variant of [reportViewport] for the periodic polling of automatic following:
+ * centers the published area on the known GPS position rather than on the center
+ * reported by the map. Only the extent (width/height in degrees) still comes
+ * from `map.boundingBox` — it only depends on the zoom, never on an animation.
  *
- * `animateTo()` est appelé à chaque nouvelle position pendant le suivi (une fois par
- * seconde environ), mais osmdroid rejette silencieusement tout appel lancé pendant
- * qu'une précédente animation tourne encore — sans erreur, sans y revenir. Un trajet
- * en voiture peut ainsi accumuler des appels ignorés : la caméra prend du retard sur
- * la position réelle sans que rien ne le signale, et le centre que rapporterait
- * `map.boundingBox` ne serait alors plus celui qu'il faut réellement charger.
- * Reconstruire la zone autour de la position GPS elle-même — toujours exacte,
- * puisqu'elle ne dépend d'aucune animation — élimine ce risque.
+ * `animateTo()` is called at each new position during following (about once per
+ * second), but osmdroid silently rejects any call launched while
+ * a previous animation is still running — no error, no retry. A trip
+ * by car can thus accumulate ignored calls: the camera lags behind the
+ * real position without anything flagging it, and the center that
+ * `map.boundingBox` would report would no longer be the one that really needs loading.
+ * Rebuilding the area around the GPS position itself — always exact,
+ * since it depends on no animation — eliminates this risk.
  */
 private fun reportAutoFollowViewport(
     map: MapView,
@@ -242,8 +242,8 @@ private fun reportAutoFollowViewport(
     var minLon = userLon - lonSpan * (0.5 + VIEWPORT_MARGIN)
     var maxLon = userLon + lonSpan * (0.5 + VIEWPORT_MARGIN)
 
-    // Vue à cheval sur l'antiméridien ou dégénérée : on n'essaie pas de filtrer
-    // en longitude, la sélection se fera sur la latitude seule.
+    // View straddling the antimeridian or degenerate: we do not try to filter
+    // on longitude, selection will be done on latitude alone.
     if (lonSpan <= 0.0 || minLon < -180.0 || maxLon > 180.0) {
         minLon = -180.0
         maxLon = 180.0
@@ -270,10 +270,10 @@ private class MapState(
     var isCurrentTracking: Boolean = false,
     var isInteractivityEnabled: Boolean = true,
     /**
-     * Dernière valeur réellement passée à `setMultiTouchControls`, ou null tant
-     * qu'on ne l'a jamais appelée. Distinct de `isInteractivityEnabled`, qui n'est
-     * mis à jour qu'avec la reconstruction des calques : il faut ici savoir si
-     * l'appel a eu lieu, pas seulement ce que valait le réglage.
+     * Last value actually passed to `setMultiTouchControls`, or null as long
+     * as it has never been called. Distinct from `isInteractivityEnabled`, which is
+     * only updated with the rebuilding of the layers: here we need to know whether
+     * the call happened, not just what the setting was.
      */
     var appliedMultiTouch: Boolean? = null,
     var wasZoomedOut: Boolean = false,
@@ -282,35 +282,35 @@ private class MapState(
     var cachedPointsPolylines: List<Polyline>? = null,
     var lastKnownBearing: Float? = null,
     var mapMode: String = "2d",
-    // Apparence choisie par l'utilisateur : tout changement invalide les polylignes en cache.
+    // Appearance chosen by the user: any change invalidates the cached polylines.
     var strokeWidth: Float = 12f,
-    /** Couleur d'origine du parcours affiché en plein écran, s'il en a une. */
+    /** Original color of the track displayed full screen, if it has one. */
     var sourceColor: Int? = null,
-    /** Couleur choisie par l'utilisateur pour le parcours affiché en plein écran. */
+    /** Color chosen by the user for the track displayed full screen. */
     var displayColor: Int? = null,
     /**
-     * Icône du point bleu de position, construite une seule fois puis réutilisée.
+     * Icon of the blue position dot, built only once then reused.
      *
-     * `drawMarkers` s'exécute à chaque point GPS reçu pendant un enregistrement —
-     * environ une fois par seconde, sur toute sa durée. Rien dans cette icône ne
-     * dépend de l'état courant : la refabriquer (bitmap, canvas, trois cercles)
-     * à chaque appel n'était que du travail jeté, pour un résultat identique.
+     * `drawMarkers` runs at every GPS point received during a recording —
+     * about once per second, over its whole duration. Nothing in this icon
+     * depends on the current state: rebuilding it (bitmap, canvas, three circles)
+     * at each call was just wasted work, for an identical result.
      */
     var blueDotIcon: android.graphics.drawable.Drawable? = null,
     /**
-     * Couleurs du thème pour les repères et la trace en cours, relevées dans la
-     * composition : le dessin d'osmdroid n'a pas accès à MaterialTheme. Un
-     * changement (bascule clair ↔ sombre) vide [markerIcons] et les polylignes.
+     * Theme colors for markers and the current line, collected in the
+     * composition: osmdroid's drawing has no access to MaterialTheme. A
+     * change (light ↔ dark switch) empties [markerIcons] and the polylines.
      */
     var themeColors: MarkerColors? = null,
-    /** Icônes des repères déjà dessinées, par couleur et par taille. */
+    /** Marker icons already drawn, by color and size. */
     val markerIcons: MutableMap<Long, android.graphics.drawable.Drawable> = mutableMapOf()
 )
 
-/** Bleu du point de position (#1A73E8). */
+/** Blue of the position dot (#1A73E8). */
 private val POSITION_DOT_BLUE = Color.parseColor("#1A73E8")
 
-/** Couleurs des repères de carte, tirées du thème. */
+/** Map marker colors, taken from the theme. */
 internal data class MarkerColors(
     val position: Int,
     val start: Int,
@@ -327,8 +327,8 @@ private fun blueDotIcon(context: Context, state: MapState): android.graphics.dra
     ).also { state.blueDotIcon = it }
 
 /**
- * Pastille d'un repère (départ, arrivée), dessinée une fois par couleur puis
- * réutilisée : même raison que [MapState.blueDotIcon].
+ * Chip of a marker (start, finish), drawn once per color then
+ * reused: same reason as [MapState.blueDotIcon].
  */
 private fun markerIcon(context: Context, state: MapState, fill: Int, sizeDp: Float): android.graphics.drawable.Drawable {
     val key = (fill.toLong() shl 8) or sizeDp.toLong()
@@ -336,8 +336,8 @@ private fun markerIcon(context: Context, state: MapState, fill: Int, sizeDp: Flo
 }
 
 /**
- * Pastille de la maquette : disque de couleur cerclé de blanc, sur une ombre douce
- * qui la détache des tuiles claires comme sombres.
+ * Chip from the mockup: a color disc ringed in white, on a soft shadow
+ * that sets it apart from both light and dark tiles.
  */
 private fun createDotIcon(context: Context, fill: Int, sizeDp: Float, ringDp: Float): android.graphics.drawable.Drawable {
     val density = context.resources.displayMetrics.density
@@ -350,7 +350,7 @@ private fun createDotIcon(context: Context, fill: Int, sizeDp: Float, ringDp: Fl
 
     val paint = Paint().apply { isAntiAlias = true }
 
-    // Ombre : deux disques translucides légèrement décalés vers le bas.
+    // Shadow: two translucent discs slightly offset downward.
     paint.color = Color.BLACK
     paint.alpha = 40
     canvas.drawCircle(c, c + density, radius + shadowPx * 0.8f, paint)
@@ -365,26 +365,26 @@ private fun createDotIcon(context: Context, fill: Int, sizeDp: Float, ringDp: Fl
     return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }
 
-// `lazy` : la langue des libellés suit celle de l'appareil au premier usage, sans
-// reconstruire une source de tuiles (et son identité) à chaque recomposition.
+// `lazy`: the label language follows the device's at first use, without
+// rebuilding a tile source (and its identity) at every recomposition.
 private val GOOGLE_SATELLITE_TILE_SOURCE: OnlineTileSourceBase by lazy {
     val hl = java.util.Locale.getDefault().language.ifEmpty { "en" }
     object : OnlineTileSourceBase(
-    "GoogleSatellite",
-    0, 20, 256, "",
-    arrayOf(
-        "https://mt0.google.com/vt/lyrs=y&hl=$hl",
-        "https://mt1.google.com/vt/lyrs=y&hl=$hl",
-        "https://mt2.google.com/vt/lyrs=y&hl=$hl",
-        "https://mt3.google.com/vt/lyrs=y&hl=$hl"
-    )
-) {
-    override fun getTileURLString(pMapTileIndex: Long): String {
-        val zoom = MapTileIndex.getZoom(pMapTileIndex)
-        val x = MapTileIndex.getX(pMapTileIndex)
-        val y = MapTileIndex.getY(pMapTileIndex)
-        return getBaseUrl() + "&x=" + x + "&y=" + y + "&z=" + zoom
-    }
+        "GoogleSatellite",
+        0, 20, 256, "",
+        arrayOf(
+            "https://mt0.google.com/vt/lyrs=y&hl=$hl",
+            "https://mt1.google.com/vt/lyrs=y&hl=$hl",
+            "https://mt2.google.com/vt/lyrs=y&hl=$hl",
+            "https://mt3.google.com/vt/lyrs=y&hl=$hl"
+        )
+    ) {
+        override fun getTileURLString(pMapTileIndex: Long): String {
+            val zoom = MapTileIndex.getZoom(pMapTileIndex)
+            val x = MapTileIndex.getX(pMapTileIndex)
+            val y = MapTileIndex.getY(pMapTileIndex)
+            return getBaseUrl() + "&x=" + x + "&y=" + y + "&z=" + zoom
+        }
     }
 }
 
@@ -399,9 +399,9 @@ fun MapViewContainer(
     isImported: Boolean = false,
     isMerged: Boolean = false,
     sourceColor: Int? = null,
-    /** Couleur choisie par l'utilisateur pour le parcours affiché, null s'il n'a rien choisi. */
+    /** Color chosen by the user for the displayed track, null if nothing was chosen. */
     displayColor: Int? = null,
-    /** Épaisseur choisie pour le parcours affiché, en dp, null s'il n'a rien choisi. */
+    /** Thickness chosen for the displayed track, in dp, null if nothing was chosen. */
     displayWidthDp: Float? = null,
     isCurrentTracking: Boolean = false,
     zoomBannerTopPadding: androidx.compose.ui.unit.Dp = 110.dp,
@@ -418,9 +418,9 @@ fun MapViewContainer(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val markerColors = MarkerColors(
-        // Bleu de Google Maps, comme avant la refonte : c'est la couleur que l'on
-        // cherche des yeux pour se situer, et le vert du thème la perdait parmi les
-        // forêts de la carte. Le départ reste dans la couleur du thème.
+        // Google Maps blue, as before the redesign: it is the color the eye
+        // looks for to get its bearings, and the theme's green lost it among the
+        // map's forests. The start stays in the theme color.
         position = POSITION_DOT_BLUE,
         start = scheme.primary.toArgb(),
         end = scheme.onSurface.toArgb(),
@@ -481,8 +481,8 @@ fun MapViewContainer(
                 val state = map.tag as? MapState ?: MapState().also { map.tag = it }
                 state.bypassZoomThreshold = bypassZoomThreshold
 
-                // Bascule clair ↔ sombre : les icônes et la trace en cours changent de
-                // couleur, donc tout ce qui en est dessiné est à refaire.
+                // Light ↔ dark switch: icons and the current line change
+                // color, so everything drawn from them must be redone.
                 val themeChanged = state.themeColors != markerColors
                 if (themeChanged) {
                     state.themeColors = markerColors
@@ -492,34 +492,34 @@ fun MapViewContainer(
                 }
                 val isZoomedOut = isZoomedOutTooMuch && !bypassZoomThreshold
 
-                // `setMultiTouchControls` n'est pas un simple réglage : chaque appel
-                // remplace le MultiTouchController d'osmdroid par un neuf. L'appeler à
-                // chaque recomposition — donc une à deux fois par seconde pendant un
-                // enregistrement, à chaque nouvelle position GPS — jetait le contrôleur
-                // au milieu du geste de l'utilisateur.
+                // `setMultiTouchControls` is not a simple setting: each call
+                // replaces osmdroid's MultiTouchController with a new one. Calling it at
+                // each recomposition — hence once or twice a second during a
+                // recording, at every new GPS position — threw the controller away
+                // in the middle of the user's gesture.
                 //
-                // Or c'est ce contrôleur qui referme le pincement. osmdroid pilote le vrai
-                // niveau de zoom pendant un pincement (`setMultiTouchScale` calcule
-                // log2(échelle) + le zoom relevé à l'ouverture du geste), et ne remet le
-                // point d'ancrage à null que dans le `selectObject` de fin de geste.
-                // Contrôleur remplacé en cours de route = fin de geste jamais reçue :
-                // `mMultiTouchScaleCurrentPoint` reste renseigné, et `getProjection()`
-                // continue d'y recaler toutes les projections suivantes. La carte semblait
-                // alors zoomer ou dézoomer d'elle-même, bien après que le doigt ait quitté
-                // l'écran — et seulement en mode focus, seul moment où les recompositions
-                // s'enchaînent assez vite pour tomber pendant un geste.
+                // Yet it is this controller that closes the pinch. osmdroid drives the real
+                // zoom level during a pinch (`setMultiTouchScale` computes
+                // log2(scale) + the zoom noted when the gesture opened), and only resets the
+                // anchor point to null in the end-of-gesture `selectObject`.
+                // Controller replaced midway = end of gesture never received:
+                // `mMultiTouchScaleCurrentPoint` stays set, and `getProjection()`
+                // keeps readjusting all the following projections to it. The map seemed
+                // to zoom in or out by itself, long after the finger left
+                // the screen — and only in focus mode, the only moment when
+                // recompositions chain fast enough to land during a gesture.
                 //
-                // On ne touche donc à ce réglage que lorsqu'il change réellement, comme le
-                // fait déjà le code juste au-dessus pour la source de tuiles.
+                // We therefore only touch this setting when it really changes, as
+                // the code just above already does for the tile source.
                 if (state.appliedMultiTouch != isInteractivityEnabled) {
                     state.appliedMultiTouch = isInteractivityEnabled
                     map.setMultiTouchControls(isInteractivityEnabled)
                 }
 
-                // "auto" : la carte s'oriente dans le sens de la marche pendant un
-                // enregistrement, et revient au Nord dès qu'il est arrêté. Le mode
-                // effectif est mémorisé dans state.mapMode, ce qui déclenche la
-                // reconstruction des calques au moment de la bascule.
+                // "auto": the map orients itself in the direction of travel during a
+                // recording, and returns to North as soon as it stops. The effective
+                // mode is stored in state.mapMode, which triggers the
+                // rebuilding of the layers at the moment of the switch.
                 val mapModePreference = prefs.getString("pref_map_mode", "2d") ?: "2d"
                 val mapMode = when (mapModePreference) {
                     "auto" -> if (isCurrentTracking) "3d" else "2d"
@@ -542,7 +542,7 @@ fun MapViewContainer(
                     }
                 }
 
-                // Apparence choisie dans les paramètres / l'historique
+                // Appearance chosen in the settings / the history
                 val strokeWidth = TrackStylePreferences.getStrokeWidth(map.context, displayWidthDp)
 
                 val styleChanged = state.strokeWidth != strokeWidth ||
@@ -595,11 +595,11 @@ fun MapViewContainer(
 
         var showWarningDialog by remember { mutableStateOf(false) }
 
-        // Bandeau quand le zoom est trop large pour dessiner les tracés sans ralentir.
+        // Banner when the zoom is too wide to draw tracks without slowing down.
         val hasTracks = points.isNotEmpty() || overlayTracks.any { it.points.isNotEmpty() }
         val showZoomBanner = hasTracks && isZoomedOutTooMuch
-        // Le bandeau replié en pastille reste replié jusqu'à la prochaine fois qu'il
-        // réapparaît : un utilisateur qui l'a écarté n'a pas à le revoir à chaque geste.
+        // The banner collapsed into a chip stays collapsed until the next time it
+        // reappears: a user who dismissed it does not have to see it again at every gesture.
         var bannerCollapsed by remember { mutableStateOf(false) }
         LaunchedEffect(showZoomBanner) {
             if (!showZoomBanner) bannerCollapsed = false
@@ -632,8 +632,8 @@ fun MapViewContainer(
             )
         }
 
-        // Pas d'AnimatedVisibility ici : elle rogne son contenu, ombre comprise, pendant
-        // toute sa transition (voir « L'ombre tranchée » dans CLAUDE.md).
+        // No AnimatedVisibility here: it clips its content, shadow included, during
+        // its whole transition (see “The sliced shadow” in CLAUDE.md).
         if (showZoomBanner) {
             val bannerModifier = Modifier
                 .align(Alignment.TopStart)
@@ -665,31 +665,31 @@ fun MapViewContainer(
         }
     }
 
-    // Recentrage de la caméra, à l'appui sur le bouton « localiser » (mode focus).
+    // Camera recentering, on pressing the “locate” button (focus mode).
     //
-    // Ce bloc imposait aussi le zoom, en le ramenant à `pref_default_zoom`. C'était le
-    // défaut rapporté : « quand j'appuie sur localiser pour passer en focus, ça zoome
-    // ou dézoome tout seul, au moment du clic ». Deux raisons de ne plus y toucher :
+    // This block also forced the zoom, bringing it back to `pref_default_zoom`. That was the
+    // reported defect: “when I press locate to go into focus, it zooms
+    // in or out by itself, at the moment of the click”. Two reasons not to touch it any more:
     //
-    // - `pref_default_zoom` n'est pas un réglage choisi par l'utilisateur : c'est le
-    //   dernier zoom mémorisé par la carte. Or cette mémorisation est bornée à une fois
-    //   par seconde et sans rattrapage de la dernière valeur (voir MAP_STATE_PERSIST_MS
-    //   et `persistMapStateThrottled`) : elle retient donc presque toujours un zoom
-    //   relevé *au milieu* du dernier geste, jamais celui où l'utilisateur s'est arrêté.
-    //   Le recentrage y ramenait la carte, d'où le saut en avant ou en arrière.
-    // - Même juste, cette valeur n'aurait pas à s'imposer : « localiser » veut dire
-    //   « centre-toi sur moi », pas « change mon échelle ».
+    // - `pref_default_zoom` is not a setting chosen by the user: it is the
+    //   last zoom stored by the map. But this storing is bounded to once
+    //   per second with no catch-up of the last value (see MAP_STATE_PERSIST_MS
+    //   and `persistMapStateThrottled`): it therefore almost always keeps a zoom
+    //   noted *in the middle* of the last gesture, never the one where the user stopped.
+    //   Recentering brought the map back to it, hence the jump forward or backward.
+    // - Even if right, this value would not have to be imposed: “locate” means
+    //   “center on me”, not “change my scale”.
     //
-    // Le zoom courant est donc conservé. Seule exception : une carte assez dézoomée pour
-    // que les tracés ne soient plus dessinés (ZOOM_THRESHOLD) — s'y recentrer sans
-    // rapprocher laisserait l'utilisateur devant un pays entier, ce qui n'est pas ce
-    // qu'il demande en appuyant sur « localiser ».
+    // The current zoom is therefore kept. Only exception: a map zoomed out enough that
+    // tracks are no longer drawn (ZOOM_THRESHOLD) — recentering there without
+    // zooming in would leave the user in front of a whole country, which is not
+    // what they ask for by pressing “locate”.
     //
-    // `recenterTrigger` reste dans les clés pour forcer une nouvelle exécution quand on
-    // retape sur le bouton alors que le mode focus est déjà actif (sa valeur seule ne
-    // changerait pas), mais la garde ne porte que sur `isAutoFollowActive` : sinon
-    // l'effet se rejouait aussi au moment où le mode focus s'éteint, donc juste après le
-    // geste manuel qui vient de le désengager.
+    // `recenterTrigger` stays in the keys to force a new run when the button is
+    // tapped again while focus mode is already active (its value alone would not
+    // change), but the guard only depends on `isAutoFollowActive`: otherwise
+    // the effect also replayed when focus mode turns off, hence right after the
+    // manual gesture that has just disengaged it.
     LaunchedEffect(recenterTrigger, isAutoFollowActive) {
         if (isAutoFollowActive) {
             if (mapView.zoomLevelDouble < ZOOM_THRESHOLD) {
@@ -705,46 +705,46 @@ fun MapViewContainer(
             } else if (currentUserLocation != null) {
                 mapView.controller.animateTo(GeoPoint(currentUserLocation.latitude, currentUserLocation.longitude))
             }
-            // Un déplacement programmatique de la carte ne produit pas d'événement de
-            // défilement exploitable : sans cette republication, la zone visible reste
-            // celle d'avant le recentrage.
+            // A programmatic move of the map produces no usable scroll
+            // event: without this republication, the visible area stays
+            // the one from before the recentering.
             kotlinx.coroutines.delay(RECENTER_SETTLE_MS)
             reportViewport(mapView, onViewportChanged)
         }
     }
 
     /*
-     * Pendant le suivi automatique, la carte se déplace seule au fil des positions.
-     * Comme aucun de ces déplacements ne republie la zone visible, le ViewModel
-     * conservait celle d'avant : `getDisplayPoints` continuait de renvoyer le détail
-     * de l'ancienne zone, et la partie nouvellement visible d'un tracé dense restait
-     * réduite à sa silhouette — jusqu'à ce qu'un glissement à la main déclenche enfin
-     * un `onScroll`.
+     * During automatic following, the map moves by itself as positions come in.
+     * As none of these moves republishes the visible area, the ViewModel
+     * kept the previous one: `getDisplayPoints` kept returning the detail
+     * of the old area, and the newly visible part of a dense track stayed
+     * reduced to its silhouette — until a manual drag finally triggered
+     * an `onScroll`.
      *
-     * La republication est périodique, et non accrochée au recentrage : les positions
-     * arrivant environ une fois par seconde, un effet dépendant de currentUserLocation
-     * serait annulé avant la fin de l'animation et ne publierait jamais rien.
-     * `MapViewport` étant une data class dans un StateFlow, une zone inchangée
-     * n'entraîne aucun rechargement.
+     * The republication is periodic, and not hooked to the recentering: positions
+     * arriving about once per second, an effect depending on currentUserLocation
+     * would be cancelled before the animation ends and would never publish anything.
+     * `MapViewport` being a data class in a StateFlow, an unchanged area
+     * triggers no reload.
      *
-     * Se fier au centre rapporté par la carte ne suffit pas : `animateTo()`, appelé à
-     * chaque nouvelle position, peut être rejeté par osmdroid si l'animation
-     * précédente tourne encore — sans erreur, sans y revenir. Pendant un trajet en
-     * voiture, ces appels ignorés s'accumulent et la caméra prend du retard sur la
-     * position réelle, silencieusement : le sondage se répète bien, mais republie une
-     * zone qui n'a jamais fini de rejoindre l'endroit à charger — jusqu'à ce qu'un
-     * geste manuel (glissement, zoom) recale tout d'un coup via `onScroll`/`onZoom`.
-     * `reportAutoFollowViewport` reconstruit donc la zone autour de la position GPS
-     * elle-même, lue via `rememberUpdatedState` pour rester à jour dans cette boucle
-     * de longue durée — jamais autour d'un centre de caméra qui peut avoir décroché.
+     * Relying on the center reported by the map is not enough: `animateTo()`, called at
+     * each new position, can be rejected by osmdroid if the previous
+     * animation is still running — no error, no retry. During a car
+     * trip, these ignored calls pile up and the camera lags behind the
+     * real position, silently: the polling does repeat, but publishes an
+     * area that never finished reaching the place to load — until a
+     * manual gesture (drag, zoom) readjusts everything at once via `onScroll`/`onZoom`.
+     * `reportAutoFollowViewport` therefore rebuilds the area around the GPS position
+     * itself, read via `rememberUpdatedState` to stay current in this long-lived
+     * loop — never around a camera center that may have come loose.
      */
     val latestUserLocation by rememberUpdatedState(currentUserLocation)
     val latestIsCurrentTracking by rememberUpdatedState(isCurrentTracking)
     LaunchedEffect(isAutoFollowActive) {
         if (!isAutoFollowActive) return@LaunchedEffect
 
-        // Repère du dernier envoi. Tant que la vue reste bien à l'intérieur de ce qui
-        // a déjà été demandé, republier ne ferait que relancer une lecture identique.
+        // Mark of the last send. As long as the view stays well inside what has
+        // already been requested, republishing would only restart an identical read.
         var publishedLat = Double.NaN
         var publishedLon = Double.NaN
         var publishedZoom = Double.NaN
@@ -759,16 +759,16 @@ fun MapViewContainer(
 
             val loc = latestUserLocation
             val followingGps = latestIsCurrentTracking && loc != null
-            // Le centre du suivi GPS est la position elle-même, jamais celle que
-            // rapporte la caméra : `animateTo` peut avoir pris du retard (voir
+            // The center of GPS following is the position itself, never the one
+            // reported by the camera: `animateTo` may have lagged behind (see
             // reportAutoFollowViewport).
             val centerLat = if (followingGps) loc!!.latitude else (box.latNorth + box.latSouth) / 2.0
             val centerLon = if (followingGps) loc!!.longitude else (box.lonEast + box.lonWest) / 2.0
             val zoom = mapView.zoomLevelDouble
 
-            // Un changement de zoom change le niveau de détail attendu : on republie
-            // toujours. Sauter ce cas laisserait un zoom avant sur la silhouette
-            // grossière, exactement le gain de détail qu'il venait chercher.
+            // A zoom change changes the expected level of detail: we always
+            // republish. Skipping this case would leave a zoom-in on the coarse
+            // silhouette, exactly the gain in detail it came for.
             val zoomChanged = publishedZoom.isNaN() || zoom != publishedZoom
             val movedFar = publishedLat.isNaN() ||
                     kotlin.math.abs(centerLat - publishedLat) > latSpan * AUTO_FOLLOW_RELOAD_FRACTION ||
@@ -865,15 +865,15 @@ fun rememberMapViewWithLifecycle(
             private var lastZoomedOut = defaultZoom < ZOOM_THRESHOLD
 
             /**
-             * Dernière mémorisation de la position de carte, sur horloge monotone.
+             * Last storing of the map position, on a monotonic clock.
              *
-             * osmdroid notifie ces deux rappels à chaque image de ses animations —
-             * `MapController.onAnimationUpdate` déplace la carte une soixantaine de
-             * fois par seconde. Y enregistrer la position à chaque fois revenait à
-             * demander quatre écritures de préférences par image, soit plus de deux
-             * cents accès disque par seconde tant que le suivi automatique animait la
-             * carte. Une fois par seconde suffit largement : cette valeur ne sert qu'à
-             * retrouver le même cadrage au prochain lancement.
+             * osmdroid notifies these two callbacks at every frame of its animations —
+             * `MapController.onAnimationUpdate` moves the map about sixty
+             * times a second. Saving the position each time amounted to
+             * four preference writes per frame, i.e. over two
+             * hundred disk accesses per second as long as automatic following animated the
+             * map. Once per second is plenty: this value only serves to
+             * find the same framing at the next launch.
              */
             private var lastPersistedAt = 0L
 
@@ -915,8 +915,8 @@ fun rememberMapViewWithLifecycle(
             }
         })
 
-        // Première publication de la zone visible, une fois la carte réellement
-        // mesurée : avant le layout, boundingBox n'a pas de valeur exploitable.
+        // First publication of the visible area, once the map is really
+        // measured: before layout, boundingBox has no usable value.
         map.addOnFirstLayoutListener { _, _, _, _, _ ->
             reportViewport(map, onViewportChanged)
         }
@@ -933,8 +933,8 @@ fun rememberMapViewWithLifecycle(
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)
         val selectedStyle = prefs.getString("pref_map_style", "mapnik") ?: "mapnik"
         if (selectedStyle != "usgs_sat") {
-            // L'imagerie satellite est laissée intacte : l'assombrir la rendrait
-            // illisible, et une photo aérienne n'a pas de fond clair à inverser.
+            // Satellite imagery is left untouched: darkening it would make it
+            // unreadable, and an aerial photo has no light background to invert.
             mapView.overlayManager.tilesOverlay.setColorFilter(
                 if (isDark) DARK_TILES_COLOR_FILTER else null
             )
@@ -998,10 +998,10 @@ private fun drawMarkers(map: MapView, state: MapState) {
 }
 
 /**
- * Découpe une trace en tronçons continus, un par polyligne à dessiner.
+ * Splits a track into continuous segments, one per polyline to draw.
  *
- * C'est ce qui fait qu'une trace reprise, mise en pause puis relancée, ou issue d'une
- * fusion, apparaît comme un seul parcours mais sans trait reliant ses morceaux.
+ * This is what makes a resumed track, paused then restarted, or one resulting from a
+ * merge, appear as a single track but with no line joining its pieces.
  */
 internal fun buildSegmentsFromPoints(trackPoints: List<TrackPoint>): List<MapSegment> {
     val segments = mutableListOf<MapSegment>()
@@ -1015,16 +1015,16 @@ internal fun buildSegmentsFromPoints(trackPoints: List<TrackPoint>): List<MapSeg
     for (pt in trackPoints) {
         if (pt.latitude == 0.0 && pt.longitude == 0.0) continue
 
-        // Un changement de couleur coupe le tronçon même sans rupture déclarée : une
-        // polyligne n'a qu'une couleur, et deux trajets voisins d'un même fichier
-        // KML se retrouveraient sinon peints du même trait.
+        // A color change cuts the segment even without a declared break: a
+        // polyline has only one color, and two neighboring trips of the same KML
+        // file would otherwise end up painted in the same stroke.
         val colorChanged = hasPrevious && pt.segmentColor != prevColor
 
-        // Le saut de temps ne signale une pause d'enregistrement que si les deux points
-        // se suivent réellement. Sur une trace dense affichée en niveau de détail réduit,
-        // les points intermédiaires sont volontairement omis (les id sautent) : l'écart de
-        // temps y est normal et ne doit pas couper le tracé. Les vraies ruptures de
-        // segment restent portées par isDiscontinuous, toujours conservé à l'affichage.
+        // The time jump only signals a recording pause if the two points
+        // really follow each other. On a dense track shown at reduced detail,
+        // the intermediate points are deliberately omitted (ids skip): the time
+        // gap is normal there and must not cut the line. Real segment
+        // breaks remain carried by isDiscontinuous, always kept for display.
         val pointsAreAdjacent = prevId <= 0L || pt.id <= 0L || pt.id == prevId + 1L
         val isTimeGap = pointsAreAdjacent &&
                 prevTime > 0L && pt.timestamp > 0L &&
@@ -1048,8 +1048,8 @@ internal fun buildSegmentsFromPoints(trackPoints: List<TrackPoint>): List<MapSeg
 }
 
 /**
- * Un morceau de tracé d'un seul tenant, et la couleur que son fichier d'origine lui
- * donnait — null s'il n'en donnait pas.
+ * A piece of line in one go, and the color its original file
+ * gave it — null if it gave none.
  */
 internal data class MapSegment(
     val sourceColor: Int?,
@@ -1070,11 +1070,11 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
 
                 for (segment in segments) {
                     if (segment.points.isNotEmpty()) {
-                        // La couleur se décide tronçon par tronçon : un même fichier
-                        // importé peut réunir des dizaines de trajets, chacun de la
-                        // sienne. Une couleur choisie à la main sur le parcours passe
-                        // devant : elle vaut pour lui tout entier, tronçons compris,
-                        // sinon la choisir ne se verrait pas sur un KML coloré.
+                        // The color is decided segment by segment: a single imported
+                        // file can gather dozens of trips, each with its
+                        // own. A color chosen by hand on the track takes
+                        // precedence: it applies to the whole of it, segments included,
+                        // otherwise choosing it would not show on a colored KML.
                         val segmentColor = TrackStylePreferences.resolveTrackColor(
                             displayColor = overlayTrack.displayColor,
                             sourceColor = segment.sourceColor ?: overlayTrack.sourceColor,
@@ -1082,8 +1082,8 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
                             isMerged = overlayTrack.isMerged
                         )
 
-                        // Chaque tracé superposé a son épaisseur : celle de la trace
-                        // principale ([MapState.strokeWidth]) ne vaut que pour elle.
+                        // Each overlaid line has its own thickness: that of the main
+                        // track ([MapState.strokeWidth]) only applies to it.
                         val polyline = Polyline().apply {
                             outlinePaint.color = segmentColor
                             outlinePaint.strokeWidth = overlayStrokeWidth
@@ -1112,8 +1112,8 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
 
             for (segment in segments) {
                 if (segment.points.isNotEmpty()) {
-                    // La couleur d'enregistrement du thème prime sur tout : c'est le
-                    // seul signal qui distingue la trace en train de s'écrire.
+                    // The theme's recording color wins over everything: it is the
+                    // only signal that distinguishes the track currently being written.
                     val trackLineColor = if (state.isCurrentTracking) {
                         state.themeColors?.recording ?: Color.parseColor("#E4572E")
                     } else {
@@ -1143,9 +1143,9 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
         map.overlays.addAll(cachedPointsPolylines)
     }
 
-    // 3. Draw markers. Les objets Marker sont refaits à chaque appel (légers),
-    // mais leur icône de position — coûteuse à dessiner — est mise en cache
-    // dans MapState par blueDotIcon() : voir sa raison d'être plus haut.
+    // 3. Draw markers. Marker objects are rebuilt at each call (light),
+    // but their position icon — costly to draw — is cached
+    // in MapState by blueDotIcon(): see its reason for being above.
     drawMarkers(map, state)
 }
 
@@ -1166,20 +1166,20 @@ private fun rebuildMapOverlays(map: MapView, state: MapState, isZoomedOut: Boole
 }
 
 /**
- * Cap à afficher, ou null s'il n'y a rien de neuf à en dire — l'appelant garde alors
- * le dernier cap connu.
+ * Bearing to display, or null if there is nothing new to say about it — the caller then keeps
+ * the last known bearing.
  *
- * **Une position connue fait autorité, et elle seule.** Le repli sur les points
- * enregistrés ne vaut que faute de position GPS : s'en servir parce que la position
- * n'a pas changé depuis le passage précédent était un piège. Pendant une pause
- * d'enregistrement, `points` ne bouge plus et garde éternellement le cap qu'on avait
- * en s'arrêtant ; la carte basculait donc entre le cap réel et ce cap fossilisé,
- * plusieurs fois par seconde et sur une centaine de degrés. Le défaut est d'autant
- * plus visible que l'affichage est réévalué souvent, ce qui est le cas depuis que la
- * zone visible est échantillonnée à intervalle régulier.
+ * **A known position is authoritative, and it alone.** Falling back on the recorded
+ * points only applies for lack of a GPS position: using them because the position
+ * had not changed since the previous pass was a trap. During a recording
+ * pause, `points` no longer moves and forever keeps the bearing we had
+ * when stopping; the map therefore flipped between the real bearing and this fossilized one,
+ * several times a second and over a hundred degrees. The defect is all the
+ * more visible as the display is reevaluated often, which has been the case since the
+ * visible area is sampled at regular intervals.
  *
- * Renvoyer null quand la position n'a pas assez bougé est donc la bonne réponse :
- * mieux vaut conserver le cap précédent qu'en inventer un autre.
+ * Returning null when the position has not moved enough is therefore the right answer:
+ * better to keep the previous bearing than to invent another.
  */
 internal fun computeCurrentBearing(
     points: List<TrackPoint>,
@@ -1192,8 +1192,8 @@ internal fun computeCurrentBearing(
             previousLocation.latitude, previousLocation.longitude,
             currentLocation.latitude, currentLocation.longitude
         )
-        // Sous ce seuil, l'écart entre deux relevés tient davantage au bruit du GPS
-        // qu'à un déplacement réel : le cap qu'on en tirerait serait aléatoire.
+        // Below this threshold, the gap between two readings is due more to GPS noise
+        // than to real movement: the bearing derived from it would be random.
         if (dist < BEARING_MIN_DISTANCE_METERS) return null
         return calculateBearing(
             previousLocation.latitude, previousLocation.longitude,
@@ -1201,7 +1201,7 @@ internal fun computeCurrentBearing(
         )
     }
 
-    // Aucune position connue : on s'oriente sur la fin du tracé affiché.
+    // No known position: we orient on the end of the displayed track.
     if (points.size >= 2) {
         val last = points.last()
         for (i in points.size - 2 downTo 0.coerceAtLeast(points.size - 10)) {
@@ -1222,17 +1222,17 @@ internal fun computeCurrentBearing(
 }
 
 /**
- * Rapproche le cap affiché de [target], en suivant l'arc le plus court.
+ * Brings the displayed bearing closer to [target], following the shortest arc.
  *
- * Deux raisons de ne pas poser directement la valeur. D'abord le passage par le nord :
- * interpoler de 350° à 10° en ligne droite ferait faire à la carte un tour complet
- * pour un virage de vingt degrés. Ensuite le confort : le cap issu de deux positions
- * consécutives tressaute, et l'appliquer tel quel donnait une carte qui sursaute à
- * chaque relevé au lieu de tourner.
+ * Two reasons not to set the value directly. First the crossing of north:
+ * interpolating from 350° to 10° in a straight line would make the map do a full turn
+ * for a twenty-degree bend. Then comfort: the bearing from two
+ * consecutive positions jitters, and applying it as is gave a map that jolts at
+ * every reading instead of turning.
  */
 internal fun smoothedBearing(previous: Float?, target: Float): Float {
     if (previous == null) return target
-    // Écart ramené dans [-180°, 180°] : c'est ce qui choisit le sens de rotation.
+    // Gap brought back into [-180°, 180°]: this is what chooses the rotation direction.
     val delta = ((target - previous + 540f) % 360f) - 180f
     return ((previous + delta * BEARING_SMOOTHING) % 360f + 360f) % 360f
 }
@@ -1257,8 +1257,8 @@ private fun calculateBearing(lat1: Double, lon1: Double, lat2: Double, lon2: Dou
 }
 
 /**
- * Bandeau de la maquette quand les tracés sont masqués faute de zoom suffisant :
- * explication, « Forcer l'affichage » (avec confirmation) et « Laisser masqués ».
+ * Banner from the mockup when tracks are hidden for lack of enough zoom:
+ * explanation, “Force display” (with confirmation) and “Keep hidden”.
  */
 @Composable
 private fun HeavyTracksBanner(onForce: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
@@ -1319,7 +1319,7 @@ private fun HeavyTracksBanner(onForce: () -> Unit, onDismiss: () -> Unit, modifi
     }
 }
 
-/** Pastille flottante sur la carte : état des tracés, et une action éventuelle. */
+/** Floating chip on the map: state of the tracks, and an optional action. */
 @Composable
 private fun MapPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,

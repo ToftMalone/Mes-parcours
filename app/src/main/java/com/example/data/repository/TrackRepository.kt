@@ -40,8 +40,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         val track = trackDao.getTrackById(trackId) ?: return false
         val updated = track.copy(isRecording = true, isPaused = false)
         trackDao.updateTrack(updated)
-        // La trace va se remettre à grossir : ce qui avait été mis en cache quand elle
-        // était figée ne la décrit déjà plus.
+        // The track is about to grow again: what was cached while it was frozen
+        // no longer describes it.
         invalidatePointCaches(trackId)
         val resume = loadResumeState(updated)
         _currentTrackId.value = trackId
@@ -52,35 +52,35 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         return true
     }
 
-    /** Points à réafficher et statistiques de départ pour reprendre un enregistrement. */
+    /** Points to redisplay and starting statistics to resume a recording. */
     data class ResumeState(
         val points: List<TrackPoint>,
         val stats: LiveStats,
         /**
-         * De quoi prolonger la vitesse moyenne : somme des vitesses retenues et nombre
-         * de relevés. Le service repartait de zéro sur ces deux cumuls alors que la
-         * distance et la durée étaient restaurées, si bien qu'après une reprise la
-         * moyenne ne portait plus que sur ce qui avait été enregistré depuis.
+         * What is needed to extend the average speed: sum of the retained speeds and number
+         * of readings. The service restarted from zero on these two totals while
+         * distance and duration were restored, so that after a resume the
+         * average only covered what had been recorded since.
          */
         val speedSumMps: Double = 0.0,
         val speedSamples: Int = 0
     )
 
-    /** Au-delà, on ne recalcule plus les statistiques point par point. */
+    /** Beyond this, statistics are no longer recomputed point by point. */
     private val statsRecomputeLimit = 200_000
 
-    /** Nombre de points récents conservés en mémoire pour l'affichage en direct. */
+    /** Number of recent points kept in memory for the live display. */
     private val liveTailLimit = 20_000
 
 
     /**
-     * Prépare la reprise d'une trace sans jamais charger en mémoire une trace
-     * importée de plusieurs millions de points.
+     * Prepares the resume of a track without ever loading into memory an
+     * imported track of several million points.
      *
-     * En dessous de [statsRecomputeLimit] points (tout enregistrement réaliste :
-     * 200 000 points = plus de 55 h à 1 Hz), on recalcule tout comme avant. Au-delà,
-     * on repart des statistiques déjà stockées sur la trace — exactes pour une trace
-     * importée — et on ne relit que la fin du tracé pour la carte en direct.
+     * Below [statsRecomputeLimit] points (any realistic recording:
+     * 200,000 points = more than 55 h at 1 Hz), everything is recomputed as before. Beyond,
+     * we start from the statistics already stored on the track — exact for an imported
+     * track — and only reread the end of the line for the live map.
      */
     suspend fun loadResumeState(track: Track): ResumeState {
         val pointCount = trackDao.getTrackPointMeta(track.id)?.pointCount ?: 0
@@ -99,8 +99,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         val tail = trackDao.getLastPoints(track.id, liveTailLimit).asReversed()
         val avgSpeed = if (track.duration > 0) track.totalDistance / track.duration else track.avgSpeed
-        // Faute d'avoir relu les vitesses, on pondère la moyenne connue par l'effectif :
-        // les points à venir ne pèsent alors que leur part, comme si on avait tout relu.
+        // Having not reread the speeds, we weight the known average by the count:
+        // the points to come then weigh only their share, as if everything had been reread.
         return ResumeState(
             speedSumMps = avgSpeed * pointCount,
             speedSamples = pointCount,
@@ -122,7 +122,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         val generatedName = com.example.util.FormatUtils.formatTrackInProgressName(startTime)
         val track = Track(
             name = generatedName,
-            activityType = "Parcours",
+            activityType = "Track",
             startTime = startTime,
             isRecording = true
         )
@@ -138,10 +138,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         val existing = trackDao.getTrackById(trackId)
         if (existing != null) {
             val endTime = System.currentTimeMillis()
-            // Ne finalise le nom généré à la création (avec l'heure de fin) que s'il
-            // n'a jamais été personnalisé. Sans ce garde-fou, reprendre puis arrêter
-            // une trace déjà nommée — par un arrêt précédent ou un renommage manuel —
-            // écrasait ce nom par un « Parcours du … à … » recalculé.
+            // Only finalizes the name generated at creation (with the end time) if it
+            // was never customized. Without this safeguard, resuming then stopping
+            // an already named track — by a previous stop or a manual rename —
+            // overwrote that name with a recomputed “Track on … from … to …”.
             val stillPlaceholderName = existing.name ==
                 com.example.util.FormatUtils.formatTrackInProgressName(existing.startTime)
             val finalName = if (stillPlaceholderName) {
@@ -163,8 +163,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             )
             trackDao.updateTrack(updated)
         }
-        // La trace est figée : ce qui en sera calculé à partir de maintenant peut être
-        // mis en cache, mais rien de ce qui précède ne doit y subsister.
+        // The track is frozen: what is computed from it from now on may be
+        // cached, but nothing from before must remain there.
         invalidatePointCaches(trackId)
         _currentTrackId.value = null
         _isTracking.value = false
@@ -174,28 +174,28 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
-    // Affichage par fenêtre de vue
+    // Viewport-based display
     //
-    // Une trace importée peut compter des millions de points : les charger tous
-    // pour dessiner la carte saturerait la mémoire. On combine donc une silhouette
-    // grossière de la trace entière (pour que le tracé reste continu hors écran)
-    // avec le détail de la zone visible. Zoom suffisant = tous les points réels
-    // de la zone sont dessinés. La base, elle, conserve toujours 100 % des points.
+    // An imported track can have millions of points: loading them all
+    // to draw the map would exhaust memory. We therefore combine a coarse
+    // silhouette of the whole track (so the line stays continuous off screen)
+    // with the detail of the visible area. Enough zoom = all real points
+    // of the area are drawn. The database always keeps 100% of the points.
     // ------------------------------------------------------------------
 
-    /** En deçà de ce nombre de points, la trace est chargée entièrement, comme avant. */
+    /** Below this number of points, the track is loaded entirely, as before. */
     private val fullLoadLimit = 60_000
 
-    /** Nombre de points visé pour la silhouette de la trace entière. */
+    /** Target number of points for the silhouette of the whole track. */
     private val skeletonBudget = 4_000
 
-    /** Nombre de points visé pour le détail de la zone visible. */
+    /** Target number of points for the detail of the visible area. */
     private val detailBudget = 40_000
 
     /**
-     * Au-delà de cette fraction de l'emprise de la trace couverte par la vue, on se
-     * contente de la silhouette : la vue embrasse quasiment tout, le détail n'apporterait
-     * rien et coûterait un parcours complet de la trace.
+     * Beyond this fraction of the track's extent covered by the view, we settle for
+     * the silhouette: the view takes in almost everything, detail would bring
+     * nothing and cost a full pass over the track.
      */
     private val skeletonOnlyCoverage = 0.55
 
@@ -203,20 +203,20 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     private val skeletonCache = java.util.concurrent.ConcurrentHashMap<Long, List<TrackPoint>>()
 
     /**
-     * Points complets des traces sous [fullLoadLimit], gardés d'un appel à l'autre.
+     * Full points of the tracks below [fullLoadLimit], kept from one call to the next.
      *
-     * Ces traces-là sont renvoyées en entier quelle que soit la zone visible : le
-     * résultat ne dépend pas du tout du cadrage, et le relire était donc du travail
-     * intégralement perdu. En suivi automatique, où la zone se republie au fil du
-     * déplacement, cela revenait à redemander à SQLite jusqu'à soixante mille lignes
-     * par trace affichée et à en reconstruire autant d'objets — de quoi occuper
-     * plusieurs secondes avant que le moindre point nouveau n'apparaisse.
+     * These tracks are returned in full whatever the visible area: the
+     * result does not depend on the framing at all, so rereading it was
+     * entirely wasted work. In automatic following, where the area is republished as
+     * movement goes on, this amounted to asking SQLite again for up to sixty thousand rows
+     * per displayed track and rebuilding as many objects — enough to keep busy
+     * for several seconds before any new point appeared.
      *
-     * Le cache ne coûte pas de mémoire supplémentaire, au contraire : ces listes
-     * étaient déjà retenues par le flux d'affichage, et l'on en fabriquait une copie
-     * neuve à chaque tour pendant que la précédente vivait encore. Renvoyer la même
-     * instance rend en prime la comparaison de la carte immédiate, là où elle
-     * repassait sur chaque point pour conclure que rien n'avait changé.
+     * The cache costs no extra memory, on the contrary: these lists
+     * were already held by the display flow, and a fresh copy was made
+     * at each turn while the previous one was still alive. Returning the same
+     * instance also makes the map's comparison immediate, where it
+     * used to go over every point to conclude nothing had changed.
      */
     private val fullPointsCache = java.util.concurrent.ConcurrentHashMap<Long, List<TrackPoint>>()
 
@@ -227,19 +227,19 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Points à dessiner pour [trackId] compte tenu de la zone visible [viewport].
+     * Points to draw for [trackId] given the visible area [viewport].
      *
-     * Ne renvoie jamais plus de ~[skeletonBudget] + [detailBudget] points, quelle que
-     * soit la taille de la trace. Pour les traces courantes (< [fullLoadLimit] points),
-     * renvoie simplement tous les points, exactement comme auparavant.
+     * Never returns more than ~[skeletonBudget] + [detailBudget] points, whatever
+     * the size of the track. For ordinary tracks (< [fullLoadLimit] points),
+     * simply returns all points, exactly as before.
      */
     suspend fun getDisplayPoints(trackId: Long, viewport: MapViewport?): List<TrackPoint> {
-        // Une trace en cours d'enregistrement grossit à chaque seconde : son effectif
-        // et son emprise seraient déjà faux à la lecture suivante. Les mettre en cache
-        // figeait l'affichage sur ce qu'elle contenait à la première consultation — la
-        // suite du tracé n'apparaissait plus tant qu'on ne quittait pas l'application.
-        // Le cache ne vaut que pour les traces figées, seules assez denses d'ailleurs
-        // pour que le calcul coûte quelque chose.
+        // A track being recorded grows every second: its count
+        // and extent would already be wrong at the next read. Caching them
+        // froze the display on what it contained at the first lookup — the
+        // rest of the line no longer appeared until the app was left.
+        // The cache only applies to frozen tracks, which are also the only ones dense
+        // enough for the computation to cost anything.
         val isLive = _isTracking.value && _currentTrackId.value == trackId
 
         val meta = (if (isLive) null else pointMetaCache[trackId])
@@ -250,7 +250,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         if (meta.pointCount == 0 || minId == null) return emptyList()
 
         if (meta.pointCount <= fullLoadLimit) {
-            // Indépendant de [viewport] : d'où la mise en cache, voir [fullPointsCache].
+            // Independent of [viewport]: hence the caching, see [fullPointsCache].
             return (if (isLive) null else fullPointsCache[trackId])
                 ?: trackDao.getPointsForTrack(trackId)
                     .also { if (!isLive) fullPointsCache[trackId] = it }
@@ -263,7 +263,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         if (viewport == null) return skeleton
 
-        // Vue quasi globale : la silhouette suffit, et on évite un parcours complet.
+        // Nearly global view: the silhouette is enough, and we avoid a full pass.
         if (coversMostOfTrack(meta, viewport)) return skeleton
 
         val inView = trackDao.countPointsInBounds(
@@ -290,11 +290,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Parcourt la totalité des points d'une trace, page par page.
+     * Walks through all the points of a track, page by page.
      *
-     * Utilisé par l'export : garantit que le fichier produit contient 100 % des
-     * points, indépendamment de ce qui est affiché à l'écran, sans jamais tenir
-     * la trace entière en mémoire.
+     * Used by the export: guarantees that the produced file contains 100% of the
+     * points, regardless of what is displayed on screen, without ever holding
+     * the whole track in memory.
      */
     suspend fun forEachPoint(trackId: Long, pageSize: Int = 2_000, action: (TrackPoint) -> Unit) {
         var afterId = 0L
@@ -314,7 +314,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         val latSpan = maxLat - minLat
         val lonSpan = maxLon - minLon
-        // Trace ponctuelle : pas d'emprise exploitable, on laisse le détail décider.
+        // Single-point track: no usable extent, we let the detail decide.
         if (latSpan <= 0.0 && lonSpan <= 0.0) return false
 
         val visibleLat = overlap(minLat, maxLat, viewport.minLat, viewport.maxLat)
@@ -338,9 +338,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Fusionne deux sous-ensembles ordonnés par id de la même trace, sans doublon.
-     * Le résultat reste une sous-suite chronologique valide : le tracé est continu,
-     * grossier hors écran et fin dans la zone visible.
+     * Merges two id-ordered subsets of the same track, with no duplicates.
+     * The result remains a valid chronological subsequence: the line is continuous,
+     * coarse off screen and fine in the visible area.
      */
     private fun mergeOrderedById(a: List<TrackPoint>, b: List<TrackPoint>): List<TrackPoint> {
         if (a.isEmpty()) return b
@@ -364,21 +364,21 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Importe un GPX/KML en flux : les points sont écrits en base au fur et à mesure
-     * du parsing, sans jamais charger le fichier entier ni la liste complète des
-     * points en mémoire. La ligne du parcours est insérée d'abord (pour obtenir son
-     * id), puis mise à jour avec les statistiques une fois le parsing terminé.
+     * Imports a GPX/KML as a stream: points are written to the database as the
+     * parsing goes, without ever loading the whole file or the complete list of
+     * points into memory. The track row is inserted first (to get its
+     * id), then updated with the statistics once parsing is finished.
      *
-     * **Une transaction par lot, plus une seule pour tout l'import.** Une transaction
-     * unique verrouillait la base en écriture d'un bout à l'autre : importer un gros
-     * KML pendant une sortie figeait l'enregistrement — points GPS, statistiques,
-     * notification — jusqu'à la fin de l'import. Chaque lot ne tient plus le verrou
-     * que le temps de son insertion.
+     * **One transaction per batch, no longer a single one for the whole import.** A single
+     * transaction locked the database for writing from end to end: importing a big
+     * KML during an outing froze the recording — GPS points, statistics,
+     * notification — until the import ended. Each batch now holds the lock
+     * only for the time of its insertion.
      *
-     * L'atomicité est rendue à la main : la ligne réservée porte un `startTime`
-     * repère ([Track.IMPORT_PLACEHOLDER_START_TIME]) qui la cache de l'historique, un
-     * échec la supprime avec ses points, et [cleanupInterruptedImports] rattrape au
-     * lancement suivant celle d'un import tué avec l'application.
+     * Atomicity is restored by hand: the reserved row carries a marker `startTime`
+     * ([Track.IMPORT_PLACEHOLDER_START_TIME]) that hides it from the history, a
+     * failure deletes it along with its points, and [cleanupInterruptedImports] catches up at the
+     * next launch the one from an import killed along with the app.
      */
     suspend fun importTrackFromUri(context: Context, uri: android.net.Uri): Long =
         withContext(Dispatchers.IO) {
@@ -413,7 +413,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 )
                 trackId
             } catch (e: Throwable) {
-                // NonCancellable : une annulation doit, elle aussi, laisser la base nette.
+                // NonCancellable: a cancellation must also leave the database clean.
                 withContext(kotlinx.coroutines.NonCancellable) {
                     runCatching {
                         trackDao.deletePointsForTrack(trackId)
@@ -425,9 +425,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
 
     /**
-     * Supprime les lignes d'imports interrompus par l'arrêt de l'application. À
-     * n'appeler qu'au démarrage du processus : aucun import ne peut alors être en
-     * cours, puisqu'ils ne survivent pas au processus qui les a lancés.
+     * Deletes the rows of imports interrupted by the app being stopped. To be called
+     * only at process start: no import can then be
+     * running, since they do not survive the process that launched them.
      */
     fun cleanupInterruptedImports() {
         database.runInTransaction {
@@ -437,16 +437,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Fusionne [trackIds] dans [destinationTrackId], par ordre chronologique.
+     * Merges [trackIds] into [destinationTrackId], in chronological order.
      *
-     * La recopie des points est faite par SQLite lui-même (INSERT … SELECT) : aucun
-     * point ne transite par la mémoire de l'application, ce qui permet de fusionner
-     * des parcours de plusieurs millions de points.
+     * The copying of points is done by SQLite itself (INSERT … SELECT): no
+     * point passes through the app's memory, which makes it possible to merge
+     * tracks of several million points.
      *
-     * Les points de la destination sont eux aussi recopiés, pour qu'ils se placent à
-     * leur rang chronologique parmi les autres, puis leurs lignes d'origine sont
-     * supprimées. Tout se déroule dans une transaction unique : en cas d'échec,
-     * aucune trace n'est perdue.
+     * The destination's points are copied too, so they take their
+     * chronological place among the others, then their original rows are
+     * deleted. Everything happens in a single transaction: on failure,
+     * no track is lost.
      */
     suspend fun mergeAndSaveTracks(
         trackIds: List<Long>,
@@ -460,9 +460,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             if (tracks.size < 2) {
                 throw UserFacingArgumentException(R.string.err_merge_min_two)
             }
-            // Fusionner le parcours en cours d'enregistrement supprimait sa ligne sous le
-            // service, qui continuait d'y écrire : chaque point suivant était refusé par
-            // la clé étrangère, en silence, et tout le reste de la sortie était perdu.
+            // Merging the track being recorded deleted its row under the
+            // service, which kept writing to it: every following point was refused by
+            // the foreign key, silently, and the whole rest of the outing was lost.
             if (tracks.any { isBeingRecorded(it) }) {
                 throw UserFacingArgumentException(R.string.err_merge_one_recording)
             }
@@ -472,8 +472,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
             val orderedTracks = tracks.sortedBy { it.startTime }
 
-            // Borne des points déjà présents dans la destination. Elle sépare
-            // l'ancien du nouveau pendant toute l'opération.
+            // Bound of the points already present in the destination. It separates
+            // old from new throughout the operation.
             val destinationOldMaxId = trackDao.getMaxPointId(destinationTrackId) ?: 0L
 
             val totalDistance = tracks.sumOf { it.totalDistance }
@@ -494,16 +494,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 elevationGain = totalElevationGain,
                 elevationLoss = totalElevationLoss,
                 isRecording = false,
-                // isImported n'est pas recalculé : la provenance du parcours d'accueil
-                // reste vraie. Mais le résultat porte désormais sa propre catégorie —
-                // l'historique a un onglet « Fusionnés » — et c'est isMerged qui l'y
-                // range, en le retirant de sa catégorie d'origine.
+                // isImported is not recomputed: the origin of the host track
+                // remains true. But the result now carries its own category —
+                // the history has a “Merged” tab — and it is isMerged that
+                // files it there, removing it from its original category.
                 isMerged = true
             )
 
             trackDao.updateTrack(updatedDestinationTrack)
 
-            // Recopie parcours par parcours, dans l'ordre chronologique.
+            // Copy track by track, in chronological order.
             var hasCopiedSomething = false
             for (track in orderedTracks) {
                 val sourceMaxId = if (track.id == destinationTrackId) {
@@ -513,26 +513,26 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 }
                 if (sourceMaxId <= 0L) continue
 
-                // Repère posé avant la copie : tout ce qui portera un id supérieur
-                // vient d'être inséré par cette étape.
+                // Mark placed before the copy: everything carrying a higher id
+                // has just been inserted by this step.
                 val watermark = trackDao.getMaxPointIdGlobal() ?: 0L
                 trackDao.copyPointsInto(destinationTrackId, track.id, sourceMaxId)
 
                 if (trackDao.countPointsAfter(destinationTrackId, watermark) == 0) continue
 
-                // Chaque parcours ajouté ouvre un nouveau tronçon : pas de trait
-                // reliant la fin du précédent au début de celui-ci.
+                // Each added track opens a new segment: no line
+                // joining the end of the previous one to the start of this one.
                 if (hasCopiedSomething) {
                     trackDao.markFirstPointAfterAsDiscontinuous(destinationTrackId, watermark)
                 }
                 hasCopiedSomething = true
             }
 
-            // Les points d'origine de la destination ont été recopiés à leur place :
-            // on retire les lignes initiales.
+            // The original points of the destination were copied into place:
+            // we remove the initial rows.
             trackDao.deletePointsUpTo(destinationTrackId, destinationOldMaxId)
 
-            // Supprimer les autres tracés ainsi que leurs points
+            // Delete the other tracks as well as their points
             tracks.forEach { track ->
                 if (track.id != destinationTrackId) {
                     trackDao.deletePointsForTrack(track.id)
@@ -547,37 +547,37 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
-    // Découpage d'un parcours
+    // Splitting a track
     // ------------------------------------------------------------------
 
-    /** Ce qui décide de l'endroit où le parcours est coupé. */
+    /** What decides where the track is cut. */
     enum class SplitMode {
         /**
-         * Aux ruptures de tronçon déjà présentes dans le parcours. C'est ce que
-         * portent les fichiers importés : un export Google Earth réunit couramment
-         * des dizaines de voyages, chacun dans son propre `<coordinates>`.
+         * At the segment breaks already present in the track. This is what
+         * imported files carry: a Google Earth export commonly gathers
+         * dozens of trips, each in its own `<coordinates>`.
          */
         SEGMENT_BREAKS,
 
         /**
-         * Là où le temps s'est arrêté plus longtemps qu'un seuil choisi. Utile sur un
-         * enregistrement réel coupé par une nuit ou une longue pause.
+         * Where time stopped for longer than a chosen threshold. Useful on a
+         * real recording cut by a night or a long pause.
          *
-         * Sans effet sur un GPX sans balise `<time>` ou sur un KML, dont les points
-         * reçoivent un horodatage synthétique régulier à l'import : il n'y a alors
-         * aucun trou à trouver, et le découpage le signale au lieu d'échouer.
+         * No effect on a GPX without `<time>` tags or on a KML, whose points
+         * receive a regular synthetic timestamp on import: there is then
+         * no gap to find, and the split reports it instead of failing.
          */
         TIME_GAP
     }
 
-    /** Nombre de points relus par lot pendant le repérage des coupures. */
+    /** Number of points reread per batch while locating the cuts. */
     private val splitScanPageSize = 2_000
 
     /**
-     * Une tranche repérée pendant la lecture, avant d'être écrite en base.
+     * A slice located during reading, before being written to the database.
      *
-     * Les bornes sont des identifiants de points, jamais des positions : c'est ce qui
-     * permet à SQLite de recopier la tranche lui-même.
+     * Bounds are point identifiers, never positions: that is what
+     * lets SQLite copy the slice itself.
      */
     private data class PlannedPiece(
         val fromId: Long,
@@ -588,26 +588,26 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     )
 
     /**
-     * Découpe [sourceTrackId] en plusieurs parcours, selon [mode].
+     * Splits [sourceTrackId] into several tracks, according to [mode].
      *
-     * Le parcours d'origine n'est modifié en rien, et n'est supprimé que si
-     * [deleteSource] le demande — les morceaux contiennent alors exactement les mêmes
-     * points, rien n'est perdu.
+     * The original track is not modified in any way, and is only deleted if
+     * [deleteSource] asks for it — the pieces then contain exactly the same
+     * points, nothing is lost.
      *
-     * Deux temps, et c'est délibéré :
+     * Two steps, and this is deliberate:
      *
-     * 1. **Une seule lecture** du parcours, page par page, qui repère les coupures et
-     *    cumule au passage les statistiques de chaque morceau
-     *    ([TrackStatsAccumulator]). Rien d'autre que la page courante n'est en
-     *    mémoire : un parcours de plusieurs millions de points passe. Cette lecture
-     *    se fait **hors transaction**, pour ne pas tenir la base en écriture pendant
-     *    toute sa durée.
-     * 2. **Une transaction unique** qui crée les parcours et fait recopier les points
-     *    par SQLite (`INSERT … SELECT`, invariant 5). Une interruption ne laisse donc
-     *    jamais un découpage à moitié fait.
+     * 1. **A single read** of the track, page by page, which locates the cuts and
+     *    accumulates along the way the statistics of each piece
+     *    ([TrackStatsAccumulator]). Nothing but the current page is in
+     *    memory: a track of several million points goes through. This read
+     *    happens **outside a transaction**, so as not to hold the database for writing
+     *    for its whole duration.
+     * 2. **A single transaction** that creates the tracks and has SQLite copy the points
+     *    (`INSERT … SELECT`, invariant 5). An interruption therefore never leaves
+     *    a half-done split.
      *
-     * Lève [IllegalArgumentException] si le parcours est introuvable ou en cours
-     * d'enregistrement, et [IllegalStateException] s'il n'y a rien à découper.
+     * Throws [IllegalArgumentException] if the track is not found or is being
+     * recorded, and [IllegalStateException] if there is nothing to split.
      */
     suspend fun splitTrack(
         sourceTrackId: Long,
@@ -622,7 +622,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             throw UserFacingArgumentException(R.string.err_track_is_recording)
         }
 
-        // --- 1. Repérage des coupures, en une passe ---
+        // --- 1. Locating the cuts, in one pass ---
 
         val pieces = mutableListOf<PlannedPiece>()
         var accumulator = TrackStatsAccumulator()
@@ -640,7 +640,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             for (point in page) {
                 val prev = previous
                 if (prev == null) {
-                    // Tout premier point du parcours : il ouvre la première tranche.
+                    // Very first point of the track: it opens the first slice.
                     pieceFromId = point.id
                     pieceStartTime = point.timestamp
                 } else {
@@ -649,8 +649,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                         SplitMode.TIME_GAP -> point.timestamp - prev.timestamp >= gapMillis
                     }
                     if (startsNewPiece) {
-                        // La tranche courante s'arrête juste avant ce point : sa borne
-                        // haute est exclusive, donc c'est l'identifiant de ce point.
+                        // The current slice stops just before this point: its upper
+                        // bound is exclusive, so it is this point's identifier.
                         pieces += PlannedPiece(
                             fromId = pieceFromId,
                             untilId = point.id,
@@ -673,7 +673,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             throw UserFacingStateException(R.string.err_track_empty)
         }
 
-        // Dernière tranche : elle va jusqu'au bout, d'où la borne haute maximale.
+        // Last slice: it goes to the very end, hence the maximal upper bound.
         pieces += PlannedPiece(
             fromId = pieceFromId,
             untilId = Long.MAX_VALUE,
@@ -691,7 +691,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             )
         }
 
-        // --- 2. Écriture ---
+        // --- 2. Writing ---
 
         return database.withTransaction {
             val newTrackIds = mutableListOf<Long>()
@@ -711,16 +711,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                         elevationGain = stats.elevationGain,
                         elevationLoss = stats.elevationLoss,
                         isRecording = false,
-                        // La provenance ne change pas : un morceau de parcours importé
-                        // reste importé, et reste rangé dans l'onglet où l'on avait
-                        // l'habitude de trouver son parent.
+                        // The origin does not change: a piece of an imported track
+                        // stays imported, and stays filed in the tab where its parent
+                        // used to be found.
                         isImported = source.isImported,
                         isMerged = source.isMerged,
-                        // Jamais affiché d'office : un découpage en trente morceaux
-                        // les allumerait tous d'un coup sur la carte.
+                        // Never displayed by default: a split into thirty pieces
+                        // would light them all up on the map at once.
                         isSelectedForMap = false,
-                        // Les morceaux gardent l'apparence du parent, y compris la
-                        // couleur choisie à la main s'il en avait une.
+                        // The pieces keep the parent's appearance, including the
+                        // color chosen by hand if it had one.
                         sourceColor = source.sourceColor,
                         displayColor = source.displayColor,
                         displayWidthDp = source.displayWidthDp
@@ -750,31 +750,31 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
-    // Rognage du début et de la fin
+    // Trimming the start and the end
     // ------------------------------------------------------------------
 
     /**
-     * Crée une copie de [sourceTrackId] amputée de ses [dropStartMillis] premières
-     * millisecondes et de ses [dropEndMillis] dernières.
+     * Creates a copy of [sourceTrackId] cut of its first [dropStartMillis]
+     * milliseconds and its last [dropEndMillis].
      *
-     * Le besoin le plus banal d'un traqueur GPS : l'enregistrement oublié qui a
-     * continué pendant la route du retour, ou démarré depuis le parking dix minutes
-     * avant le départ réel.
+     * The most ordinary need of a GPS tracker: the recording forgotten that
+     * kept going during the trip back, or started from the car park ten minutes
+     * before the real departure.
      *
-     * Même forme que [splitTrack], et pour les mêmes raisons : une seule lecture du
-     * parcours page par page — donc une empreinte mémoire bornée quelle que soit sa
-     * taille — qui repère les bornes **par identifiant de point** et cumule au
-     * passage les statistiques de ce qui sera conservé ; puis une transaction unique
-     * où SQLite recopie la tranche lui-même (invariant 5).
+     * Same shape as [splitTrack], and for the same reasons: a single read of the
+     * track page by page — hence a memory footprint bounded whatever its
+     * size — which locates the bounds **by point identifier** and accumulates along the
+     * way the statistics of what will be kept; then a single transaction
+     * where SQLite copies the slice itself (invariant 5).
      *
-     * Les bornes se comparent aux horodatages, jamais à un rang : sur un
-     * enregistrement à trous — pause, perte de signal — retirer « les cinq premières
-     * minutes » ne veut pas dire retirer un nombre fixe de points.
+     * Bounds are compared with timestamps, never with a rank: on a
+     * recording with gaps — pause, signal loss — removing “the first five
+     * minutes” does not mean removing a fixed number of points.
      *
-     * Le parcours d'origine n'est jamais modifié, et n'est supprimé que si
-     * [deleteSource] le demande. Lève [IllegalArgumentException] si le parcours est
-     * introuvable ou en cours d'enregistrement, et [IllegalStateException] s'il n'y a
-     * rien à rogner ou s'il ne resterait pas de quoi faire un parcours.
+     * The original track is never modified, and is only deleted if
+     * [deleteSource] asks for it. Throws [IllegalArgumentException] if the track is
+     * not found or is being recorded, and [IllegalStateException] if there is
+     * nothing to trim or if not enough would remain to make a track.
      */
     suspend fun trimTrack(
         sourceTrackId: Long,
@@ -792,7 +792,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             throw UserFacingStateException(R.string.err_trim_none_selected)
         }
 
-        // --- 1. Bornes du parcours, puis repérage, en deux lectures légères ---
+        // --- 1. Track bounds, then locating, in two light reads ---
 
         val firstTimestamp = trackDao.getFirstPointTimestamp(sourceTrackId)
             ?: throw UserFacingStateException(R.string.err_track_empty)
@@ -805,9 +805,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             throw UserFacingStateException(R.string.err_trim_nothing_left)
         }
 
-        // Une seule passe : les bornes retenues sont des identifiants, et les
-        // statistiques sont cumulées sur les seuls points conservés. Sans ce cumul il
-        // faudrait relire la copie après coup, soit deux fois le parcours.
+        // A single pass: the retained bounds are identifiers, and the
+        // statistics are accumulated over the kept points only. Without this accumulation we
+        // would have to reread the copy afterwards, i.e. the track twice.
         val accumulator = TrackStatsAccumulator()
         var fromId = -1L
         var untilId = Long.MAX_VALUE
@@ -824,8 +824,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             for (point in page) {
                 if (point.timestamp < keepFromTime) continue
                 if (point.timestamp > keepUntilTime) {
-                    // Premier point au-delà de la fin conservée : il donne la borne
-                    // haute, qui est exclusive.
+                    // First point beyond the kept end: it gives the upper
+                    // bound, which is exclusive.
                     if (untilId == Long.MAX_VALUE) untilId = point.id
                     continue
                 }
@@ -839,14 +839,14 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             }
         }
 
-        // Deux points au moins : en dessous, il n'y a ni tracé ni distance à montrer.
+        // At least two points: below that, there is neither a line nor a distance to show.
         if (keptCount < 2) {
             throw UserFacingStateException(R.string.err_trim_too_few)
         }
 
         val stats = accumulator.result()
 
-        // --- 2. Écriture ---
+        // --- 2. Writing ---
 
         return database.withTransaction {
             val newTrackId = trackDao.insertTrack(
@@ -862,8 +862,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                     elevationGain = stats.elevationGain,
                     elevationLoss = stats.elevationLoss,
                     isRecording = false,
-                    // Même héritage que le découpage : la provenance et l'apparence
-                    // du parent, mais jamais son affichage sur la carte.
+                    // Same inheritance as splitting: the origin and appearance
+                    // of the parent, but never its display on the map.
                     isImported = source.isImported,
                     isMerged = source.isMerged,
                     isSelectedForMap = false,
@@ -879,8 +879,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 fromId = fromId,
                 untilId = untilId
             )
-            // Le premier point conservé ouvrait peut-être un tronçon dans le parcours
-            // d'origine ; dans le parcours neuf il ne fait qu'ouvrir le tracé.
+            // The first kept point may have opened a segment in the original
+            // track; in the new track it only opens the line.
             trackDao.clearFirstPointDiscontinuity(newTrackId)
 
             if (deleteSource) {
@@ -903,12 +903,12 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Donne à chaque parcours existant la couleur qu'il affichait avant le passage aux
-     * couleurs par parcours, puis note que c'est fait.
+     * Gives each existing track the color it displayed before the move to
+     * per-track colors, then notes that it is done.
      *
-     * Appelée à chaque démarrage mais ne travaille qu'une fois : sans cette reprise,
-     * tous les parcours d'un utilisateur ayant réglé ses couleurs par catégorie
-     * changeraient d'apparence à la mise à jour, sans qu'il ait rien demandé.
+     * Called at every launch but only works once: without this backfill,
+     * all the tracks of a user who had set per-category colors
+     * would change appearance on update, without them having asked for anything.
      */
     suspend fun backfillDisplayColors(context: android.content.Context) {
         if (TrackStylePreferences.hasMigratedColors(context)) return
@@ -920,17 +920,17 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             fromFile = if (legacy.fromFile) 1 else 0
         )
         TrackStylePreferences.setMigratedColors(context)
-        // Rien à invalider : les caches ne retiennent que des points, et Room réémet
-        // de lui-même les flux de parcours après cet UPDATE.
+        // Nothing to invalidate: caches only hold points, and Room re-emits
+        // the track flows by itself after this UPDATE.
     }
 
     suspend fun insertPoint(point: TrackPoint) {
         if (point.trackId <= 0) return
         try {
-            // Pas de vérification préalable de l'existence du parcours : c'était une
-            // requête supplémentaire à chaque point GPS, soit une par seconde en
-            // enregistrement. La contrainte de clé étrangère joue déjà ce rôle et
-            // l'échec éventuel est rattrapé ici.
+            // No prior check that the track exists: it was an extra
+            // query for every GPS point, i.e. one per second while
+            // recording. The foreign key constraint already plays that role and
+            // any failure is caught here.
             trackDao.insertTrackPoint(point)
             // Add to live list to refresh UI instantly
             _livePoints.value = _livePoints.value + point
@@ -940,12 +940,12 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Supprime un parcours, sauf s'il est en cours d'enregistrement : renvoie alors
-     * false sans rien toucher.
+     * Deletes a track, unless it is being recorded: it then returns
+     * false without touching anything.
      *
-     * Le supprimer sous le service le laissait tourner à vide — GPS allumé,
-     * notification affichée, chaque point refusé par la clé étrangère — pendant que
-     * l'écran, lui, se croyait à l'arrêt et n'offrait plus de quoi l'interrompre.
+     * Deleting it under the service left it running idle — GPS on,
+     * notification shown, every point refused by the foreign key — while
+     * the screen thought it stopped and no longer offered a way to interrupt it.
      */
     suspend fun deleteTrack(trackId: Long): Boolean {
         val track = trackDao.getTrackById(trackId)
@@ -958,11 +958,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         return true
     }
 
-    /** Vrai pour le parcours qu'un enregistrement alimente, ou laissé ouvert en base. */
+    /** True for the track a recording feeds, or left open in the database. */
     fun isBeingRecorded(track: Track): Boolean =
         track.isRecording || (_isTracking.value && _currentTrackId.value == track.id)
 
-    /** Mémorise la pause en base, pour qu'elle survive à l'arrêt du processus. */
+    /** Stores the pause in the database, so that it survives the process being killed. */
     suspend fun setTrackPaused(trackId: Long, paused: Boolean) {
         trackDao.setTrackPaused(trackId, paused)
     }
@@ -1005,13 +1005,13 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     val currentUserLocation: StateFlow<TrackPoint?> = _currentUserLocation.asStateFlow()
 
     /**
-     * Altitude courante au-dessus du niveau de la mer, ou null si aucune mesure
-     * exploitable n'a été obtenue.
+     * Current altitude above sea level, or null if no usable
+     * measurement was obtained.
      *
-     * Publiée à part de [currentUserLocation] : `TrackPoint.altitude` n'est pas
-     * nullable et ne peut donc pas distinguer « altitude inconnue » de « altitude
-     * nulle », alors que l'affichage doit montrer « — » dans le premier cas plutôt
-     * qu'un « 0 m » qui se lirait comme une mesure.
+     * Published apart from [currentUserLocation]: `TrackPoint.altitude` is not
+     * nullable and therefore cannot tell “unknown altitude” from “zero
+     * altitude”, whereas the display must show “—” in the first case rather
+     * than a “0 m” that would read as a measurement.
      */
     private val _currentAltitude = MutableStateFlow<com.example.util.AltitudeFix?>(null)
     val currentAltitude: StateFlow<com.example.util.AltitudeFix?> = _currentAltitude.asStateFlow()
@@ -1051,13 +1051,13 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Retrouve un enregistrement laissé ouvert et remet l'état en direct à sa hauteur.
+     * Finds a recording left open and brings the live state up to date.
      *
-     * @param markPaused Faut-il présenter la trace retrouvée comme mise en pause ?
-     * Vrai au lancement de l'application, qui découvre une trace sans que rien ne
-     * l'alimente. Faux quand c'est le service qui appelle pour reprendre tout de
-     * suite : marquer une pause qu'il vient justement de lever affichait « en pause »
-     * à l'écran alors que les positions s'enregistraient bel et bien.
+     * @param markPaused Should the track found be presented as paused?
+     * True at app launch, which discovers a track with nothing feeding
+     * it. False when it is the service calling to resume right
+     * away: marking a pause it has just lifted showed “paused”
+     * on screen while positions were really being recorded.
      */
     suspend fun checkForAndRestoreActiveTrack(markPaused: Boolean = true): Track? {
         if (_isTracking.value && _currentTrackId.value != null) {
@@ -1075,11 +1075,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Statistiques d'une liste de points déjà en mémoire.
+     * Statistics of a list of points already in memory.
      *
-     * Simple enveloppe autour de [TrackStatsAccumulator], qui porte le calcul lui-même
-     * et sert aussi au découpage, où les points arrivent en flux. Une seconde
-     * implémentation pour les listes finirait par diverger de celle des flux.
+     * A simple wrapper around [TrackStatsAccumulator], which carries the computation itself
+     * and also serves splitting, where points arrive as a stream. A second
+     * implementation for lists would end up diverging from the streaming one.
      */
     fun calculateStatsFromPoints(points: List<TrackPoint>): LiveStats {
         val accumulator = TrackStatsAccumulator()
@@ -1093,17 +1093,17 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         fun getInstance(context: Context): TrackRepository {
             return INSTANCE ?: synchronized(this) {
-                // Re-vérification sous le verrou. Sans elle, deux appels simultanés
-                // (service GPS et interface au démarrage, par exemple) créent chacun
-                // un dépôt avec ses propres StateFlow : le service alimente alors une
-                // instance pendant que l'écran en observe une autre, et les points et
-                // statistiques en direct n'apparaissent jamais.
+                // Re-check under the lock. Without it, two simultaneous calls
+                // (GPS service and interface at startup, for example) each create
+                // a repository with its own StateFlows: the service then feeds
+                // one instance while the screen observes another, and the live points and
+                // statistics never appear.
                 INSTANCE ?: TrackRepository(AppDatabase.getInstance(context))
                     .also { INSTANCE = it }
             }
         }
 
-        /** Instance isolée sur une base fournie, pour les tests. */
+        /** Isolated instance on a supplied database, for tests. */
         @androidx.annotation.VisibleForTesting
         fun createForTesting(database: AppDatabase): TrackRepository = TrackRepository(database)
     }

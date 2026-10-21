@@ -4,10 +4,10 @@ import android.content.Context
 import android.preference.PreferenceManager
 
 /**
- * Empêche de re-signaler chaque jour la même version déjà notifiée une fois.
+ * Prevents reporting the same version, already notified once, every day.
  *
- * Sans elle, `UpdateCheckWorker` renotifierait la même mise à jour ignorée à chaque
- * passage quotidien, tant qu'elle reste la plus récente publiée.
+ * Without it, `UpdateCheckWorker` would notify the same ignored update again at each
+ * daily pass, as long as it remains the most recent published.
  */
 internal object UpdateCheckPreferences {
 

@@ -52,29 +52,29 @@ class TrackingService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
 
     /**
-     * Traitement des points GPS, sérialisé sur un seul thread.
+     * GPS point processing, serialized on a single thread.
      *
-     * Chaque position déclenche une coroutine qui met à jour des accumulateurs
-     * partagés (distance, dénivelé, dernière position, drapeau de discontinuité).
-     * Sur un pool multi-thread, un lot de positions — LocationResult en livre
-     * plusieurs d'un coup — lançait autant de coroutines simultanées qui se
-     * marchaient dessus : distances calculées contre une position arbitraire,
-     * incréments perdus. Un exécuteur à un seul thread garantit l'ordre d'arrivée.
+     * Each position triggers a coroutine that updates shared accumulators
+     * (distance, elevation, last position, discontinuity flag).
+     * On a multi-thread pool, a batch of positions — LocationResult delivers
+     * several at once — launched as many simultaneous coroutines that
+     * trampled each other: distances computed against an arbitrary position,
+     * lost increments. A single-thread executor guarantees arrival order.
      */
     private val pointExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val pointScope = CoroutineScope(pointExecutor.asCoroutineDispatcher() + Job())
 
-    /** Thread principal uniquement, comme tout ce que touche [applyState]. */
+    /** Main thread only, like everything [applyState] touches. */
     private var timerJob: Job? = null
 
     /**
-     * Mode de la demande de positions en cours : true = économe (pause, application
-     * quittée), false = pleine précision, null = aucune demande. Thread principal
-     * uniquement. Évite de redemander les positions quand rien n'a changé.
+     * Mode of the current location request: true = economical (paused, app
+     * left), false = full accuracy, null = no request. Main thread
+     * only. Avoids requesting positions again when nothing has changed.
      */
     private var appliedLowPower: Boolean? = null
 
-    /** Sérialise les écritures de la pause en base, voir [persistPauseState]. */
+    /** Serializes the pause writes to the database, see [persistPauseState]. */
     private val pauseWriteMutex = Mutex()
 
     private val notificationManager: NotificationManager by lazy {
@@ -86,20 +86,20 @@ class TrackingService : Service() {
     }
 
     /**
-     * Dernier texte réellement affiché, pour ne pas republier deux fois le même.
+     * Last text actually displayed, so as not to republish the same one twice.
      *
-     * Volatile : la fonction est appelée depuis le minuteur et depuis le thread de
-     * traitement des points. Dans le pire des cas, deux fils la voient encore vide au
-     * même instant et publient chacun une fois — sans conséquence, l'affichage étant
-     * identique.
+     * Volatile: the function is called from the timer and from the point
+     * processing thread. In the worst case, two threads still see it empty at the
+     * same instant and each publish once — harmless, the display being
+     * identical.
      */
     @Volatile
     private var lastNotificationText: String? = null
 
     /**
-     * Horloge monotone de la dernière notification effectivement republiée, pour
-     * borner la cadence quand l'écran est éteint (voir [updateStatsNotification]).
-     * Volatile pour la même raison que [lastNotificationText].
+     * Monotonic clock of the last notification actually republished, to
+     * bound the rate when the screen is off (see [updateStatsNotification]).
+     * Volatile for the same reason as [lastNotificationText].
      */
     @Volatile
     private var lastNotifiedAtElapsedRealtime = 0L
@@ -110,26 +110,26 @@ class TrackingService : Service() {
     private var startTimeMs: Long = 0
 
     /**
-     * Durée déjà acquise avant le segment de chronométrage en cours : ce qu'ont compté
-     * les périodes précédentes, plus ce qu'apportait une trace reprise.
+     * Duration already acquired before the current timing segment: what the previous
+     * periods counted, plus what a resumed track brought.
      */
     @Volatile
     private var elapsedBaseSeconds: Long = 0
 
-    /** Repère monotone du début du segment en cours, ou 0 si le chronomètre est arrêté. */
+    /** Monotonic mark of the start of the current segment, or 0 if the stopwatch is stopped. */
     @Volatile
     private var segmentStartedAtRealtime: Long = 0
 
     /**
-     * Durée totale de l'enregistrement, en secondes.
+     * Total duration of the recording, in seconds.
      *
-     * Déduite d'une horloge monotone plutôt qu'incrémentée par une boucle
-     * `delay(1000)` : `delay` ne promet pas la ponctualité, et le retard de chaque
-     * tour s'ajoutait au précédent. Sur une sortie de plusieurs heures, la durée
-     * affichée finissait sensiblement en dessous du temps réellement écoulé.
+     * Derived from a monotonic clock rather than incremented by a
+     * `delay(1000)` loop: `delay` does not promise punctuality, and the lateness of each
+     * turn added up. On an outing of several hours, the displayed duration
+     * ended up noticeably below the time actually elapsed.
      *
-     * `elapsedRealtime` et non `currentTimeMillis` : l'heure système peut sauter — mise
-     * à l'heure réseau, changement manuel — et la durée ferait alors un bond.
+     * `elapsedRealtime` and not `currentTimeMillis`: the system time can jump — network
+     * time sync, manual change — and the duration would then leap.
      */
     private val elapsedSeconds: Long
         get() = if (segmentStartedAtRealtime == 0L) {
@@ -140,15 +140,15 @@ class TrackingService : Service() {
         }
 
     /**
-     * Dernière position retenue du tronçon en cours, ou null si le tronçon vient de
-     * commencer (démarrage, sortie de pause, reprise d'une trace existante).
+     * Last retained position of the current segment, or null if the segment has just
+     * started (start, exit from pause, resume of an existing track).
      *
-     * C'est cette valeur seule qui décide de la discontinuité : un point sans
-     * position précédente ouvre un nouveau tronçon et n'ajoute aucune distance.
-     * L'ancien drapeau isDiscontinuousNext était écrit depuis le thread principal
-     * (pause/reprise) et consommé depuis le thread de traitement : un point déjà
-     * en vol pouvait le consommer à la place du premier point d'après la reprise,
-     * qui se retrouvait alors relié en ligne droite au tronçon précédent.
+     * This value alone decides discontinuity: a point with no
+     * previous position opens a new segment and adds no distance.
+     * The old isDiscontinuousNext flag was written from the main thread
+     * (pause/resume) and consumed from the processing thread: a point already
+     * in flight could consume it instead of the first point after the resume,
+     * which would then end up joined by a straight line to the previous segment.
      */
     @Volatile
     private var lastLocation: Location? = null
@@ -157,9 +157,9 @@ class TrackingService : Service() {
     private var isPaused = false
 
     /**
-     * Vrai dès qu'un démarrage ou une reprise a été lancé dans ce service. Thread
-     * principal uniquement. Faux, une pause s'adresse à un service tout juste créé pour
-     * la recevoir — le précédent ayant été tué — qui n'a rien à mettre en pause.
+     * True as soon as a start or a resume has been launched in this service. Main
+     * thread only. When false, a pause is addressed to a freshly created service
+     * made to receive it — the previous one having been killed — which has nothing to pause.
      */
     private var hasSession = false
     private var isLocationUpdatesActive = false
@@ -173,14 +173,14 @@ class TrackingService : Service() {
     private var speedSumMps = 0.0
 
     /**
-     * Chaîne de traitement de l'altitude, entièrement sur [pointScope] : conversion
-     * vers le niveau de la mer, lissage, puis cumul du dénivelé.
+     * Altitude processing chain, entirely on [pointScope]: conversion
+     * to sea level, smoothing, then elevation accumulation.
      */
     private lateinit var altitudeResolver: AltitudeResolver
     private val altitudeSmoother = AltitudeSmoother()
     private val elevation = ElevationAccumulator()
 
-    /** Dernière altitude lissée connue, réutilisée quand un relevé n'en porte pas. */
+    /** Last known smoothed altitude, reused when a reading carries none. */
     private var lastKnownAltitude: Double? = null
 
     private val locationCallback = object : LocationCallback() {
@@ -201,8 +201,8 @@ class TrackingService : Service() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         createNotificationChannel()
 
-        // En pause, la précision suit la présence de l'écran : pleine quand on regarde
-        // la carte, économe dès qu'on quitte l'application (voir requestLocationUpdates).
+        // While paused, accuracy follows screen presence: full when looking at
+        // the map, economical as soon as the app is left (see requestLocationUpdates).
         serviceScope.launch(Dispatchers.Main) {
             repository.isAppInForeground.collect {
                 if (isPaused && isLocationUpdatesActive && !isServiceStopping) requestLocationUpdates()
@@ -211,15 +211,15 @@ class TrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Redémarrage par le système après une éviction mémoire : START_STICKY relance
-        // le service avec une intention nulle. Sans ce cas, aucune branche ne
-        // s'appliquait — ni notification de premier plan, ni GPS, ni minuteur. Le
-        // service repartait vide et l'enregistrement s'arrêtait en silence, sans que
-        // rien ne le signale à l'utilisateur, qui croyait sa sortie toujours en cours.
+        // Restart by the system after a memory eviction: START_STICKY relaunches
+        // the service with a null intent. Without this case, no branch
+        // applied — no foreground notification, no GPS, no timer. The
+        // service restarted empty and the recording stopped silently, with
+        // nothing telling the user, who believed their outing was still going.
         //
-        // ACTION_RESTORE : même reprise, demandée par BootReceiver après un redémarrage du
-        // téléphone ou une mise à jour. Dans les deux cas, l'état reprend celui qui est
-        // mémorisé en base — pause comprise.
+        // ACTION_RESTORE: same resume, requested by BootReceiver after a phone
+        // reboot or an update. In both cases, the state picks up the one
+        // stored in the database — pause included.
         if (intent?.action == null || intent.action == ACTION_RESTORE) {
             if (!RecordingRecovery.canRecordFromBackground(this)) {
                 RecordingRecovery.notifyInterrupted(this)
@@ -234,7 +234,7 @@ class TrackingService : Service() {
         when (intent.action) {
             ACTION_START -> {
                 val name = intent.getStringExtra(EXTRA_TRACK_NAME) ?: getString(R.string.track_untitled)
-                val activityType = intent.getStringExtra(EXTRA_ACTIVITY_TYPE) ?: "Randonnée"
+                val activityType = intent.getStringExtra(EXTRA_ACTIVITY_TYPE) ?: "Hiking"
                 val existingTrackId = intent.getLongExtra(EXTRA_TRACK_ID, -1L)
                 
                 // CRITICAL: Call startForeground synchronously AT start time to avoid OS timeout crash.
@@ -257,11 +257,11 @@ class TrackingService : Service() {
     }
 
     private suspend fun attachToOrRestoreActiveTrack(name: String, activityType: String, existingTrackId: Long = -1L) {
-        // Lu avant toute suspension : une reprise après redémarrage peut se faire en
-        // pause, et l'écran ne doit pas afficher « en cours » le temps de la lecture.
+        // Read before any suspension: a resume after a reboot may happen
+        // paused, and the screen must not show “recording” while the read is under way.
         val restorePaused = isPaused
-        // Aucun point précédent tant que le tronçon n'a pas repris : le premier point
-        // enregistré ouvrira donc un nouveau tronçon, sans trait de raccordement.
+        // No previous point as long as the segment has not resumed: the first point
+        // recorded will therefore open a new segment, with no joining line.
         lastLocation = null
 
         val activeTrack = if (existingTrackId > 0) {
@@ -272,17 +272,17 @@ class TrackingService : Service() {
                 updated
             } else null
         } else {
-            // markPaused = false : le service reprend l'enregistrement à l'instant même.
-            // Le laisser à vrai faisait afficher « en pause » à l'écran pendant que les
-            // positions s'enregistraient — le service et le dépôt se contredisaient.
+            // markPaused = false: the service resumes recording this very instant.
+            // Leaving it true made the screen show “paused” while
+            // positions were being recorded — the service and the repository contradicted each other.
             repository.checkForAndRestoreActiveTrack(markPaused = restorePaused)
         }
 
         if (activeTrack != null) {
             trackId = activeTrack.id
             startTimeMs = activeTrack.startTime
-            // Ne charge que ce qui est nécessaire : une trace importée peut compter
-            // plusieurs millions de points et ne tiendrait pas en mémoire.
+            // Only loads what is necessary: an imported track can have
+            // several million points and would not fit in memory.
             val resume = repository.loadResumeState(activeTrack)
             val points = resume.points
             val stats = resume.stats
@@ -291,19 +291,19 @@ class TrackingService : Service() {
             segmentStartedAtRealtime = 0L
             totalDistanceMeters = stats.distanceMeters
             maxSpeedMps = stats.maxSpeedMps
-            // Les totaux de dénivelé reprennent où ils étaient, mais sans référence
-            // d'altitude : l'écart entre l'endroit quitté et celui où l'on reprend ne
-            // doit pas être compté comme un dénivelé parcouru.
+            // Elevation totals pick up where they were, but without an altitude
+            // reference: the gap between the place left and the one where we resume
+            // must not be counted as elevation traveled.
             elevation.restore(stats.elevationGain, stats.elevationLoss)
             altitudeSmoother.reset()
             lastKnownAltitude = null
-            // La moyenne se prolonge au lieu de repartir de zéro : voir ResumeState.
+            // The average continues instead of restarting from zero: see ResumeState.
             speedSumMps = resume.speedSumMps
             totalSpeedPoints = resume.speedSamples
 
-            // lastLocation reste volontairement null. La renseigner avec le dernier
-            // point de la trace reprise faisait compter la distance à vol d'oiseau
-            // entre l'ancien tronçon et l'endroit où l'on reprend.
+            // lastLocation deliberately stays null. Filling it with the last
+            // point of the resumed track counted the straight-line distance
+            // between the old segment and the place where we resume.
         } else {
             trackId = repository.createNewTrack(name, activityType)
             startTimeMs = System.currentTimeMillis()
@@ -325,36 +325,36 @@ class TrackingService : Service() {
         lastNotificationText = null
         lastNotifiedAtElapsedRealtime = 0L
 
-        // Toute la préparation passe par pointScope, le thread unique qui traite aussi
-        // les points GPS. Elle se faisait auparavant sur serviceScope alors que les
-        // positions arrivaient déjà — le GPS était armé après 200 ms, la reprise d'une
-        // trace pouvant en prendre bien plus. Deux threads écrivaient donc les mêmes
-        // champs : une distance tout juste ajoutée se faisait écraser par la valeur
-        // restaurée, et le lisseur d'altitude — un ArrayDeque, qui n'est pas prévu pour
-        // ça — subissait un reset() d'un côté pendant un add() de l'autre.
+        // All the preparation goes through pointScope, the single thread that also processes
+        // GPS points. It used to run on serviceScope while
+        // positions were already arriving — the GPS was armed after 200 ms, while resuming a
+        // track could take much longer. Two threads therefore wrote the same
+        // fields: a distance just added was overwritten by the restored
+        // value, and the altitude smoother — an ArrayDeque, which is not meant for
+        // that — suffered a reset() on one side during an add() on the other.
         pointScope.launch {
             totalSpeedPoints = 0
             speedSumMps = 0.0
 
             attachToOrRestoreActiveTrack(name, activityType, existingTrackId)
 
-            // Le GPS n'est armé qu'une fois la préparation finie : aucun point ne peut
-            // donc être traité avant que les accumulateurs soient dans leur état de
-            // départ. Le court délai laisse au système le temps de propager la priorité
-            // de premier plan du processus avant la demande de positions.
+            // The GPS is only armed once the preparation is finished: no point can
+            // therefore be processed before the accumulators are in their starting
+            // state. The short delay gives the system time to propagate the process's
+            // foreground priority before the location request.
             delay(200L)
             withContext(Dispatchers.Main) { applyState() }
         }
     }
 
     /**
-     * Aligne le GPS, le chronomètre, l'écran et la base sur [isPaused].
+     * Aligns the GPS, the stopwatch, the screen and the database with [isPaused].
      *
-     * **Thread principal uniquement**, comme les commandes pause / reprise / arrêt que
-     * reçoit [onStartCommand]. C'est ce qui les ordonne entre elles : le chronomètre
-     * était jusqu'ici démarré depuis le thread des points, après la préparation d'une
-     * reprise. Une pause demandée pendant cette préparation passait donc avant, et le
-     * chronomètre repartait ensuite — il tournait pendant la pause.
+     * **Main thread only**, like the pause / resume / stop commands that
+     * [onStartCommand] receives. That is what orders them relative to each other: the stopwatch
+     * used to be started from the points thread, after the preparation of a
+     * resume. A pause requested during that preparation therefore went first, and the
+     * stopwatch then restarted — it ran during the pause.
      */
     private fun applyState() {
         if (isServiceStopping || trackId <= 0) return
@@ -372,11 +372,11 @@ class TrackingService : Service() {
     }
 
     /**
-     * Écrit la pause en base, pour qu'elle survive à l'arrêt du processus.
+     * Writes the pause to the database, so that it survives the process being killed.
      *
-     * Chaque écriture relit [isPaused] sous le verrou au lieu d'emporter la valeur du
-     * moment où elle a été demandée : deux écritures lancées coup sur coup ne peuvent
-     * donc pas s'achever dans le désordre et laisser en base l'avant-dernier état.
+     * Each write rereads [isPaused] under the lock instead of carrying the value from
+     * the moment it was requested: two writes launched back to back therefore
+     * cannot finish out of order and leave the second-to-last state in the database.
      */
     private fun persistPauseState() {
         serviceScope.launch {
@@ -395,9 +395,9 @@ class TrackingService : Service() {
         timerJob = serviceScope.launch {
             while (true) {
                 delay(1000L)
-                // Le minuteur publie lui-même la durée. La laisser à la charge des
-                // points GPS figeait le chronomètre affiché dès la perte du signal,
-                // alors que le temps, lui, continuait de passer.
+                // The timer publishes the duration itself. Leaving it to the
+                // GPS points froze the displayed stopwatch as soon as the signal was lost,
+                // while time kept passing.
                 val stats = repository.liveStats.value
                 val seconds = elapsedSeconds
                 if (stats.durationSec != seconds) {
@@ -408,7 +408,7 @@ class TrackingService : Service() {
         }
     }
 
-    /** Fige la durée acquise : le chronomètre repartira de cette valeur. */
+    /** Freezes the acquired duration: the stopwatch will restart from this value. */
     private fun freezeElapsed() {
         elapsedBaseSeconds = elapsedSeconds
         segmentStartedAtRealtime = 0L
@@ -416,24 +416,24 @@ class TrackingService : Service() {
 
     private fun pauseTracking() {
         isPaused = true
-        // Coupe le tronçon : à la reprise, aucun trait ne reliera les deux morceaux.
+        // Cuts the segment: on resume, no line will join the two pieces.
         lastLocation = null
-        // Tout de suite, même si la préparation n'est pas finie : c'est ce que voit l'écran.
+        // Right away, even if the preparation is not finished: this is what the screen sees.
         repository.setRecordingPaused(true)
         applyState()
     }
 
     /**
-     * Reprise après un redémarrage décidé par le système, sans intention d'origine.
+     * Resume after a restart decided by the system, with no original intent.
      *
-     * On ne reprend que s'il reste vraiment un enregistrement ouvert en base. Appeler
-     * [resumeTracking] à l'aveugle créerait sinon un parcours vide : faute de trace
-     * active à retrouver, [attachToOrRestoreActiveTrack] en ouvre une nouvelle.
+     * We only resume if a recording is really still open in the database. Calling
+     * [resumeTracking] blindly would otherwise create an empty track: with no
+     * active track to find, [attachToOrRestoreActiveTrack] opens a new one.
      */
     /**
-     * Pause reçue sans enregistrement en cours dans ce service : on la mémorise sur le
-     * parcours resté ouvert en base, pour qu'aucune reprise ultérieure ne le relance,
-     * puis le service s'arrête — il n'a pas été mis au premier plan et n'a rien à faire.
+     * Pause received with no recording in progress in this service: we store it on the
+     * track left open in the database, so that no later resume restarts it,
+     * then the service stops — it was not put in the foreground and has nothing to do.
      */
     private fun pauseOrphanTrack() {
         isPaused = true
@@ -454,8 +454,8 @@ class TrackingService : Service() {
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     }
-                    // La pause mémorisée est respectée : sans elle, le trajet suivant
-                    // s'enregistrait alors que l'utilisateur avait mis en pause.
+                    // The stored pause is respected: without it, the next trip
+                    // was recorded while the user had paused.
                     active.isPaused -> restoreTracking(paused = true)
                     else -> restoreTracking(paused = false)
                 }
@@ -465,18 +465,18 @@ class TrackingService : Service() {
 
     private fun resumeTracking() = restoreTracking(paused = false)
 
-    /** Reprend l'enregistrement, ou le rouvre en pause après un redémarrage. */
+    /** Resumes the recording, or reopens it paused after a restart. */
     private fun restoreTracking(paused: Boolean) {
         hasSession = true
         isPaused = paused
         repository.setRecordingPaused(paused)
-        // Nouveau tronçon, sans raccordement avec ce qui précède.
+        // New segment, with no joining to what precedes.
         lastLocation = null
-        // Sur pointScope, pour la même raison qu'au démarrage : la restauration touche
-        // aux accumulateurs que le traitement des points fait vivre.
+        // On pointScope, for the same reason as at start: restoration touches
+        // the accumulators that point processing keeps alive.
         pointScope.launch {
             if (trackId <= 0) {
-                attachToOrRestoreActiveTrack(getString(R.string.track_untitled), "Randonnée")
+                attachToOrRestoreActiveTrack(getString(R.string.track_untitled), "Hiking")
             }
             withContext(Dispatchers.Main) { applyState() }
         }
@@ -503,18 +503,18 @@ class TrackingService : Service() {
             return
         }
 
-        // La simulation de coordonnées est un outil de développement : elle fabrique
-        // un parcours circulaire fictif à Paris. Elle ne doit JAMAIS s'activer dans une
-        // version publiée, sinon l'application enregistre en silence des données
-        // inventées que l'utilisateur croira être son trajet réel. La détection
-        // d'émulateur est heuristique (elle teste par exemple si le produit contient
-        // "sdk") et peut se déclencher à tort sur un vrai appareil.
+        // Coordinate simulation is a development tool: it fabricates
+        // a fictitious circular track in Paris. It must NEVER be activated in a
+        // published version, otherwise the app silently records invented data
+        // that the user will take for their real trip. Emulator
+        // detection is heuristic (it tests, for example, whether the product contains
+        // "sdk") and may trigger wrongly on a real device.
         if (BuildConfig.DEBUG && EnvironmentUtils.isEmulatorOrCloud(this)) {
             if (simulationJob?.isActive != true) startGPSCoordinateSimulation()
             return
         }
 
-        // Aucun fournisseur de position actif : on le signale au lieu d'inventer un trajet.
+        // No location provider active: we say so instead of inventing a trip.
         val lm = getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
         val isGpsEnabled = try { lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) } catch (e: Exception) { false }
         val isNetworkEnabled = try { lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { false }
@@ -527,10 +527,10 @@ class TrackingService : Service() {
             return
         }
 
-        // En pause et hors de l'écran, rien ne s'enregistre et personne ne regarde la
-        // carte : la puce GPS tournait pourtant à pleine précision, une position par
-        // seconde, pendant toute la pause. On se contente alors d'une position
-        // approximative toutes les dix secondes, de quoi garder l'état du signal à jour.
+        // While paused and off screen, nothing is recorded and nobody looks at the
+        // map: the GPS chip was nevertheless running at full accuracy, one position per
+        // second, throughout the pause. We now settle for an
+        // approximate position every ten seconds, enough to keep the signal state up to date.
         val lowPower = isPaused && !repository.isAppInForeground.value
         if (isLocationUpdatesActive && appliedLowPower == lowPower) return
 
@@ -547,8 +547,8 @@ class TrackingService : Service() {
         }
 
         try {
-            // Pas de retrait préalable : une nouvelle demande sur le même rappel
-            // remplace la précédente, sans trou dans la réception des positions.
+            // No prior removal: a new request on the same callback
+            // replaces the previous one, with no gap in position reception.
             appliedLowPower = lowPower
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
@@ -610,15 +610,15 @@ class TrackingService : Service() {
     }
 
     /**
-     * Convertit l'altitude du relevé vers le niveau de la mer, la lisse et la publie.
-     * Renvoie l'altitude lissée, ou null si le relevé n'en portait pas d'exploitable.
+     * Converts the reading's altitude to sea level, smooths it and publishes it.
+     * Returns the smoothed altitude, or null if the reading carried no usable one.
      *
-     * À n'appeler que depuis [pointScope] : la conversion lit les données de géoïde.
+     * To be called only from [pointScope]: the conversion reads geoid data.
      *
-     * Une lacune isolée ne remet pas l'affichage à blanc. Un relevé sans altitude
-     * signifie généralement une perte momentanée du calage tridimensionnel ; effacer
-     * la valeur à chaque fois ferait clignoter le nombre affiché. La dernière mesure
-     * réelle reste donc visible, et l'état du signal GPS est déjà signalé à côté.
+     * An isolated gap does not blank the display. A reading without altitude
+     * generally means a momentary loss of the three-dimensional fix; clearing
+     * the value each time would make the displayed number flicker. The last
+     * real measurement therefore stays visible, and the GPS signal state is already shown next to it.
      */
     private fun publishAltitude(location: Location): Double? {
         val fix = altitudeResolver.resolve(location) ?: return null
@@ -663,21 +663,21 @@ class TrackingService : Service() {
             val currSpeed = if (location.hasSpeed()) location.speed else 0f
             val currTime = location.time
 
-            // Un point sans position précédente ouvre un nouveau tronçon. Cela couvre
-            // le tout premier point d'une trace, la sortie de pause et la reprise
-            // d'une trace existante, sans drapeau partagé entre threads.
+            // A point with no previous position opens a new segment. This covers
+            // the very first point of a track, the exit from pause and the resume
+            // of an existing track, with no flag shared between threads.
             val prevLoc = lastLocation
             val pointDiscontinuous = prevLoc == null
 
-            // Altitude ramenée au niveau de la mer puis lissée. C'est cette valeur qui
-            // est enregistrée, donc aussi celle qui part dans les fichiers GPX — la
-            // balise <ele> est censée être une altitude au-dessus de la mer.
+            // Altitude brought back to sea level then smoothed. This is the value that
+            // is recorded, hence also the one that goes into GPX files — the
+            // <ele> tag is supposed to be an altitude above the sea.
             val currAlt = publishAltitude(location)
 
-            // Le nouveau tronçon coupe aussi la série d'altitudes : l'écart entre
-            // l'endroit quitté et celui où l'on reprend n'est pas un dénivelé parcouru.
-            // On se raccroche au même signal que la discontinuité du tracé, plutôt
-            // qu'à un drapeau écrit depuis le thread principal.
+            // The new segment also cuts the altitude series: the gap between
+            // the place left and the one where we resume is not elevation traveled.
+            // We hook onto the same signal as the track discontinuity, rather
+            // than a flag written from the main thread.
             if (pointDiscontinuous) {
                 elevation.breakSegment()
             }
@@ -690,7 +690,7 @@ class TrackingService : Service() {
                 trackId = trackId,
                 latitude = currLat,
                 longitude = currLng,
-                // 0.0 seulement si aucune altitude n'a jamais pu être obtenue.
+                // 0.0 only if no altitude could ever be obtained.
                 altitude = currAlt ?: lastKnownAltitude ?: 0.0,
                 speed = currSpeed,
                 timestamp = currTime,
@@ -768,23 +768,23 @@ class TrackingService : Service() {
         val pausePrefix = if (isPaused) getString(R.string.notif_paused_prefix) else ""
         val notificationString = pausePrefix + getString(R.string.notif_stats, formattedKm, formattedTime)
 
-        // Le minuteur et l'arrivée d'un point GPS appellent tous deux cette fonction,
-        // chacun à environ une fois par seconde : la moitié des mises à jour
-        // réécrivait donc un texte identique, en traversant le système pour rien.
-        // Sur une sortie de quatre heures, cela faisait une quinzaine de milliers
-        // d'allers-retours inutiles.
+        // The timer and the arrival of a GPS point both call this function,
+        // each about once per second: half of the updates
+        // therefore rewrote an identical text, crossing the system for nothing.
+        // On a four-hour outing, that made about fifteen thousand useless
+        // round trips.
         if (notificationString == lastNotificationText) return
 
-        // Écran éteint : personne ne peut voir cette notification à l'instant où elle
-        // change, la republier à chaque seconde ne fait que consommer pour rien — le
-        // défaut relevé à la demande de l'auteur. Un battement par minute suffit à la
-        // garder à peu près à jour (pour un réveil de l'écran, un aperçu depuis le
-        // volet de notifications), sans reproduire le coût observé en continu.
+        // Screen off: nobody can see this notification at the moment it
+        // changes, republishing it every second only consumes for nothing — the
+        // defect flagged at the author's request. One beat per minute is enough to
+        // keep it roughly up to date (for a screen wake-up, a preview from the
+        // notification shade), without reproducing the continuous cost observed.
         //
-        // `lastNotificationText` n'est délibérément pas mis à jour dans cette
-        // branche : le texte continue de différer à chaque appel tant qu'il change
-        // réellement (secondes qui défilent), ce qui refait passer ce test bon marché
-        // à chaque tick — seul l'appel à notify(), le coûteux, reste retenu.
+        // `lastNotificationText` is deliberately not updated in this
+        // branch: the text keeps differing at each call as long as it really
+        // changes (seconds ticking), which makes this cheap test pass
+        // again at each tick — only the call to notify(), the costly one, stays held back.
         val now = android.os.SystemClock.elapsedRealtime()
         if (!powerManager.isInteractive &&
             now - lastNotifiedAtElapsedRealtime < SCREEN_OFF_NOTIFY_INTERVAL_MS
@@ -805,11 +805,11 @@ class TrackingService : Service() {
         freezeElapsed()
 
         serviceScope.launch {
-            // trackId vaut -1 quand ce service vient tout juste d'être créé pour
-            // recevoir cet arrêt : le précédent avait été tué avec le processus, et
-            // l'interface lui adresse malgré tout ACTION_STOP. Sans ce rattrapage, la
-            // trace restait marquée « en cours » en base pour toujours et revenait à
-            // chaque lancement comme un enregistrement fantôme, impossible à refermer.
+            // trackId is -1 when this service has just been created to
+            // receive this stop: the previous one had been killed with the process, and
+            // the interface sends it ACTION_STOP all the same. Without this catch-up, the
+            // track stayed marked “in progress” in the database forever and came back at
+            // each launch as a phantom recording, impossible to close.
             val finishedTrackId = if (trackId != -1L) {
                 trackId
             } else {
@@ -818,9 +818,9 @@ class TrackingService : Service() {
 
             if (finishedTrackId != -1L) {
                 val live = repository.liveStats.value
-                // Le chronomètre de ce service ne vaut que s'il a lui-même mené
-                // l'enregistrement. Sinon, les statistiques restaurées depuis la base
-                // au lancement de l'application sont les seules qui aient un sens.
+                // This service's stopwatch is only valid if it led the recording
+                // itself. Otherwise, the statistics restored from the database
+                // at app launch are the only ones that make sense.
                 val stats = if (trackId != -1L) live.copy(durationSec = elapsedSeconds) else live
                 repository.finishTracking(finishedTrackId, stats)
                 com.example.util.AutoBackupManager.performAutoBackup(applicationContext, finishedTrackId)
@@ -855,12 +855,12 @@ class TrackingService : Service() {
     }
 
     /**
-     * Gabarit de la notification, construit une seule fois.
+     * Notification template, built only once.
      *
-     * Rien n'y varie que le texte : le titre, l'icône, l'action « Arrêter » et surtout
-     * les deux PendingIntent sont identiques d'un bout à l'autre de l'enregistrement.
-     * Les refabriquer à chaque mise à jour — plusieurs milliers de fois par sortie —
-     * ne produisait que du travail.
+     * Nothing in it varies but the text: the title, the icon, the “Stop” action and above all
+     * the two PendingIntents are identical from one end of the recording to the other.
+     * Rebuilding them at each update — several thousand times per outing —
+     * produced nothing but work.
      */
     private val notificationBuilder: NotificationCompat.Builder by lazy {
         val notificationIntent = Intent(this, MainActivity::class.java).apply {
@@ -928,8 +928,8 @@ class TrackingService : Service() {
         timerJob?.cancel()
         isServiceStopping = true
         removeLocationUpdatesSafely()
-        // Sans ces annulations, les coroutines lancées par le service (dont la boucle
-        // du minuteur et la simulation) survivent à sa destruction.
+        // Without these cancellations, the coroutines launched by the service (including the timer
+        // loop and the simulation) outlive its destruction.
         pointScope.cancel()
         serviceScope.cancel()
         pointExecutor.shutdown()
@@ -941,8 +941,8 @@ class TrackingService : Service() {
         private const val NOTIFICATION_ID = 88231
 
         /**
-         * Cadence minimale de republication de la notification quand l'écran est
-         * éteint. Voir [updateStatsNotification].
+         * Minimum republish rate of the notification when the screen is
+         * off. See [updateStatsNotification].
          */
         private const val SCREEN_OFF_NOTIFY_INTERVAL_MS = 60_000L
 
@@ -951,12 +951,12 @@ class TrackingService : Service() {
         const val ACTION_PAUSE = "com.example.service.action.PAUSE"
         const val ACTION_RESUME = "com.example.service.action.RESUME"
 
-        /** Reprise sans l'application, dans l'état mémorisé en base : voir BootReceiver. */
+        /** Resume without the app, in the state stored in the database: see BootReceiver. */
         const val ACTION_RESTORE = "com.example.service.action.RESTORE"
 
         /**
-         * Cadence des positions en pause, application quittée. Assez courte pour que
-         * l'alerte de perte de signal (45 s hors de l'écran) ne se déclenche pas.
+         * Rate of positions while paused, app left. Short enough that the
+         * signal-loss alert (45 s off screen) does not trigger.
          */
         private const val PAUSED_LOCATION_INTERVAL_MS = 10_000L
         

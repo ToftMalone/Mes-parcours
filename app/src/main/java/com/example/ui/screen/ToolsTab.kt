@@ -112,19 +112,19 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/** Outils disponibles. Le menu s'étoffera au fil des versions. */
+/** Available tools. The menu will grow over versions. */
 private enum class Tool(@StringRes val titleRes: Int) {
     MERGE(R.string.tool_merge),
     SPLIT(R.string.tool_split),
     TRIM(R.string.tool_trim)
 }
 
-/** Où en est un outil : réglages, travail en cours, résultat, ou rien à traiter. */
+/** Where a tool stands: settings, work in progress, result, or nothing to process. */
 private sealed interface ToolPhase {
     data object Form : ToolPhase
     data object Busy : ToolPhase
     data class Done(val title: String, val body: String, val resultTrackId: Long?) : ToolPhase
-    /** Pas assez de parcours pour que l'outil ait un sens. */
+    /** Not enough tracks for the tool to make sense. */
     data class Need(val title: String, val body: String) : ToolPhase
 }
 
@@ -134,14 +134,14 @@ fun ToolsTab(
     onNavigateToDetails: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
-    /** Un outil ouvert prend tout l'écran : la barre de navigation s'efface. */
+    /** An open tool takes the whole screen: the navigation bar disappears. */
     onInToolChanged: (Boolean) -> Unit = {},
     onOpenHistory: () -> Unit = {}
 ) {
     var openTool by remember { mutableStateOf<Tool?>(null) }
 
     LaunchedEffect(openTool) { onInToolChanged(openTool != null) }
-    // Le retour arrière ferme l'outil avant de quitter l'onglet.
+    // Back navigation closes the tool before leaving the tab.
     BackHandler(enabled = openTool != null) { openTool = null }
 
     val close = { openTool = null }
@@ -255,12 +255,12 @@ private fun ToolMenuEntry(
     }
 }
 
-// ------------------------------------------------------ Gabarit commun des outils
+// ------------------------------------------------------ Common tool template
 
 /**
- * Gabarit d'un outil ouvert : en-tête avec retour, contenu défilant, et bouton
- * d'action en bas — ou, selon [phase], l'état « en cours », le résultat, ou l'écran
- * qui explique qu'il manque des parcours.
+ * Template of an open tool: header with back, scrolling content, and an
+ * action button at the bottom — or, depending on [phase], the “in progress” state, the result, or the screen
+ * explaining that tracks are missing.
  */
 @Composable
 private fun ToolScaffold(
@@ -329,7 +329,7 @@ private fun ToolScaffold(
     }
 }
 
-/** Bouton d'action d'un outil : 60 dp, pleine largeur. */
+/** Action button of a tool: 60 dp, full width. */
 @Composable
 private fun ToolActionButton(
     text: String,
@@ -360,7 +360,7 @@ private fun ToolActionButton(
     }
 }
 
-/** Travail en cours : un cookie qui tourne, et une vague qui avance. */
+/** Work in progress: a spinning cookie, and a wave moving along. */
 @Composable
 private fun BusyState(title: String, subtitle: String, modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "tool_busy")
@@ -462,7 +462,7 @@ private fun DoneState(
     }
 }
 
-/** Il manque des parcours pour que l'outil ait un sens. */
+/** Tracks are missing for the tool to make sense. */
 @Composable
 private fun NeedTracksState(title: String, body: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
     Column(
@@ -525,7 +525,7 @@ private fun PillButton(
     }
 }
 
-/** Les deux boutons de fin d'un outil : « Terminé », et l'accès au résultat. */
+/** The two end buttons of a tool: “Done”, and access to the result. */
 @Composable
 private fun DoneButtons(onFinish: () -> Unit, primaryLabel: String?, onPrimary: () -> Unit, primaryTag: String) {
     PillButton(stringResource(R.string.tool_done), onFinish, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface, "tool_done_button")
@@ -534,7 +534,7 @@ private fun DoneButtons(onFinish: () -> Unit, primaryLabel: String?, onPrimary: 
     }
 }
 
-// ------------------------------------------------------------ Briques communes
+// ------------------------------------------------------------ Common building blocks
 
 private fun displayColor(track: Track) = Color(
     TrackStylePreferences.resolveTrackColor(track.displayColor, track.sourceColor, track.isImported, track.isMerged)
@@ -549,7 +549,7 @@ private fun categoryOf(track: Track) = stringResource(
     }
 )
 
-/** Champ de saisie « rempli » de la maquette : fond neutre, trait primaire dessous. */
+/** “Filled” input field from the mockup: neutral background, primary line underneath. */
 @Composable
 private fun FilledField(
     value: String,
@@ -578,7 +578,7 @@ private fun FilledField(
     )
 }
 
-/** Ligne d'explication : icône primaire et texte discret. */
+/** Explanation line: primary icon and discreet text. */
 @Composable
 private fun InfoLine(icon: ImageVector, text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(horizontal = 4.dp)) {
@@ -623,7 +623,7 @@ private fun SwitchCard(title: String, subtitle: String, checked: Boolean, onTogg
     }
 }
 
-/** Parcours choisi pour découper ou rogner ; l'appui ouvre la liste des parcours. */
+/** Track chosen to split or trim; a tap opens the list of tracks. */
 @Composable
 private fun SelectedTrackCard(track: Track, subtitle: String, onClick: () -> Unit) {
     Row(
@@ -651,7 +651,7 @@ private fun SelectedTrackCard(track: Track, subtitle: String, onClick: () -> Uni
     }
 }
 
-/** Choix d'un parcours, dans une feuille : pour découper ou rogner. */
+/** Choice of a track, in a sheet: to split or trim. */
 @Composable
 private fun TrackPickerSheet(tracks: List<Track>, selectedId: Long?, onPick: (Track) -> Unit, onDismiss: () -> Unit) {
     MpSheet(onDismissRequest = onDismiss) {
@@ -705,8 +705,8 @@ private fun TrackPickerSheet(tracks: List<Track>, selectedId: Long?, onPick: (Tr
 }
 
 /**
- * Curseur de la maquette (Material 3 Expressive) : piste épaisse coupée d'un vide
- * de part et d'autre d'une poignée verticale.
+ * Slider from the mockup (Material 3 Expressive): thick track cut by a gap
+ * on either side of a vertical handle.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -758,7 +758,7 @@ private fun MpSlider(
     )
 }
 
-// ------------------------------------------------------------------ Fusionner
+// ------------------------------------------------------------------ Merge
 
 @Composable
 private fun MergeTracksTool(
@@ -778,19 +778,19 @@ private fun MergeTracksTool(
     val selectedTracks = tracks.filter { it.id in selectedSourceIds }.sortedBy { it.startTime }
 
     /**
-     * Le parcours qui accueille les autres est **le plus ancien de la sélection**, et
-     * n'est plus demandé.
+     * The track that hosts the others is **the oldest of the selection**, and
+     * is no longer asked for.
      *
-     * C'était déjà celui que l'écran proposait par défaut, et le choix n'avait guère
-     * de sens à poser : les points sont de toute façon recopiés dans l'ordre
-     * chronologique, si bien que la destination ne change ni le tracé, ni les
-     * statistiques, ni le nom — seulement la ligne de la base qui survit et, avec
-     * elle, la catégorie du résultat. Partir du plus ancien donne la réponse
-     * attendue : la fusion se range là où commence le voyage.
+     * It was already the one the screen proposed by default, and the choice made little
+     * sense to ask: points are copied in chronological order anyway, so
+     * the destination changes neither the line, nor the statistics, nor the name —
+     * only the database row that survives and, with it, the result's category.
+     * Starting from the oldest gives the expected answer: the merge is filed
+     * where the trip begins.
      */
     val destinationTrack = selectedTracks.firstOrNull()
 
-    // Le nom proposé est celui du parcours d'accueil.
+    // The proposed name is that of the host track.
     LaunchedEffect(destinationTrack?.id) {
         destinationTrack?.let { mergedName = it.name }
     }
@@ -888,8 +888,8 @@ private fun MergeTracksTool(
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp)
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Le parcours en cours d'enregistrement n'est pas proposé : le fusionner
-            // supprimerait sa ligne sous le service (voir mergeAndSaveTracks).
+            // The track being recorded is not offered: merging it
+            // would delete its row under the service (see mergeAndSaveTracks).
             tracks.filter { !viewModel.isBeingRecorded(it) }.sortedByDescending { it.startTime }.forEach { track ->
                 val isSelected = track.id in selectedSourceIds
                 MergeTrackRow(track, isSelected) {
@@ -906,8 +906,8 @@ private fun MergeTracksTool(
             testTag = "merged_name_field"
         )
         Spacer(modifier = Modifier.height(12.dp))
-        // La fusion réunit les parcours choisis en un seul : ils ne restent pas à côté.
-        // La maquette promettait l'inverse ; le texte dit ce que fait réellement l'outil.
+        // The merge combines the chosen tracks into one: they do not stay alongside.
+        // The mockup promised the opposite; the text says what the tool really does.
         InfoLine(
             Icons.Rounded.Sort,
             stringResource(R.string.merge_info)
@@ -955,12 +955,12 @@ private fun MergeTrackRow(track: Track, selected: Boolean, onToggle: () -> Unit)
     }
 }
 
-// ------------------------------------------------------------------- Découper
+// ------------------------------------------------------------------- Split
 
 /**
- * Seuils de pause proposés, de 5 minutes à 6 heures. Une liste plutôt qu'un pas
- * régulier : entre 5 et 30 minutes chaque cran compte, au-delà d'une heure seule
- * l'heure compte.
+ * Proposed pause thresholds, from 5 minutes to 6 hours. A list rather than a
+ * regular step: between 5 and 30 minutes every notch counts, beyond an hour only
+ * the hour counts.
  */
 private val PAUSE_STEPS_MINUTES = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 360)
 
@@ -993,8 +993,8 @@ private fun SplitTrackTool(
     var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
     var picking by remember { mutableStateOf(false) }
 
-    // Le nom proposé est celui du parcours choisi : les morceaux s'appelleront
-    // « … (1) », « … (2) », etc.
+    // The proposed name is that of the chosen track: the pieces will be called
+    // “… (1)”, “… (2)”, etc.
     LaunchedEffect(selectedTrack?.id) {
         selectedTrack?.let { baseName = it.name }
     }
@@ -1193,11 +1193,11 @@ private fun SegmentButton(
     }
 }
 
-// --------------------------------------------------------------------- Rogner
+// --------------------------------------------------------------------- Trim
 
-/** Bornes des curseurs de rognage, en minutes, et pas du curseur. */
+/** Bounds of the trim sliders, in minutes, and slider step. */
 private const val TRIM_MAX_MINUTES = 60f
-private const val TRIM_SLIDER_STEPS = 59 // un cran par minute
+private const val TRIM_SLIDER_STEPS = 59 // one notch per minute
 
 @Composable
 private fun TrimTrackTool(
@@ -1222,8 +1222,8 @@ private fun TrimTrackTool(
     var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
     var picking by remember { mutableStateOf(false) }
 
-    // Le nom proposé est celui du parcours choisi, suffixé : le résultat est une
-    // copie, et deux lignes du même nom dans l'historique ne se distingueraient pas.
+    // The proposed name is that of the chosen track, suffixed: the result is a
+    // copy, and two rows of the same name in the history would be indistinguishable.
     LaunchedEffect(selectedTrack?.id) {
         selectedTrack?.let { newName = trimNameFormat.format(it.name) }
     }
@@ -1385,8 +1385,8 @@ private fun TrimSliderCard(label: String, minutes: Int, value: Float, onValueCha
 }
 
 /**
- * Barre de la durée conservée : le parcours entier, dont les bouts retirés sont
- * hachurés, en proportion de leur durée réelle.
+ * Bar of the kept duration: the whole track, with the removed ends
+ * hatched, in proportion to their real duration.
  */
 @Composable
 private fun KeptDurationBar(totalSeconds: Long, dropStartMinutes: Int, dropEndMinutes: Int) {

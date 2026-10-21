@@ -15,31 +15,31 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Le thème sombre de la carte assombrit les tuiles Mapnik par une matrice de
- * couleurs. Trois exigences se sont succédé, et les tests fixent la dernière :
+ * The map's dark theme darkens the Mapnik tiles with a color
+ * matrix. Three requirements followed one another, and the tests pin down the last:
  *
- * 1. `TilesOverlay.INVERT_COLORS`, une inversion nue, teintait les forêts en magenta
- *    et l'eau en brun — inverser retourne la teinte autant que la clarté.
- * 2. Désaturer puis inverser supprimait la dominante, mais aussi toute couleur.
- * 3. Inverser puis tourner les teintes d'un demi-tour rend les couleurs de Mapnik
- *    assombries : c'est le comportement attendu ici.
+ * 1. `TilesOverlay.INVERT_COLORS`, a bare inversion, tinted forests magenta
+ *    and water brown — inverting flips hue as much as lightness.
+ * 2. Desaturating then inverting removed the dominant tint, but also every color.
+ * 3. Inverting then rotating the hues by a half turn gives back Mapnik's colors,
+ *    darkened: that is the expected behavior here.
  *
- * Les assertions portent donc à la fois sur ce qu'il faut obtenir (des teintes
- * reconnaissables et sombres) et sur les deux travers à ne pas retrouver (le magenta,
- * et l'absence de couleur).
+ * The assertions therefore cover both what must be obtained (recognizable
+ * and dark hues) and the two faults not to be found again (magenta,
+ * and the absence of color).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34])
 class DarkTilesColorFilterTest {
 
-    /** Couleurs réellement présentes sur une tuile OpenStreetMap standard. */
+    /** Colors actually present on a standard OpenStreetMap tile. */
     private val grassGreen = Color.rgb(200, 230, 160)
     private val waterBlue = Color.rgb(170, 211, 223)
     private val paperBeige = Color.rgb(242, 239, 233)
     private val midGrey = Color.rgb(128, 128, 128)
 
-    /** Fait passer une couleur unie au travers du filtre et renvoie le résultat. */
+    /** Runs a solid color through the filter and returns the result. */
     private fun applyFilter(color: Int): Int {
         val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         Canvas(bitmap).drawRect(
@@ -52,7 +52,7 @@ class DarkTilesColorFilterTest {
         return bitmap.getPixel(0, 0)
     }
 
-    /** Écart entre la composante la plus forte et la plus faible : 0 = gris pur. */
+    /** Gap between the strongest and weakest component: 0 = pure gray. */
     private fun chroma(color: Int): Int {
         val r = Color.red(color)
         val g = Color.green(color)
@@ -67,75 +67,75 @@ class DarkTilesColorFilterTest {
         "r=${Color.red(color)} g=${Color.green(color)} b=${Color.blue(color)}"
 
     @Test
-    fun `le gazon ressort en vert fonce`() {
+    fun `grass comes out dark green`() {
         val filtered = applyFilter(grassGreen)
         val r = Color.red(filtered)
         val g = Color.green(filtered)
         val b = Color.blue(filtered)
 
-        assertTrue("le vert doit rester la composante dominante : ${describe(filtered)}", g > r && g > b)
-        assertTrue("et le résultat doit être sombre : ${luminance(filtered)}", luminance(filtered) < 90)
+        assertTrue("green must remain the dominant component: ${describe(filtered)}", g > r && g > b)
+        assertTrue("and the result must be dark: ${luminance(filtered)}", luminance(filtered) < 90)
     }
 
     @Test
-    fun `l eau ressort en bleu sombre et non en brun`() {
+    fun `water comes out dark blue and not brown`() {
         val filtered = applyFilter(waterBlue)
         val r = Color.red(filtered)
         val b = Color.blue(filtered)
 
-        // L'inversion nue rendait l'eau brune, c'est-à-dire rouge dominant sur bleu.
-        assertTrue("le bleu doit dominer le rouge : ${describe(filtered)}", b > r)
-        assertTrue("et le résultat doit être sombre : ${luminance(filtered)}", luminance(filtered) < 90)
+        // The bare inversion made water brown, i.e. red dominant over blue.
+        assertTrue("blue must dominate red: ${describe(filtered)}", b > r)
+        assertTrue("and the result must be dark: ${luminance(filtered)}", luminance(filtered) < 90)
     }
 
     @Test
-    fun `le vert ne devient plus magenta`() {
-        // Le défaut d'origine : une inversion pure donne du magenta, soit rouge et
-        // bleu nettement au-dessus du vert.
+    fun `green no longer turns magenta`() {
+        // The original defect: a pure inversion gives magenta, i.e. red and
+        // blue clearly above green.
         val filtered = applyFilter(grassGreen)
         val r = Color.red(filtered)
         val g = Color.green(filtered)
         val b = Color.blue(filtered)
 
-        assertTrue("dominante magenta détectée : ${describe(filtered)}", !(r > g && b > g))
+        assertTrue("magenta dominant tint detected: ${describe(filtered)}", !(r > g && b > g))
     }
 
     @Test
-    fun `les couleurs ne sont pas effacees`() {
-        // La variante désaturée rendait un gris parfait. Les teintes doivent
-        // désormais rester franchement identifiables.
+    fun `colors are not erased`() {
+        // The desaturated variant gave a perfect gray. Hues must now
+        // remain clearly identifiable.
         for ((name, color) in listOf("gazon" to grassGreen, "eau" to waterBlue)) {
             val filtered = applyFilter(color)
             assertTrue(
-                "$name doit garder de la couleur, chroma obtenu = ${chroma(filtered)}",
+                "$name must keep some color, chroma obtained = ${chroma(filtered)}",
                 chroma(filtered) >= 15
             )
         }
     }
 
     @Test
-    fun `le fond clair devient sombre`() {
+    fun `a light background becomes dark`() {
         val filtered = applyFilter(paperBeige)
         assertTrue(
-            "le beige du papier doit ressortir sombre, luminance = ${luminance(filtered)}",
+            "the paper beige must come out dark, luminance = ${luminance(filtered)}",
             luminance(filtered) < 40
         )
 
-        // L'ordre des clartés est renversé : ce qui était le plus clair sur la tuile
-        // est désormais le plus sombre.
+        // The order of lightness is reversed: what was lightest on the tile
+        // is now the darkest.
         assertTrue(
-            "le fond, plus clair que le gazon, doit ressortir plus sombre que lui",
+            "the background, lighter than the grass, must come out darker than it",
             luminance(filtered) < luminance(applyFilter(grassGreen))
         )
     }
 
     @Test
-    fun `les gris restent neutres`() {
-        // Chaque ligne de la matrice de teinte somme à 1 : un gris ne doit pas prendre
-        // de dominante, sans quoi les routes et les libellés se coloreraient.
+    fun `grays stay neutral`() {
+        // Each row of the hue matrix sums to 1: a gray must not take on
+        // a tint, otherwise roads and labels would be colored.
         val filtered = applyFilter(midGrey)
         assertTrue(
-            "un gris moyen doit rester neutre : ${describe(filtered)}",
+            "a mid gray must stay neutral: ${describe(filtered)}",
             chroma(filtered) <= 3
         )
     }

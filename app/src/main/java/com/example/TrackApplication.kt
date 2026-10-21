@@ -15,35 +15,34 @@ class TrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         OsmConfig.init(this)
-        // Les formats (durées, noms de parcours) ont besoin des ressources hors composition.
+        // Formats (durations, track names) need resources outside composition.
         FormatUtils.init(this)
 
-        // Programme la vérification quotidienne de mise à jour — voir
-        // UpdateCheckWorker pour le choix d'une tâche de fond plutôt que d'une
-        // surveillance continue. Sans effet si elle est déjà programmée.
+        // Schedules the periodic update check — see UpdateCheckWorker for why a
+        // background task was chosen over continuous monitoring. No effect if it is
+        // already scheduled.
         UpdateCheckWorker.schedule(this)
 
-        // Marque l'écran d'accueil comme déjà vu sur une installation déjà en usage
-        // avant son introduction — voir OnboardingPreferences.backfillIfAlreadyUsed.
-        // Avant tout accès à la base : l'ouvrir la créerait, et fausserait le résultat.
+        // Marks the welcome screen as already seen on an installation that was in use
+        // before it was introduced — see OnboardingPreferences.backfillIfAlreadyUsed.
+        // Before any database access: opening it would create it and skew the result.
         OnboardingPreferences.backfillIfAlreadyUsed(
             context = this,
             hasExistingDatabase = getDatabasePath("my_tracks_db").exists()
         )
 
-        // Reprise des couleurs, une seule fois, au premier lancement après le passage
-        // aux couleurs par parcours : chaque parcours déjà en base reçoit explicitement
-        // celle qu'il affichait jusqu'ici. Sans cela, un utilisateur ayant réglé ses
-        // couleurs par catégorie verrait tout son historique changer d'apparence sans
-        // avoir rien demandé.
+        // Color backfill, once, on the first launch after the move to per-track colors:
+        // every track already in the database explicitly receives the color it displayed
+        // so far. Without it, a user who had set per-category colors would see their whole
+        // history change appearance without having asked for anything.
         //
-        // Sur un fil d'arrière-plan : c'est une écriture en base, et la migration Room
-        // se déclenche à cette première ouverture. Un échec ne doit pas empêcher
-        // l'application de démarrer — au pire les couleurs se recalculent par défaut.
+        // On a background thread: this is a database write, and the Room migration
+        // runs on this first opening. A failure must not prevent the app from
+        // starting — at worst colors fall back to their defaults.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            // Un import tué avec l'application laisse sa ligne réservée en base, cachée
-            // de l'historique : on la retire ici, aucun import ne pouvant être en cours
-            // au démarrage du processus (voir TrackRepository.importTrackFromUri).
+            // An import killed along with the app leaves its reserved row in the database,
+            // hidden from the history: it is removed here, since no import can be running
+            // at process start (see TrackRepository.importTrackFromUri).
             runCatching {
                 TrackRepository.getInstance(this@TrackApplication).cleanupInterruptedImports()
             }

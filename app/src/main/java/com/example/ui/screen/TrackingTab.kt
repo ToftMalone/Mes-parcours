@@ -103,14 +103,14 @@ enum class AlertState {
     LOST, FOUND
 }
 
-/** État des commandes du bas : chacun redessine le même bouton principal. */
+/** State of the bottom controls: each redraws the same main button. */
 private enum class ControlsMode { IDLE, CHOICE, RECORDING, PAUSED }
 
 /**
- * Écran « Enregistrer » : la carte plein écran, et par-dessus, comme sur la maquette,
- * la pastille d'état du GPS, le bouton de fond de carte, la carte de statistiques et
- * le bouton principal qui se transforme d'un état à l'autre (Démarrer → choix →
- * Pause/Arrêter → Reprendre/Arrêter).
+ * “Record” screen: the full-screen map, and on top of it, as on the mockup,
+ * the GPS status chip, the map background button, the statistics card and
+ * the main button that transforms from one state to another (Start → choice →
+ * Pause/Stop → Resume/Stop).
  */
 @Composable
 fun TrackingTab(
@@ -131,8 +131,8 @@ fun TrackingTab(
     val bypassZoomThreshold by viewModel.bypassZoomThreshold.collectAsState()
     val allTracks by viewModel.allTracks.collectAsState()
 
-    // Démarrer : au premier appui, propose « nouveau parcours » ou « reprendre une
-    // trace » au lieu de démarrer directement — s'il existe une trace à reprendre.
+    // Start: on the first tap, offers “new track” or “resume a
+    // track” instead of starting directly — if there is a track to resume.
     var showStartOptions by remember { mutableStateOf(false) }
     var showResumePicker by remember { mutableStateOf(false) }
 
@@ -148,8 +148,8 @@ fun TrackingTab(
     val currentAltitude by viewModel.currentAltitude.collectAsState()
     val isAppInForeground by viewModel.isAppInForeground.collectAsState()
 
-    // Part de l'état courant : sinon chaque arrivée sur l'onglet, signal déjà
-    // acquis, annonçait « Signal GPS trouvé » comme s'il venait de revenir.
+    // Starts from the current state: otherwise each arrival on the tab, signal already
+    // acquired, announced “GPS signal found” as if it had just come back.
     var delayedGpsStatus by remember { mutableStateOf(gpsStatus) }
     var activeAlertState by remember { mutableStateOf<AlertState?>(null) }
 
@@ -179,8 +179,8 @@ fun TrackingTab(
             }
         } else if (gpsStatus == GpsStatus.SEARCHING) {
             val wasFound = delayedGpsStatus == GpsStatus.FOUND
-            // Trois secondes de confirmation avant d'annoncer une perte : un passage
-            // sous un pont ne mérite pas une alerte.
+            // Three seconds of confirmation before announcing a loss: passing
+            // under a bridge does not deserve an alert.
             kotlinx.coroutines.delay(3000L)
             if (gpsStatus == GpsStatus.SEARCHING) {
                 delayedGpsStatus = gpsStatus
@@ -201,14 +201,14 @@ fun TrackingTab(
     val currentAlt = currentAltitude?.metersAboveSeaLevel
     val currentSpeed = currentUserLocation?.speed?.toDouble() ?: liveStats.currentSpeedMps
 
-    // Hauteur de la carte de statistiques, pour poser le bandeau des tracés masqués
-    // juste en dessous : elle grandit quand un enregistrement démarre.
+    // Height of the statistics card, to place the hidden tracks banner
+    // just below it: it grows when a recording starts.
     var statsCardHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val zoomBannerTop = with(density) { statsCardHeightPx.toDp() } + 36.dp
 
     val startNew = {
-        viewModel.startRecording(context, context.getString(R.string.track_new_name), "Parcours")
+        viewModel.startRecording(context, context.getString(R.string.track_new_name), "Track")
         showStartOptions = false
     }
 
@@ -237,10 +237,10 @@ fun TrackingTab(
             onViewportChanged = { viewModel.updateMapViewport(it) }
         )
 
-        // --- Haut de l'écran : la carte de statistiques, à la place qu'occupait
-        // l'ancien bandeau d'altitude — à la demande de l'auteur, qui a gardé le
-        // dessin de la maquette mais voulu retrouver la disposition d'avant. Les
-        // alertes de signal la recouvrent le temps de s'afficher, comme avant.
+        // --- Top of the screen: the statistics card, in the place the
+        // old altitude banner occupied — at the author's request, who kept the
+        // mockup's design but wanted the former layout back. Signal
+        // alerts cover it while they are displayed, as before.
         if (hasLocationPermission) {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -287,8 +287,8 @@ fun TrackingTab(
             )
         }
 
-        // --- Bas de l'écran, à droite, comme avant et aux mêmes tailles : recentrage
-        // (56 dp), puis le bouton secondaire (56 dp) et le bouton principal (72 dp).
+        // --- Bottom of the screen, on the right, as before and at the same sizes: recenter
+        // (56 dp), then the secondary button (56 dp) and the main button (72 dp).
         if (hasLocationPermission) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -352,7 +352,7 @@ fun TrackingTab(
     }
 }
 
-// ------------------------------------------------------------------ Pastilles
+// ------------------------------------------------------------------ Chips
 
 @Composable
 private fun GpsChip(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
@@ -395,10 +395,10 @@ private fun GpsAlert(lost: Boolean, subtitle: String, modifier: Modifier = Modif
 }
 
 /**
- * État du GPS dans la carte de statistiques, comme le point de l'ancien bandeau :
- * plein quand le signal est là, qui pulse pendant la recherche. L'animation infinie
- * ne vit que pendant la recherche — une horloge d'animation permanente empêcherait
- * le processeur de se reposer (voir « Audit batterie de la 1.2 »).
+ * GPS state in the statistics card, like the dot of the old banner:
+ * solid when the signal is there, pulsing during the search. The infinite animation
+ * only lives during the search — a permanent animation clock would keep
+ * the processor from resting (see “Battery audit of 1.2”).
  */
 @Composable
 private fun GpsDot(found: Boolean) {
@@ -432,7 +432,7 @@ private fun GpsDot(found: Boolean) {
     }
 }
 
-// ------------------------------------------------------------------ Statistiques
+// ------------------------------------------------------------------ Statistics
 
 private fun kmValue(meters: Double) = String.format(Locale.getDefault(), "%.2f", meters / 1000.0)
 
@@ -441,9 +441,9 @@ private fun speedValue(mps: Double) = String.format(Locale.getDefault(), "%.1f",
 private fun altitudeValue(meters: Double?) = meters?.let { Math.round(it).toString() } ?: "—"
 
 /**
- * Chiffres qui défilent un à un, comme un compteur mécanique : seul le chiffre qui
- * change bouge. Les positions sont comptées depuis la droite, pour qu'un chiffre de
- * plus à gauche (« 9,99 » → « 10,00 ») ne fasse pas rouler tous les autres.
+ * Digits that scroll one by one, like a mechanical counter: only the digit that
+ * changes moves. Positions are counted from the right, so that an extra digit on the
+ * left (“9.99” → “10.00”) does not make all the others roll.
  */
 @Composable
 private fun RollingNumber(text: String, style: TextStyle, modifier: Modifier = Modifier) {
@@ -468,10 +468,10 @@ private fun RollingNumber(text: String, style: TextStyle, modifier: Modifier = M
 }
 
 /**
- * Bandeau de statistiques, **à la taille de l'ancien** — une seule rangée de
- * chiffres, à la demande de l'auteur qui voulait garder la place d'avant pour la
- * carte — mais dans le dessin de la refonte : fond de surface, Bricolage pour les
- * chiffres, unités dans les libellés, point d'état du GPS à droite.
+ * Statistics banner, **at the size of the old one** — a single row of
+ * figures, at the author's request, who wanted to keep the former space for the
+ * map — but in the redesign's look: surface background, Bricolage for the
+ * figures, units in the labels, GPS status dot on the right.
  */
 @Composable
 private fun StatsCard(
@@ -503,8 +503,8 @@ private fun StatsCard(
             .testTag("live_stats_panel")
     ) {
         if (recording) {
-            // Point d'enregistrement devant la distance ; il passe à l'orange de la
-            // pause quand l'enregistrement est suspendu.
+            // Recording dot in front of the distance; it turns to the pause
+            // orange when the recording is suspended.
             Box(
                 modifier = Modifier
                     .padding(end = 10.dp)
@@ -513,8 +513,8 @@ private fun StatsCard(
                     .background(if (mode == ControlsMode.PAUSED) colors.tertiary else LocalRecordingColor.current)
                     .testTag(if (mode == ControlsMode.PAUSED) "stats_paused_dot" else "stats_recording_dot")
             )
-            // Distance, vitesse, altitude : les trois chiffres du bandeau d'avant. La
-            // durée n'y figure pas, à la demande de l'auteur.
+            // Distance, speed, altitude: the three figures of the former banner. The
+            // duration is not shown, at the author's request.
             CompactStat(stringResource(R.string.stat_distance), kmValue(stats.distanceMeters), "km", value, Modifier.weight(1f))
             CompactStat(stringResource(R.string.stat_speed), speedValue(currentSpeedMps), "km/h", value, Modifier.weight(1f))
             CompactStat(stringResource(R.string.stat_altitude), altitudeValue(currentAltitude), "m", value, Modifier.weight(1f))
@@ -538,8 +538,8 @@ private fun CompactStat(label: String, value: String, unit: String?, style: Text
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 2.dp)) {
             RollingNumber(value, style)
             if (unit != null) {
-                // Hauteur de ligne explicite : héritée du style par défaut (24 sp), elle
-                // rendait l'unité plus haute que le chiffre, qui la calait alors en haut.
+                // Explicit line height: inherited from the default style (24 sp), it
+                // made the unit taller than the figure, which then pinned it to the top.
                 Text(
                     unit,
                     fontSize = 10.sp,
@@ -554,11 +554,11 @@ private fun CompactStat(label: String, value: String, unit: String?, style: Text
     }
 }
 
-// ------------------------------------------------------------------ Commandes
+// ------------------------------------------------------------------ Controls
 
 /**
- * Bouton rond de la refonte, aux tailles des boutons d'avant : 72 dp pour l'action
- * principale, 56 dp pour les secondaires, 48 dp pour annuler.
+ * Round button of the redesign, at the sizes of the former buttons: 72 dp for the main
+ * action, 56 dp for the secondary ones, 48 dp for cancel.
  */
 @Composable
 private fun RoundButton(
@@ -590,9 +590,9 @@ private fun RoundButton(
 }
 
 /**
- * Bouton rond qui apparaît en grossissant : une échelle ne rogne rien,
- * contrairement à une transition d'AnimatedVisibility, et l'opacité reste franche
- * (voir « L'ombre tranchée » dans CLAUDE.md).
+ * Round button that appears by growing: a scale clips nothing,
+ * unlike an AnimatedVisibility transition, and the opacity stays solid
+ * (see “The sliced shadow” in CLAUDE.md).
  */
 @Composable
 private fun PoppingRoundButton(
@@ -612,7 +612,7 @@ private fun PoppingRoundButton(
     }
 }
 
-/** Ce que montre le bouton principal dans un état donné. */
+/** What the main button shows in a given state. */
 private class MainButton(
     val icon: ImageVector,
     val description: String,
@@ -623,11 +623,11 @@ private class MainButton(
 )
 
 /**
- * Les boutons d'enregistrement, en colonne et aux tailles d'avant, dans le dessin de
- * la refonte. Le bouton du bas (72 dp) est toujours l'action principale : Démarrer,
- * Nouveau parcours pendant le choix, Arrêter pendant l'enregistrement. Au-dessus
- * (56 dp) : Pause ou Reprendre, ou « Reprendre une trace » pendant le choix ; et
- * au-dessus encore, pendant le choix seulement, Annuler (48 dp).
+ * The recording buttons, in a column and at the former sizes, in the redesign's
+ * look. The bottom button (72 dp) is always the main action: Start,
+ * New track during the choice, Stop during recording. Above it
+ * (56 dp): Pause or Resume, or “Resume a track” during the choice; and
+ * higher still, during the choice only, Cancel (48 dp).
  */
 @Composable
 private fun RecordingControls(
@@ -680,8 +680,8 @@ private fun RecordingControls(
             ControlsMode.IDLE -> Unit
         }
 
-        // Le bouton principal : un seul composant, qui change de couleur et d'icône
-        // d'un état à l'autre plutôt que d'être remplacé.
+        // The main button: a single component, which changes color and icon
+        // from one state to another rather than being replaced.
         val main = when (mode) {
             ControlsMode.IDLE -> MainButton(Icons.Rounded.RadioButtonChecked, stringResource(R.string.action_start), colors.primary, colors.onPrimary, "action_fab", onStart)
             ControlsMode.CHOICE -> MainButton(Icons.Rounded.AddLocationAlt, stringResource(R.string.action_new_track), colors.primary, colors.onPrimary, "start_new_track_fab", onNewTrack)
@@ -691,7 +691,7 @@ private fun RecordingControls(
     }
 }
 
-// ------------------------------------------------------------------ Reprise
+// ------------------------------------------------------------------ Resume
 
 @Composable
 private fun ResumeTrackPickerSheet(
@@ -767,8 +767,8 @@ private fun ResumeTrackPickerSheet(
 // ------------------------------------------------------------------ Permission
 
 /**
- * Sans localisation : la carte reste visible mais voilée, et une carte explique ce
- * qui manque — plutôt qu'un écran vide qui ne dit pas où l'on est.
+ * Without location: the map stays visible but veiled, and a card explains what
+ * is missing — rather than an empty screen that does not say where you are.
  */
 @Composable
 private fun PermissionDeniedOverlay(onGrantClick: () -> Unit) {

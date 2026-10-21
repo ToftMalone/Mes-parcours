@@ -7,29 +7,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Garde-fou sur l'invariant nº 2 de CLAUDE.md : toute version de schéma vient avec sa
+ * Safeguard on invariant no. 2 of CLAUDE.md: every schema version comes with its
  * migration.
  *
- * Ce n'est pas une précaution théorique. Une migration manquante fait échouer
- * l'ouverture de la base sur l'appareil d'un utilisateur qui met à jour — et avant
- * `fallbackToDestructiveMigrationOnDowngrade`, elle effaçait tous ses parcours sans
- * un mot. Le défaut ne se voit jamais en développement, où l'on installe le plus
- * souvent par-dessus une base déjà à la bonne version, et ne se manifeste que chez
- * ceux qui viennent d'une version antérieure.
+ * This is not a theoretical precaution. A missing migration makes the opening of
+ * the database fail on the device of a user who updates — and before
+ * `fallbackToDestructiveMigrationOnDowngrade`, it erased all their tracks without
+ * a word. The defect is never seen in development, where we most often install
+ * on top of a database already at the right version, and only shows up for
+ * those coming from an earlier version.
  *
- * Le test relit la chaîne réellement déclarée, sans la recopier : recopier laisserait
- * passer exactement l'oubli que l'on cherche à empêcher.
+ * The test rereads the chain actually declared, without copying it: copying would let
+ * through exactly the omission we are trying to prevent.
  */
 class MigrationChainTest {
 
     private val declaredVersion: Int = DATABASE_VERSION
 
-    /** Version la plus ancienne encore rattrapable, celle d'où part la première migration. */
+    /** Oldest version still reachable, the one the first migration starts from. */
     private val oldestSupported: Int =
         AppDatabase.MIGRATIONS.minOf { it.startVersion }
 
     @Test
-    fun `les migrations forment une chaine continue jusqu a la version declaree`() {
+    fun `migrations form a continuous chain up to the declared version`() {
         val steps = AppDatabase.MIGRATIONS
             .associateBy { it.startVersion }
 
@@ -37,14 +37,14 @@ class MigrationChainTest {
         while (version < declaredVersion) {
             val step = steps[version]
             assertTrue(
-                "Aucune migration ne part de la version $version : une base en $version " +
-                        "ne peut pas atteindre la version $declaredVersion. Ajoutez " +
-                        "MIGRATION_${version}_${version + 1} dans AppDatabase.",
+                "No migration starts from version $version: a database at version $version " +
+                        "cannot reach version $declaredVersion. Add " +
+                        "MIGRATION_${version}_${version + 1} to AppDatabase.",
                 step != null
             )
             assertEquals(
-                "La migration partant de $version doit mener à ${version + 1} : " +
-                        "un saut de version laisse un trou dans la chaîne.",
+                "The migration starting from $version must lead to ${version + 1}: " +
+                        "a version jump leaves a hole in the chain.",
                 version + 1,
                 step!!.endVersion
             )
@@ -52,17 +52,17 @@ class MigrationChainTest {
         }
 
         assertEquals(
-            "La dernière migration doit mener à la version déclarée par @Database.",
+            "The last migration must lead to the version declared by @Database.",
             declaredVersion,
             version
         )
     }
 
     @Test
-    fun `aucune version de depart n est declaree deux fois`() {
+    fun `no starting version is declared twice`() {
         val starts = AppDatabase.MIGRATIONS.map { it.startVersion }
         assertEquals(
-            "Deux migrations partent de la même version : Room ne saurait pas laquelle " +
+            "Two migrations start from the same version: Room would not know which " +
                     "appliquer.",
             starts.size,
             starts.distinct().size
@@ -70,11 +70,11 @@ class MigrationChainTest {
     }
 
     @Test
-    fun `aucune migration ne depasse la version declaree`() {
+    fun `no migration exceeds the declared version`() {
         val tooFar = AppDatabase.MIGRATIONS.filter { it.endVersion > declaredVersion }
         assertTrue(
-            "Migration(s) menant au-delà de la version déclarée ($declaredVersion) : " +
-                    "$tooFar. La version de @Database a-t-elle été oubliée ?",
+            "Migration(s) leading beyond the declared version ($declaredVersion): " +
+                    "$tooFar. Was the @Database version forgotten?",
             tooFar.isEmpty()
         )
     }

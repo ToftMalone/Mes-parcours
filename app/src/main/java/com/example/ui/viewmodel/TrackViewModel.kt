@@ -34,24 +34,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 
 /**
- * Cadence maximale de rechargement des points quand la carte bouge.
+ * Maximum rate at which points are reloaded when the map moves.
  *
- * **`sample` et non `debounce`, et c'est tout le sujet.** `debounce` n'émet qu'après
- * un silence — ici 250 ms sans nouvelle zone. Or osmdroid notifie `onScroll` à chaque
- * image de ses animations : `MapController.onAnimationUpdate` appelle `setMapCenter`
- * une soixantaine de fois par seconde, et chaque appel descend dans `MapView.scrollTo`
- * qui prévient les écouteurs. En suivi automatique, `animateTo` est relancé à chaque
- * position GPS pour une animation d'une seconde : les animations s'enchaînent sans
- * interruption, le silence n'arrive donc jamais, et `debounce` n'émettait tout
- * simplement plus rien. Les tracés restaient figés sur la silhouette grossière
- * calculée au moment où le mode avait été activé — de longues lignes droites entre
- * des points très espacés — jusqu'à ce qu'un geste coupe le suivi, arrête les
- * animations, laisse enfin passer le silence et recharge tout d'un coup.
+ * **`sample` and not `debounce`, and that is the whole point.** `debounce` only emits after
+ * a silence — here 250 ms without a new area. But osmdroid notifies `onScroll` on every
+ * frame of its animations: `MapController.onAnimationUpdate` calls `setMapCenter`
+ * about sixty times a second, and each call goes down into `MapView.scrollTo`
+ * which notifies the listeners. In automatic following, `animateTo` is relaunched at each
+ * GPS position for a one-second animation: the animations chain without
+ * interruption, so the silence never comes, and `debounce` simply no longer emitted
+ * anything. Tracks stayed frozen on the coarse silhouette
+ * computed when the mode had been activated — long straight lines between
+ * widely spaced points — until a gesture cut the following, stopped the
+ * animations, finally let the silence through and reloaded everything at once.
  *
- * `sample` renverse la logique : il émet la zone la plus récente à intervalle
- * régulier tant qu'il en arrive, et laisse passer la dernière une fois le flux tari.
- * Un flux continu ne peut donc plus l'affamer, et une carte qui s'arrête est quand
- * même servie.
+ * `sample` reverses the logic: it emits the most recent area at a regular
+ * interval as long as some arrive, and lets the last one through once the flow dries up.
+ * A continuous flow can therefore no longer starve it, and a map that stops is
+ * still served.
  */
 private const val VIEWPORT_SAMPLE_MS = 500L
 
@@ -59,8 +59,8 @@ private const val VIEWPORT_SAMPLE_MS = 500L
 class TrackViewModel(private val repository: TrackRepository, private val appContext: Context) : ViewModel() {
 
     /**
-     * Zone actuellement visible sur la carte. Pilote le niveau de détail des tracés
-     * denses : seuls les points de cette zone sont chargés en pleine résolution.
+     * Area currently visible on the map. Drives the level of detail of dense
+     * tracks: only the points of this area are loaded at full resolution.
      */
     private val _mapViewport = MutableStateFlow<MapViewport?>(null)
 
@@ -175,9 +175,9 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
 
         viewModelScope.launch {
-            // En pause, les positions arrivent volontairement au compte-gouttes (voir
-            // TrackingService.requestLocationUpdates) et rien ne s'enregistre : un
-            // silence n'y est pas une perte de signal à signaler.
+            // While paused, positions deliberately arrive in a trickle (see
+            // TrackingService.requestLocationUpdates) and nothing is recorded: a
+            // silence there is not a signal loss to report.
             combine(
                 repository.isAppInForeground, repository.gpsStatus, repository.isTracking, repository.isPaused
             ) { inForeground, status, isTracking, isPaused ->
@@ -218,7 +218,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
 
     val currentUserLocation: StateFlow<TrackPoint?> = repository.currentUserLocation
 
-    /** Altitude au-dessus du niveau de la mer, null si aucune mesure exploitable. */
+    /** Altitude above sea level, null if no usable measurement. */
     val currentAltitude: StateFlow<com.example.util.AltitudeFix?> = repository.currentAltitude
 
     fun updateUserLocation(location: TrackPoint?) {
@@ -241,22 +241,22 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Tracés à superposer sur la carte, chacun avec de quoi choisir sa couleur.
+     * Tracks to overlay on the map, each with what is needed to choose its color.
      *
-     * **`conflate()` et non `flatMapLatest`.** `flatMapLatest` annule la lecture en
-     * cours dès qu'une nouvelle zone arrive. Hors suivi automatique, les zones
-     * n'arrivent qu'aux gestes de l'utilisateur et cela ne se voyait pas ; mais en
-     * mode focus, la zone est republiée à chaque seconde, et toute lecture plus
-     * longue qu'une seconde était donc annulée avant d'avoir rien produit. Elle
-     * repartait de zéro au tour suivant pour être annulée de nouveau : les tracés
-     * cessaient purement et simplement de se charger tant que le mode restait actif.
-     * C'est ce qui expliquait qu'un geste manuel — qui coupe le suivi, donc les
-     * republications — fasse tout réapparaître d'un coup.
+     * **`conflate()` and not `flatMapLatest`.** `flatMapLatest` cancels the read in
+     * progress as soon as a new area arrives. Outside automatic following, areas
+     * only arrive on the user's gestures and this was not visible; but in
+     * focus mode, the area is republished every second, and any read longer
+     * than a second was therefore cancelled before producing anything. It
+     * restarted from zero on the next turn to be cancelled again: tracks
+     * simply stopped loading as long as the mode stayed active.
+     * That is what explained why a manual gesture — which cuts the following, hence
+     * the republications — made everything reappear at once.
      *
-     * `conflate()` ne coupe jamais une lecture commencée : les zones qui arrivent
-     * pendant qu'elle travaille s'écrasent les unes les autres, et c'est la plus
-     * récente qui est traitée une fois la précédente terminée. Le résultat arrive
-     * peut-être avec un tour de retard, mais il arrive.
+     * `conflate()` never cuts a read that has started: the areas that arrive
+     * while it works overwrite one another, and it is the most
+     * recent that is processed once the previous one is finished. The result arrives
+     * perhaps one turn late, but it arrives.
      */
     val selectedImportedPoints: StateFlow<List<MapTrack>> = combine(
         repository.getSelectedImportedTracksFlow(),
@@ -305,12 +305,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             initialValue = null
         )
 
-    // Points destinés à l'affichage uniquement : sous-échantillonnés hors de la zone
-    // visible pour les traces très denses. Ne jamais s'en servir pour exporter —
-    // l'export relit la totalité des points en base (voir exportToUri).
+    // Points meant for display only: subsampled outside the visible area
+    // for very dense tracks. Never use them to export —
+    // the export rereads all the points in the database (see exportToUri).
     //
-    // `conflate()` pour la même raison que selectedImportedPoints : une lecture
-    // commencée doit pouvoir aller à son terme, même si la zone bouge entre-temps.
+    // `conflate()` for the same reason as selectedImportedPoints: a read that has
+    // started must be able to run to completion, even if the area moves in the meantime.
     val selectedTrackPoints: StateFlow<List<TrackPoint>> = combine(
         _selectedTrackId,
         _mapViewport.sample(VIEWPORT_SAMPLE_MS)
@@ -363,7 +363,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         context.startService(intent)
     }
 
-    /** Reprend l'enregistrement sur un nouveau tronçon, jamais raccordé au précédent. */
+    /** Resumes the recording on a new segment, never joined to the previous one. */
     fun resumeRecording(context: Context) {
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_RESUME
@@ -372,9 +372,9 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Fixe l'apparence d'un parcours : sa couleur, ou l'automatique avec [color] à
-     * null — auquel cas il retrouve la couleur de son fichier d'origine s'il en a
-     * une — et l'épaisseur de son trait, en dp.
+     * Sets a track's appearance: its color, or automatic with [color] at
+     * null — in which case it gets back the color of its original file if it has
+     * one — and its line thickness, in dp.
      */
     fun setTrackStyle(track: Track, color: Int?, widthDp: Float) {
         if (track.displayColor == color && track.displayWidthDp == widthDp) return
@@ -392,8 +392,8 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Supprime un parcours. [onResult] reçoit false si la suppression a été refusée
-     * parce que le parcours est en cours d'enregistrement (voir
+     * Deletes a track. [onResult] receives false if the deletion was refused
+     * because the track is being recorded (see
      * `TrackRepository.deleteTrack`).
      */
     fun deleteTrack(trackId: Long, onResult: (Boolean) -> Unit = {}) {
@@ -406,7 +406,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
-    /** Vrai pour le parcours qu'un enregistrement alimente : ni fusion ni suppression. */
+    /** True for the track a recording feeds: neither merging nor deletion. */
     fun isBeingRecorded(track: Track): Boolean = repository.isBeingRecorded(track)
 
     fun selectTrack(trackId: Long?) {
@@ -455,11 +455,11 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Découpe un parcours en plusieurs, et renvoie les identifiants créés.
+     * Splits a track into several, and returns the identifiers created.
      *
-     * La lecture des points se fait sur [kotlinx.coroutines.Dispatchers.IO] comme
-     * pour la fusion : elle relit tout le parcours et n'a rien à faire sur le thread
-     * principal.
+     * Reading the points happens on [kotlinx.coroutines.Dispatchers.IO] as
+     * for merging: it rereads the whole track and has no business on the main
+     * thread.
      */
     fun splitTrack(
         trackId: Long,
@@ -484,9 +484,9 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    // Le message porté par l'exception est déjà rédigé pour être lu
-                    // (« il n'y a rien à découper »…) : le préfixer le rendrait moins
-                    // clair, pas plus.
+                    // The message carried by the exception is already written to be read
+                    // (“there is nothing to split”…): prefixing it would make it less
+                    // clear, not more.
                     onError(e.userMessage(appContext, R.string.err_split_failed))
                 }
             }
@@ -494,10 +494,10 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Rogne le début et/ou la fin d'un parcours, et renvoie l'identifiant créé.
+     * Trims the start and/or the end of a track, and returns the identifier created.
      *
-     * Sur [kotlinx.coroutines.Dispatchers.IO] comme le découpage : la lecture parcourt
-     * tous les points et n'a rien à faire sur le thread principal.
+     * On [kotlinx.coroutines.Dispatchers.IO] like splitting: the read walks through
+     * all the points and has no business on the main thread.
      */
     fun trimTrack(
         trackId: Long,
@@ -522,8 +522,8 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    // Même raison que pour le découpage : le message de l'exception est
-                    // déjà rédigé pour être lu tel quel.
+                    // Same reason as for splitting: the exception's message is
+                    // already written to be read as is.
                     onError(e.userMessage(appContext, R.string.err_trim_failed))
                 }
             }
@@ -533,10 +533,10 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     // ------------------------------------------------------------------
     // Export
     //
-    // L'export relit toujours la totalité des points en base, page par page. Il ne
-    // dépend jamais de la liste affichée, qui est sous-échantillonnée hors de la
-    // zone visible pour les traces denses. Un fichier exporté contient donc
-    // exactement les points importés.
+    // The export always rereads all the points in the database, page by page. It
+    // never depends on the displayed list, which is subsampled outside the
+    // visible area for dense tracks. An exported file therefore contains
+    // exactly the imported points.
     // ------------------------------------------------------------------
 
     private enum class ExportFormat(val extension: String) {
@@ -591,12 +591,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     /**
-     * Ouvre la destination en la vidant d'abord (mode « wt »).
+     * Opens the destination, emptying it first (mode “wt”).
      *
-     * Le mode par défaut, « w », ne tronque pas le fichier chez certains fournisseurs
-     * de documents : écraser un ancien export plus long laissait sa fin derrière le
-     * nouveau contenu, et le GPX obtenu n'était plus lisible. Un fournisseur qui ne
-     * connaîtrait pas « wt » retombe sur « w », qui vaut toujours mieux qu'un échec.
+     * The default mode, “w”, does not truncate the file with some document
+     * providers: overwriting an older, longer export left its tail behind the
+     * new content, and the resulting GPX was no longer readable. A provider that
+     * does not know “wt” falls back to “w”, which is always better than a failure.
      */
     private fun openTruncating(context: Context, uri: android.net.Uri): java.io.OutputStream? =
         try {

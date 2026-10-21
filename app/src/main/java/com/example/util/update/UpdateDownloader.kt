@@ -19,17 +19,17 @@ import java.net.URL
 import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
 
-/** Empreinte en hexadécimal minuscule, la forme qu'emploie `sha256sum`. */
+/** Fingerprint in lowercase hexadecimal, the form `sha256sum` uses. */
 private fun ByteArray.toHexString(): String =
     joinToString("") { "%02x".format(it) }
 
 /**
- * Téléchargement de l'APK d'une nouvelle version, puis passage de relais à
- * l'installateur d'Android.
+ * Download of the APK of a new version, then handing over to
+ * Android's installer.
  *
- * L'installation silencieuse est impossible pour une application ordinaire : le
- * système affiche toujours son propre écran de confirmation. Tout ce que l'on peut
- * faire, c'est lui présenter le fichier.
+ * Silent installation is impossible for an ordinary app: the
+ * system always shows its own confirmation screen. All we can
+ * do is present it with the file.
  */
 object UpdateDownloader {
 
@@ -37,22 +37,22 @@ object UpdateDownloader {
     private const val BUFFER_SIZE = 64 * 1024
 
     /**
-     * Dossier de destination, dans le stockage **interne** de l'application.
+     * Destination folder, in the app's **internal** storage.
      *
-     * Le stockage externe conviendrait par bien des aspects — aucune permission
-     * requise, effacé avec l'application — mais il reste modifiable par toute autre
-     * application détenant la permission de stockage sur Android 9 et antérieur, que
-     * l'on continue de couvrir. Or l'empreinte est vérifiée pendant l'écriture,
-     * plusieurs secondes avant que l'utilisateur n'appuie sur « Installer » : dans
-     * cet intervalle, un fichier posé là pouvait être remplacé, et la vérification
-     * déjà faite ne protégeait plus rien. Android refuse bien un APK signé d'une
-     * autre clé **portant le même nom de paquet**, mais un APK au nom de paquet
-     * différent s'installerait sans obstacle — validé de confiance par un
-     * utilisateur en pleine mise à jour.
+     * External storage would suit in many respects — no permission
+     * required, erased with the app — but it remains modifiable by any other
+     * app holding the storage permission on Android 9 and earlier, which
+     * we still cover. Yet the fingerprint is checked during writing,
+     * several seconds before the user taps “Install”: in that
+     * interval, a file placed there could be replaced, and the check
+     * already done protected nothing any more. Android does refuse an APK signed with another
+     * key **bearing the same package name**, but an APK with a different package
+     * name would install without obstacle — trusted by a
+     * user in the middle of an update.
      *
-     * Le stockage interne, lui, est inaccessible aux autres applications sur toutes
-     * les versions d'Android. D'où aussi l'entrée `files-path` de `file_paths.xml` :
-     * c'est le FileProvider qui expose ensuite le fichier au seul installateur.
+     * Internal storage, for its part, is inaccessible to other apps on all
+     * versions of Android. Hence also the `files-path` entry of `file_paths.xml`:
+     * it is the FileProvider that then exposes the file to the installer alone.
      */
     private fun downloadDir(context: Context): File =
         File(context.filesDir, "updates")
@@ -64,11 +64,11 @@ object UpdateDownloader {
     }
 
     /**
-     * Télécharge l'APK en signalant l'avancement de 0 à 1.
+     * Downloads the APK while reporting progress from 0 to 1.
      *
-     * Renvoie null si le téléchargement échoue. L'écriture se fait dans un fichier
-     * temporaire renommé à la fin : un téléchargement interrompu ne laisse jamais un
-     * APK tronqué que l'on tenterait ensuite d'installer.
+     * Returns null if the download fails. Writing goes to a temporary
+     * file renamed at the end: an interrupted download never leaves a truncated
+     * APK that one would then try to install.
      */
     suspend fun download(
         context: Context,
@@ -91,8 +91,8 @@ object UpdateDownloader {
             val total = connection.contentLength.toLong()
             var downloaded = 0L
 
-            // Empreinte calculée pendant l'écriture : relire le fichier ensuite
-            // doublerait les entrées-sorties pour rien.
+            // Fingerprint computed while writing: rereading the file afterwards
+            // would double the I/O for nothing.
             val digest = MessageDigest.getInstance("SHA-256")
 
             partial.delete()
@@ -100,8 +100,8 @@ object UpdateDownloader {
                 partial.outputStream().use { output ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     while (true) {
-                        // Rend le téléchargement annulable : fermer la boîte de
-                        // dialogue annule la coroutine, et l'on s'arrête ici.
+                        // Makes the download cancellable: closing the dialog
+                        // cancels the coroutine, and we stop here.
                         coroutineContext.ensureActive()
 
                         val read = input.read(buffer)
@@ -115,20 +115,20 @@ object UpdateDownloader {
                 }
             }
 
-            // Taille annoncée non respectée : le fichier est incomplet.
+            // Announced size not met: the file is incomplete.
             //
-            // Ce contrôle ne suffit pas à lui seul : `contentLength` vaut -1 quand le
-            // serveur répond en découpage par blocs, et l'on ne saurait alors pas
-            // qu'un téléchargement s'est arrêté en route. C'est l'empreinte qui
-            // tranche vraiment, quand la publication en annonce une.
+            // This check is not enough on its own: `contentLength` is -1 when the
+            // server answers with chunked encoding, and we would then not know
+            // that a download stopped midway. It is the fingerprint that
+            // really decides, when the release announces one.
             if (total > 0 && partial.length() != total) {
                 partial.delete()
                 return@withContext null
             }
 
             if (update.sha256 != digest.digest().toHexString()) {
-                // Fichier corrompu, tronqué, ou servi par autre chose que la
-                // publication attendue : on ne le présente pas à l'installateur.
+                // File corrupted, truncated, or served by something other than the
+                // expected release: we do not present it to the installer.
                 partial.delete()
                 return@withContext null
             }
@@ -139,8 +139,8 @@ object UpdateDownloader {
                 return@withContext null
             }
 
-            // Après le renommage, pas avant : l'analyseur d'archives d'Android n'a
-            // à lire qu'un fichier portant l'extension attendue.
+            // After the rename, not before: Android's archive parser must
+            // only read a file bearing the expected extension.
             if (!isExpectedApk(context, target, update)) {
                 target.delete()
                 return@withContext null
@@ -156,30 +156,30 @@ object UpdateDownloader {
     }
 
     /**
-     * L'APK téléchargé est-il bien une mise à jour de **cette** application, dans la
-     * version annoncée ?
+     * Is the downloaded APK really an update of **this** application, in the
+     * announced version?
      *
-     * L'empreinte SHA-256 ne répond pas à cette question : elle vient du même
-     * `update.json` que l'adresse de l'APK, et quiconque peut remplacer l'un peut
-     * remplacer l'autre. Elle écarte un fichier abîmé en route, pas un fichier
-     * substitué.
+     * The SHA-256 fingerprint does not answer this question: it comes from the same
+     * `update.json` as the APK's address, and anyone who can replace one can
+     * replace the other. It rules out a file damaged en route, not a substituted
+     * file.
      *
-     * Ce qui protège vraiment, c'est la signature : Android refuse une mise à jour
-     * signée d'une autre clé — **mais seulement pour un même nom de paquet**. Un APK
-     * au nom différent s'installerait comme une seconde application, présentée à un
-     * utilisateur qui croit mettre à jour celle-ci. D'où ce contrôle-ci, qui ramène
-     * tout fichier accepté dans le cas où Android vérifie lui-même la signature.
+     * What really protects is the signature: Android refuses an update
+     * signed with another key — **but only for the same package name**. An APK
+     * with a different name would install as a second application, presented to a
+     * user who thinks they are updating this one. Hence this check, which brings
+     * every accepted file back to the case where Android itself verifies the signature.
      *
-     * Le certificat n'est volontairement pas comparé ici : une fois le nom de paquet
-     * garanti, ce serait refaire le contrôle d'Android, avec le risque — invérifiable
-     * sans appareil — qu'une version d'Android ne rende pas la signature d'une
-     * archive non installée et fasse refuser à tort toutes les mises à jour.
+     * The certificate is deliberately not compared here: once the package name is
+     * guaranteed, that would redo Android's check, with the risk — unverifiable
+     * without a device — that a version of Android does not return the signature of an
+     * uninstalled archive and wrongly makes every update be refused.
      *
-     * Le numéro de version doit aussi correspondre à celui du manifeste : un APK
-     * différent de celui annoncé n'a aucune raison légitime d'être servi.
+     * The version number must also match that of the manifest: an APK
+     * different from the announced one has no legitimate reason to be served.
      *
-     * Le nom attendu est celui de la release ([BuildConfig.UPDATE_PACKAGE_NAME]), et
-     * non `context.packageName`, qui porte le suffixe `.debug` dans un APK de debug.
+     * The expected name is that of the release ([BuildConfig.UPDATE_PACKAGE_NAME]), and
+     * not `context.packageName`, which carries the `.debug` suffix in a debug APK.
      */
     private fun isExpectedApk(context: Context, apk: File, update: AvailableUpdate): Boolean {
         val pm = context.packageManager
@@ -199,8 +199,8 @@ object UpdateDownloader {
     }
 
     /**
-     * Depuis Android 8, installer un APK exige que l'utilisateur ait autorisé cette
-     * application précise à installer des applications inconnues.
+     * Since Android 8, installing an APK requires the user to have allowed this
+     * specific app to install unknown apps.
      */
     fun canRequestInstall(context: Context): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -209,17 +209,17 @@ object UpdateDownloader {
             true
         }
 
-    /** Écran de réglages où accorder cette autorisation. */
+    /** Settings screen where to grant this permission. */
     fun unknownSourcesSettingsIntent(context: Context): Intent =
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
             .setData(Uri.parse("package:${context.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**
-     * Intention ouvrant l'installateur système sur l'APK téléchargé.
+     * Intent opening the system installer on the downloaded APK.
      *
-     * Le fichier est exposé par le FileProvider : passer un `file://` déclencherait
-     * une FileUriExposedException depuis Android 7.
+     * The file is exposed by the FileProvider: passing a `file://` would trigger
+     * a FileUriExposedException since Android 7.
      */
     fun installIntent(context: Context, apk: File): Intent {
         val uri = FileProvider.getUriForFile(
@@ -235,16 +235,16 @@ object UpdateDownloader {
     }
 
     /**
-     * Emplacement des téléchargements avant le passage au stockage interne.
+     * Location of the downloads before the move to internal storage.
      *
-     * Une installation mise à jour depuis une version antérieure y garde un APK d'une
-     * vingtaine de mégaoctets que plus rien ne viendrait effacer. On le nettoie donc
-     * en même temps que les autres, une fois pour toutes.
+     * An installation updated from an earlier version keeps there an APK of about
+     * twenty megabytes that nothing would ever delete. It is therefore cleaned
+     * along with the others, once and for all.
      */
     private fun legacyDownloadDir(context: Context): File? =
         context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
 
-    /** Supprime les APK déjà téléchargés : ils ne servent plus après installation. */
+    /** Deletes the APKs already downloaded: they serve no purpose after installation. */
     fun clearDownloads(context: Context) {
         for (dir in listOfNotNull(downloadDir(context), legacyDownloadDir(context))) {
             dir.listFiles()

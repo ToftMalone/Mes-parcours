@@ -51,8 +51,8 @@ object AutoBackupManager {
 
                 var localSuccess = false
 
-                // Les points sont relus page par page et écrits au fil de l'eau : une
-                // trace très dense est sauvegardée intégralement sans saturer la mémoire.
+                // Points are reread page by page and written as we go: a
+                // very dense track is backed up in full without exhausting memory.
 
                 // 1. Export GPX if requested
                 if (isGpx) {
@@ -100,7 +100,7 @@ object AutoBackupManager {
         }
     }
 
-    /** Parcourt tous les points d'une trace, page par page. */
+    /** Walks through all the points of a track, page by page. */
     private suspend fun forEachPointOf(
         db: AppDatabase,
         trackId: Long,

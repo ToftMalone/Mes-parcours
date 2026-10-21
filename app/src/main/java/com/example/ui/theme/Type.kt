@@ -10,26 +10,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// Typographie de la refonte, relevée sur la planche « Système de design » :
-// Bricolage Grotesque pour les chiffres et les titres, Figtree pour l'interface.
-// Deux polices variables embarquées dans res/font, sous licence SIL OFL 1.1 (textes
-// dans licenses/).
+// Typography of the redesign, taken from the “Design system” board:
+// Bricolage Grotesque for figures and titles, Figtree for the interface.
+// Two variable fonts embedded in res/font, under the SIL OFL 1.1 license (texts
+// in licenses/).
 //
-// **Bricolage porte trois axes** — graisse, largeur (75 à 100) et taille optique —
-// et la maquette s'en sert : les grands chiffres sont resserrés (largeur 80), les
-// titres un peu moins (85). Android ne choisit pas une largeur ni une taille optique
-// tout seul : chaque combinaison est donc déclarée comme sa propre famille, avec ses
-// réglages d'axes figés.
+// **Bricolage carries three axes** — weight, width (75 to 100) and optical size —
+// and the mockup uses them: big figures are condensed (width 80), titles
+// a little less (85). Android does not pick a width or an optical size
+// on its own: each combination is therefore declared as its own family, with its
+// axis settings frozen.
 //
-// Les axes ne s'appliquent qu'à partir d'Android 8 (API 26). En deçà — minSdk 24 —
-// le fichier est lu dans son instance par défaut : la bonne police, mais ni
-// resserrée ni graissée. Dégradation acceptée, ces versions étant marginales.
+// Axes only apply from Android 8 (API 26). Below — minSdk 24 —
+// the file is read in its default instance: the right font, but neither
+// condensed nor bolded. Accepted degradation, these versions being marginal.
 //
-// `Font(resId, …, variationSettings)` est encore marqué expérimental dans la
-// version de Compose du projet (BOM 2024.09) : l'accepter explicitement est exigé,
-// la compilation échoue sinon. L'API existe depuis Compose 1.2 et n'a pas bougé
-// depuis ; le risque accepté est celui d'une retouche de signature à une montée de
-// version, que la compilation signalerait aussitôt.
+// `Font(resId, …, variationSettings)` is still marked experimental in the
+// project's version of Compose (BOM 2024.09): accepting it explicitly is required,
+// compilation fails otherwise. The API has existed since Compose 1.2 and has not moved
+// since; the accepted risk is that of a signature tweak on a version
+// upgrade, which compilation would flag at once.
 
 @OptIn(ExperimentalTextApi::class)
 private fun bricolage(weight: Int, width: Float, opticalSize: Float) = Font(
@@ -49,22 +49,22 @@ private fun figtree(weight: Int) = Font(
     variationSettings = FontVariation.Settings(FontVariation.weight(weight))
 )
 
-/** Grands chiffres en direct (« 3,42 km ») : 750, largeur 80, taille optique 72. */
+/** Big live figures (“3.42 km”): 750, width 80, optical size 72. */
 val StatFontFamily = FontFamily(bricolage(750, 80f, 72f))
 
-/** Titres d'écran et chiffres moyens : largeur 85, en 700 et 750. */
+/** Screen titles and medium figures: width 85, in 700 and 750. */
 val DisplayFontFamily = FontFamily(
     bricolage(700, 85f, 36f),
     bricolage(750, 85f, 48f)
 )
 
-/** Titres de section et de feuille (« Reprendre une trace ») : largeur normale. */
+/** Section and sheet titles (“Resume a track”): normal width. */
 val TitleFontFamily = FontFamily(bricolage(700, 100f, 24f))
 
-/** Citation de la dédicace (« À propos ») : 500, légèrement resserrée. */
+/** Quote of the dedication (“About”): 500, slightly condensed. */
 val QuoteFontFamily = FontFamily(bricolage(500, 92f, 24f))
 
-/** Police de l'interface. */
+/** Interface font. */
 val FigtreeFontFamily = FontFamily(
     figtree(400),
     figtree(500),
@@ -73,14 +73,14 @@ val FigtreeFontFamily = FontFamily(
 )
 
 /**
- * Chiffres à chasse fixe : une durée qui défile (« 00:24:18 ») ne doit pas faire
- * danser ce qui l'entoure à chaque seconde.
+ * Fixed-width figures: a scrolling duration (“00:24:18”) must not make
+ * its surroundings dance every second.
  */
 private const val TABULAR_NUMBERS = "tnum"
 
 /**
- * Style des grands chiffres (« Stat XL » de la maquette). Hors de l'échelle Material,
- * qui n'a pas de rôle aussi grand : à appeler explicitement.
+ * Style of the big figures (“Stat XL” from the mockup). Outside the Material scale,
+ * which has no role that large: to be called explicitly.
  */
 val StatXlTextStyle = TextStyle(
     fontFamily = StatFontFamily,
@@ -92,7 +92,7 @@ val StatXlTextStyle = TextStyle(
 )
 
 val Typography = Typography(
-    // « Display » : titre d'accueil (« Mes parcours »).
+    // “Display”: welcome title (“Mes parcours”).
     displayLarge = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight(750),
@@ -114,7 +114,7 @@ val Typography = Typography(
         lineHeight = 40.sp,
         letterSpacing = (-0.5).sp
     ),
-    // « Headline » : titre des onglets (« Historique », « Paramètres »).
+    // “Headline”: tab titles (“History”, “Settings”).
     headlineLarge = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight(700),
@@ -128,7 +128,7 @@ val Typography = Typography(
         fontSize = 32.sp,
         lineHeight = 36.sp
     ),
-    // « Stat M » : chiffres secondaires (durée, vitesse, altitude).
+    // “Stat M”: secondary figures (duration, speed, altitude).
     headlineSmall = TextStyle(
         fontFamily = DisplayFontFamily,
         fontWeight = FontWeight(700),
@@ -136,7 +136,7 @@ val Typography = Typography(
         lineHeight = 30.sp,
         fontFeatureSettings = TABULAR_NUMBERS
     ),
-    // « Title » : titres de feuille, de dialogue et de carte.
+    // “Title”: sheet, dialog and card titles.
     titleLarge = TextStyle(
         fontFamily = TitleFontFamily,
         fontWeight = FontWeight(700),
@@ -155,7 +155,7 @@ val Typography = Typography(
         fontSize = 15.sp,
         lineHeight = 20.sp
     ),
-    // « Body » : 15/22 en 400.
+    // “Body”: 15/22 in 400.
     bodyLarge = TextStyle(
         fontFamily = FigtreeFontFamily,
         fontWeight = FontWeight(400),
@@ -174,7 +174,7 @@ val Typography = Typography(
         fontSize = 13.sp,
         lineHeight = 18.sp
     ),
-    // « Label L » : 700, 16 — boutons, entrées de menu.
+    // “Label L”: 700, 16 — buttons, menu entries.
     labelLarge = TextStyle(
         fontFamily = FigtreeFontFamily,
         fontWeight = FontWeight(700),
@@ -187,7 +187,7 @@ val Typography = Typography(
         fontSize = 13.sp,
         lineHeight = 16.sp
     ),
-    // « Label S » : 700, 12, espacé de 0,6 — pastilles (« ENREGISTREMENT »).
+    // “Label S”: 700, 12, spaced by 0.6 — chips (“RECORDING”).
     labelSmall = TextStyle(
         fontFamily = FigtreeFontFamily,
         fontWeight = FontWeight(700),

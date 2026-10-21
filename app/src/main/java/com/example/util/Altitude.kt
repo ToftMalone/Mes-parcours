@@ -7,54 +7,54 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import java.io.IOException
 
-/** Une altitude au-dessus du niveau de la mer, et son incertitude si elle est connue. */
+/** An altitude above sea level, and its uncertainty if known. */
 data class AltitudeFix(
     val metersAboveSeaLevel: Double,
     val accuracyMeters: Float?
 )
 
 /**
- * Au-delà de cette incertitude verticale, l'altitude n'est pas montrée.
+ * Beyond this vertical uncertainty, the altitude is not shown.
  *
- * La précision verticale du GPS vaut couramment une fois et demie à trois fois la
- * précision horizontale. Le service accepte des positions jusqu'à 65 m de précision
- * horizontale, ce qui autorise des altitudes à plus de 100 m près : les afficher
- * comme une mesure serait mentir.
+ * The vertical accuracy of GPS is commonly one and a half to three times the
+ * horizontal accuracy. The service accepts positions up to 65 m of horizontal
+ * accuracy, which allows altitudes off by more than 100 m: displaying them
+ * as a measurement would be lying.
  */
 private const val MAX_VERTICAL_ACCURACY_METERS = 20f
 
 /**
- * Convertit l'altitude brute d'une position GPS en altitude au-dessus du niveau de
- * la mer.
+ * Converts the raw altitude of a GPS position to altitude above
+ * sea level.
  *
- * `Location.getAltitude()` renvoie une hauteur au-dessus de l'**ellipsoïde WGS84**,
- * alors que toute altitude lue sur une carte, un panneau ou un topoguide se réfère au
- * **géoïde**, c'est-à-dire au niveau moyen des mers. L'écart entre les deux — de
- * l'ordre de 45 à 50 m sur la France métropolitaine — est un biais systématique, pas
- * du bruit : c'est lui qui rendait l'altitude affichée constamment trop haute.
+ * `Location.getAltitude()` returns a height above the **WGS84 ellipsoid**,
+ * whereas any altitude read on a map, a sign or a guidebook refers to the
+ * **geoid**, that is mean sea level. The gap between the two — around
+ * 45 to 50 m over metropolitan France — is a systematic bias, not
+ * noise: it is what made the displayed altitude constantly too high.
  *
- * À partir d'Android 14, le système embarque un modèle de géoïde et fait la
- * conversion hors ligne via [AltitudeConverter]. En deçà, aucune altitude n'est
- * renvoyée : mieux vaut n'afficher aucune valeur qu'une valeur fausse de 50 m. C'est
- * ici, et nulle part ailleurs, qu'il faudrait brancher un modèle de géoïde embarqué
- * pour couvrir les versions antérieures.
+ * From Android 14, the system embeds a geoid model and does the
+ * conversion offline via [AltitudeConverter]. Below that, no altitude is
+ * returned: better to show no value than a value wrong by 50 m. It is
+ * here, and nowhere else, that an embedded geoid model would have to be plugged in
+ * to cover earlier versions.
  *
- * [resolve] fait des entrées-sorties (chargement des données de géoïde) : à n'appeler
- * que depuis un thread d'arrière-plan.
+ * [resolve] does I/O (loading geoid data): to be called
+ * only from a background thread.
  */
 class AltitudeResolver(context: Context) {
 
     private val appContext = context.applicationContext
 
-    // Conservé d'un appel à l'autre : le convertisseur met en cache les données de
-    // géoïde déjà chargées.
+    // Kept from one call to the next: the converter caches the geoid
+    // data already loaded.
     private val converter: AltitudeConverter? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) AltitudeConverter() else null
 
-    /** Altitude au-dessus du niveau de la mer, ou null si le relevé est inexploitable. */
+    /** Altitude above sea level, or null if the reading is unusable. */
     fun resolve(location: Location): AltitudeFix? {
-        // getAltitude() renvoie 0.0 quand la position ne porte pas d'altitude. Sans
-        // ce test, ce 0.0 était enregistré comme une altitude réelle.
+        // getAltitude() returns 0.0 when the position carries no altitude. Without
+        // this test, that 0.0 was recorded as a real altitude.
         if (!location.hasAltitude()) return null
         val converter = this.converter ?: return null
         return resolveWithGeoid(converter, location)
@@ -62,13 +62,13 @@ class AltitudeResolver(context: Context) {
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private fun resolveWithGeoid(converter: AltitudeConverter, location: Location): AltitudeFix? {
-        // Copie : addMslAltitudeToLocation modifie la position qu'on lui passe, et
-        // l'appelant continue de se servir de la sienne.
+        // Copy: addMslAltitudeToLocation modifies the position passed to it, and
+        // the caller keeps using its own.
         val converted = Location(location)
         try {
             converter.addMslAltitudeToLocation(appContext, converted)
         } catch (e: IOException) {
-            // Données de géoïde illisibles : on préfère ne rien afficher.
+            // Unreadable geoid data: we prefer to show nothing.
             return null
         } catch (e: IllegalArgumentException) {
             return null
@@ -88,15 +88,15 @@ class AltitudeResolver(context: Context) {
 }
 
 /**
- * Lisse la suite des altitudes mesurées.
+ * Smooths the series of measured altitudes.
  *
- * Deux étages. D'abord une **médiane glissante**, qui écarte une valeur aberrante
- * isolée au lieu de la moyenner : une seule mesure à 40 m de la réalité ne déplace
- * pas la médiane, alors qu'elle contaminerait une moyenne pendant plusieurs
- * secondes. Ensuite une **moyenne exponentielle**, qui enlève le tremblement
- * résiduel et rend le nombre affiché stable.
+ * Two stages. First a **moving median**, which discards an isolated outlier
+ * instead of averaging it: a single measurement 40 m off does not move
+ * the median, whereas it would contaminate an average for several
+ * seconds. Then an **exponential average**, which removes the residual
+ * jitter and makes the displayed number stable.
  *
- * Sans dépendance Android : directement testable.
+ * No Android dependency: directly testable.
  */
 class AltitudeSmoother(
     private val windowSize: Int = MEDIAN_WINDOW,
@@ -105,17 +105,17 @@ class AltitudeSmoother(
 
     private val window = ArrayDeque<Double>()
 
-    /** Dernière valeur lissée, ou null si aucune mesure n'a encore été intégrée. */
+    /** Last smoothed value, or null if no measurement has been integrated yet. */
     var current: Double? = null
         private set
 
-    /** Repart de zéro : à appeler quand la continuité de la série est rompue. */
+    /** Starts from zero: to be called when the continuity of the series is broken. */
     fun reset() {
         window.clear()
         current = null
     }
 
-    /** Intègre une mesure et renvoie l'altitude lissée. */
+    /** Integrates a measurement and returns the smoothed altitude. */
     fun add(meters: Double): Double {
         window.addLast(meters)
         if (window.size > windowSize) window.removeFirst()
@@ -133,7 +133,7 @@ class AltitudeSmoother(
     }
 
     companion object {
-        /** Impair, pour que la médiane soit une valeur réellement mesurée. */
+        /** Odd, so that the median is a value that was really measured. */
         const val MEDIAN_WINDOW = 5
         const val SMOOTHING = 0.35
     }

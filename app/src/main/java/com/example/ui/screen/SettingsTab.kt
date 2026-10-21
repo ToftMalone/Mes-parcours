@@ -94,19 +94,19 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Pages de l'onglet : la liste des réglages, et ses deux pages de détail. */
+/** Pages of the tab: the list of settings, and its two detail pages. */
 private enum class SettingsPage { MAIN, CHANGELOG, ABOUT }
 
 /**
- * Écran des réglages.
+ * Settings screen.
  *
- * L'ordre des sections suit la fréquence d'usage : ce qu'on ajuste souvent en haut,
- * ce qu'on règle une fois pour toutes en bas. Chaque groupe ne traite qu'un sujet, et
- * chaque ligne qu'un réglage — c'est ce qui évite de retomber sur une carte
- * fourre-tout mélangeant le fond de carte, l'orientation et un panneau de vitesse.
+ * The order of the sections follows frequency of use: what is adjusted often at the top,
+ * what is set once and for all at the bottom. Each group deals with a single subject, and
+ * each row with a single setting — that is what avoids falling back on a
+ * catch-all card mixing the map background, the orientation and a speed panel.
  *
- * Le journal des nouveautés et « À propos » sont des pages à part entière, ouvertes
- * depuis le groupe « Application » ; le retour arrière y ramène à la liste.
+ * The changelog and “About” are full pages, opened
+ * from the “App” group; going back returns to the list.
  */
 @Composable
 fun SettingsTab(
@@ -114,7 +114,7 @@ fun SettingsTab(
     contentPadding: PaddingValues = PaddingValues(),
     availableUpdate: AvailableUpdate? = null,
     onShowUpdate: () -> Unit = {},
-    /** Une page de détail prend tout l'écran : la barre de navigation s'efface. */
+    /** A detail page takes the whole screen: the navigation bar disappears. */
     onSubPageChanged: (Boolean) -> Unit = {}
 ) {
     var page by remember { mutableStateOf(SettingsPage.MAIN) }
@@ -224,9 +224,9 @@ private fun SettingsMain(
 }
 
 /**
- * Rappel qu'une mise à jour a été détectée (feuille de [UpdatePrompt] refermée sans
- * installer). [onShowUpdate] rouvre cette même feuille, sans redemander au réseau ni
- * redémarrer l'application.
+ * Reminder that an update has been detected (the [UpdatePrompt] sheet dismissed without
+ * installing). [onShowUpdate] reopens that same sheet, without asking the network again or
+ * restarting the app.
  */
 @Composable
 private fun UpdateAvailableCard(update: AvailableUpdate, onShowUpdate: () -> Unit) {
@@ -258,9 +258,9 @@ private fun UpdateAvailableCard(update: AvailableUpdate, onShowUpdate: () -> Uni
                 fontWeight = FontWeight.Bold,
                 color = colors.onTertiaryContainer
             )
-            if (update.notes.isNotEmpty()) {
+            if (update.notesFor(java.util.Locale.getDefault().language).isNotEmpty()) {
                 Text(
-                    update.notes.joinToString(", "),
+                    update.notesFor(java.util.Locale.getDefault().language).joinToString(", "),
                     fontSize = 13.sp,
                     lineHeight = 17.sp,
                     color = colors.onTertiaryContainer,
@@ -285,10 +285,10 @@ private fun UpdateAvailableCard(update: AvailableUpdate, onShowUpdate: () -> Uni
 }
 
 // ---------------------------------------------------------------------------
-// Briques communes
+// Common building blocks
 //
-// Un groupe = un sujet, des lignes séparées de 2 dp dans un bloc aux coins de 28 dp :
-// un réglage de plus ne coûte qu'une ligne, pas un bloc recopié.
+// A group = a subject, rows separated by 2 dp in a block with 28 dp corners:
+// one more setting costs only one row, not a copied block.
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -313,7 +313,7 @@ private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
-/** Élément d'un groupe : fond de carte, padding de 16 dp. */
+/** Item of a group: card background, 16 dp padding. */
 @Composable
 private fun GroupItem(
     modifier: Modifier = Modifier,
@@ -330,7 +330,7 @@ private fun GroupItem(
     )
 }
 
-/** Ligne à icône : titre, sous-titre éventuel, et un élément à droite. */
+/** Row with an icon: title, optional subtitle, and an element on the right. */
 @Composable
 private fun SettingsRow(
     icon: ImageVector?,
@@ -378,7 +378,7 @@ private fun Chevron() {
     )
 }
 
-/** Bouton radio de la maquette : anneau, et pastille qui grossit à la sélection. */
+/** Radio button from the mockup: ring, and a dot that grows on selection. */
 @Composable
 private fun MpRadio(selected: Boolean) {
     val colors = MaterialTheme.colorScheme
@@ -399,7 +399,7 @@ private fun MpRadio(selected: Boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// Carte
+// Map
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -438,8 +438,8 @@ private fun MapBackgroundItem() {
 }
 
 /**
- * Vignette d'un fond de carte, dessinée comme sur la maquette : quelques formes qui
- * évoquent la carte, sans charger la moindre tuile.
+ * Thumbnail of a map background, drawn as on the mockup: a few shapes that
+ * evoke the map, without loading a single tile.
  */
 @Composable
 private fun MapStyleThumb(
@@ -455,8 +455,8 @@ private fun MapStyleThumb(
     val radius by animateDpAsState(if (selected) 28.dp else 18.dp, label = "thumb_radius")
     val ring by animateColorAsState(if (selected) colors.primary else Color.Transparent, label = "thumb_ring")
     val check by animateFloatAsState(if (selected) 1f else 0f, label = "thumb_check")
-    // Pas de rognage sur la colonne entière : ses coins arrondis mordaient sur les
-    // légendes sous la vignette.
+    // No clipping on the whole column: its rounded corners bit into the
+    // captions under the thumbnail.
     Column(
         modifier = modifier
             .clickable(onClick = onClick)
@@ -573,12 +573,12 @@ private fun OrientationSegment(label: String, selected: Boolean, onClick: () -> 
 }
 
 // ---------------------------------------------------------------------------
-// Mode nuit
+// Night mode
 // ---------------------------------------------------------------------------
 
 /**
- * Sous-titre du mode solaire : la prochaine bascule, calculée hors ligne pour la
- * dernière position de carte connue (voir `NightModePreferences.lastKnownLocation`).
+ * Subtitle of solar mode: the next switch, computed offline for the
+ * last known map position (see `NightModePreferences.lastKnownLocation`).
  */
 private fun nextSolarSwitch(context: Context, lat: Double, lng: Double, now: Long): String? {
     return when (val today = SolarTimes.compute(lat, lng, now)) {
@@ -596,11 +596,11 @@ private fun nextSolarSwitch(context: Context, lat: Double, lng: Double, now: Lon
 }
 
 /**
- * Choix de ce qui déclenche le thème sombre : le réglage d'Android, ou le lever et
- * le coucher du soleil — avec, dans ce dernier cas, un passage temporaire en sombre
- * dans les tunnels.
+ * Choice of what triggers the dark theme: Android's setting, or sunrise and
+ * sunset — with, in the latter case, a temporary switch to dark
+ * in tunnels.
  *
- * Le changement s'applique immédiatement : le thème observe la préférence.
+ * The change applies immediately: the theme observes the preference.
  */
 @Composable
 private fun NightModeGroup() {
@@ -641,8 +641,8 @@ private fun NightModeGroup() {
             onClick = { select(NightModeSource.SOLAR) },
             testTag = "night_mode_option_solar"
         )
-        // La détection de tunnel n'agit qu'en mode solaire : c'est une exception au
-        // jour, pas un réglage à part. Proposée seulement là où elle a un effet.
+        // Tunnel detection only acts in solar mode: it is an exception to
+        // daytime, not a separate setting. Offered only where it has an effect.
         if (source == NightModeSource.SOLAR) {
             SettingsRow(
                 icon = Icons.Rounded.LightMode,
@@ -679,7 +679,7 @@ private fun NightModeGroup() {
 }
 
 // ---------------------------------------------------------------------------
-// Sauvegarde
+// Backup
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -713,8 +713,8 @@ private fun AutoBackupGroup() {
                 )
             }
         )
-        // Au moins un format doit rester coché, sinon la sauvegarde automatique serait
-        // activée sans rien produire.
+        // At least one format must stay checked, otherwise the automatic backup would be
+        // enabled while producing nothing.
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
@@ -763,7 +763,7 @@ private fun FormatChip(label: String, checked: Boolean, enabled: Boolean, testTa
 }
 
 // ---------------------------------------------------------------------------
-// Pages de détail : en-tête commun
+// Detail pages: common header
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -790,24 +790,24 @@ private fun SubPageTopBar(title: String?, onBack: () -> Unit, backTag: String) {
 }
 
 // ---------------------------------------------------------------------------
-// Journal des nouveautés
+// Changelog
 // ---------------------------------------------------------------------------
 
-/** Une version, sa date de publication, et ce qu'elle a apporté. */
+/** A version, its publication date, and what it brought. */
 private class Release(val version: String, val date: String?, val changes: List<Int>)
 
 /**
- * Journal des nouveautés, de la version la plus récente à la plus ancienne.
+ * Changelog, from the most recent version to the oldest.
  *
- * **Avant la 1.0** : la liste ne contient que la version courante. À chaque
- * nouvelle version, on remplace son contenu — les versions de développement se
- * succèdent trop vite pour qu'un historique ait de l'intérêt.
+ * **Before 1.0**: the list only contained the current version. With each
+ * new version, its content was replaced — development versions
+ * followed one another too fast for a history to be of interest.
  *
- * **À partir de la 1.0** : on ajoute une entrée en tête au lieu de remplacer.
+ * **From 1.0**: an entry is added at the top instead of replacing.
  *
- * La date est celle de la publication GitHub (AAAA-MM-JJ), `null` tant que la version
- * n'est pas publiée. La version installée est repérée par comparaison avec
- * `BuildConfig.VERSION_NAME` : elle n'est jamais à désigner à la main.
+ * The date is that of the GitHub publication (YYYY-MM-DD), `null` as long as the version
+ * is not published. The installed version is identified by comparison with
+ * `BuildConfig.VERSION_NAME`: it is never to be designated by hand.
  */
 private val RELEASES = listOf(
     Release(
@@ -878,7 +878,7 @@ private val RELEASES = listOf(
     )
 )
 
-/** Version installée, sans le suffixe de la variante de debug. */
+/** Installed version, without the suffix of the debug variant. */
 private val INSTALLED_VERSION = BuildConfig.VERSION_NAME.removeSuffix("-debug")
 
 private fun formatReleaseDate(date: String?, withYear: Boolean): String? {
@@ -931,7 +931,7 @@ private fun ChangelogPage(availableUpdate: AvailableUpdate?, onBack: () -> Unit,
                             Text(stringResource(R.string.changelog_available), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.onTertiaryContainer)
                         }
                     }
-                    ReleaseBullets(availableUpdate.notes, colors.onSurfaceVariant, 14)
+                    ReleaseBullets(availableUpdate.notesFor(java.util.Locale.getDefault().language), colors.onSurfaceVariant, 14)
                 }
             }
 
@@ -960,7 +960,7 @@ private fun InstalledReleaseCard(release: Release) {
             .clip(RoundedCornerShape(36.dp))
             .background(colors.primaryContainer)
     ) {
-        // Cookie décoratif dans le coin, comme sur la maquette.
+        // Decorative cookie in the corner, as on the mockup.
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -1029,7 +1029,7 @@ private fun PastReleaseCard(release: Release) {
 }
 
 // ---------------------------------------------------------------------------
-// À propos
+// About
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -1062,12 +1062,12 @@ private fun AboutPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight(750),
                 modifier = Modifier.padding(top = 14.dp)
             )
-            // Lue depuis BuildConfig : la version n'est écrite qu'une fois, dans
-            // build.gradle.kts, et l'affichage ne peut plus dériver.
+            // Read from BuildConfig: the version is written only once, in
+            // build.gradle.kts, and the display can no longer drift.
             Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME), fontSize = 14.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
 
-        // Dédicace à Thierry.
+        // Dedication to Thierry.
         Box(
             modifier = Modifier
                 .padding(top = 22.dp)

@@ -30,8 +30,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // OsmConfig.init est déjà appelé par TrackApplication.onCreate, qui s'exécute
-        // avant toute activité : le refaire ici ne servait à rien.
+        // OsmConfig.init is already called by TrackApplication.onCreate, which runs
+        // before any activity: doing it again here was pointless.
         super.onCreate(savedInstanceState)
 
         val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)

@@ -68,26 +68,26 @@ import com.example.ui.component.ShapeBadge
 import com.example.ui.component.SunShape
 import com.example.ui.theme.DisplayFontFamily
 
-/** Nombre de pages de l'accueil. */
+/** Number of pages of the welcome. */
 private const val WELCOME_PAGES = 3
 
 /**
- * Écran de bienvenue, montré une seule fois au tout premier lancement — voir
+ * Welcome screen, shown only once on the very first launch — see
  * `OnboardingPreferences`.
  *
- * Trois pages, comme sur la maquette : ce que fait l'application, la promesse que
- * tout reste sur le téléphone, puis les autorisations expliquées avant d'être
- * demandées. Un appui sur « Commencer » déclenche la demande système (localisation,
- * et notifications à partir d'Android 13), gérée par l'appelant. La permission de
- * localisation « tout le temps » n'est pas demandée ici — `MainScreen` l'enchaîne
- * juste après, avec sa propre explication, comme elle le faisait déjà avant cet écran.
+ * Three pages, as on the mockup: what the app does, the promise that
+ * everything stays on the phone, then the permissions explained before being
+ * requested. A tap on “Get started” triggers the system request (location,
+ * and notifications from Android 13), handled by the caller. The “all the time”
+ * location permission is not requested here — `MainScreen` chains it
+ * right after, with its own explanation, as it already did before this screen.
  */
 @Composable
 fun WelcomeScreen(
     onRequestPermissions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Survit à une rotation : recommencer l'accueil au début serait déroutant.
+    // Survives a rotation: restarting the welcome from the beginning would be disorienting.
     var page by rememberSaveable { mutableIntStateOf(0) }
     BackHandler(enabled = page > 0) { page-- }
 
@@ -103,8 +103,8 @@ fun WelcomeScreen(
         AnimatedContent(
             targetState = page,
             transitionSpec = {
-                // Deux pages opaques qui glissent : pas de fondu, pour la même raison
-                // que les transitions de MainScreen.
+                // Two opaque pages that slide: no fade, for the same reason
+                // as MainScreen's transitions.
                 val forward = targetState > initialState
                 slideInHorizontally(tween(260)) { if (forward) it else -it } togetherWith
                     slideOutHorizontally(tween(260)) { if (forward) -it else it }
@@ -128,7 +128,7 @@ fun WelcomeScreen(
             }
         }
 
-        // Points de pagination : la page courante s'allonge.
+        // Pagination dots: the current page lengthens.
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             modifier = Modifier
@@ -202,8 +202,8 @@ private fun PageTitle(text: String, size: Int) {
 @Composable
 private fun IntroPage() {
     val colors = MaterialTheme.colorScheme
-    // Illustration : un grand cookie portant le tracé, un compteur et une pastille
-    // « GPX · KML » posés autour, comme sur la maquette.
+    // Illustration: a large cookie carrying the line, a counter and a
+    // “GPX · KML” chip placed around, as on the mockup.
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -334,7 +334,7 @@ private fun PromiseLine(icon: ImageVector, title: String, subtitle: String) {
 @Composable
 private fun PermissionsPage() {
     val colors = MaterialTheme.colorScheme
-    // Avant Android 13, les notifications ne se demandent pas : une seule autorisation.
+    // Before Android 13, notifications are not requested: a single permission.
     val asksNotifications = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     Spacer(modifier = Modifier.height(24.dp))
     PageTitle(stringResource(if (asksNotifications) R.string.welcome_permissions_title_two else R.string.welcome_permissions_title_one), 38)

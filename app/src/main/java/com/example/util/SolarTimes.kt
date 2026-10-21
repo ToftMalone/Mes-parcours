@@ -7,85 +7,85 @@ import kotlin.math.roundToLong
 import kotlin.math.sin
 
 /**
- * Heures de lever et de coucher du soleil, calculées localement.
+ * Sunrise and sunset times, computed locally.
  *
- * Aucun appel réseau : l'algorithme (équation du lever du soleil, formulation NOAA)
- * ne dépend que de la position et de la date, et tombe à moins de deux minutes des
- * heures publiées. C'est ce qui permet au thème de rester juste sans connexion — en
- * tunnel, en montagne, à l'étranger — sans clé d'API, et sans transmettre la
- * position de l'utilisateur à un service tiers.
+ * No network call: the algorithm (sunrise equation, NOAA formulation)
+ * depends only on position and date, and lands within two minutes of the published
+ * times. That is what lets the theme stay right without a connection — in a
+ * tunnel, in the mountains, abroad — without an API key, and without sending the
+ * user's position to a third-party service.
  *
- * Sans dépendance Android : toute la logique est testable directement.
+ * No Android dependency: all the logic is directly testable.
  */
 object SolarTimes {
 
     private const val DAY_MS = 86_400_000.0
 
-    /** Jour julien du 1ᵉʳ janvier 1970 à 0 h UTC. */
+    /** Julian day of January 1, 1970 at 0 h UTC. */
     private const val JULIAN_EPOCH = 2_440_587.5
 
-    /** Jour julien du 1ᵉʳ janvier 2000 à 12 h TT (J2000). */
+    /** Julian day of January 1, 2000 at 12 h TT (J2000). */
     private const val J2000 = 2_451_545.0
 
-    /** Obliquité de l'écliptique, en degrés. */
+    /** Obliquity of the ecliptic, in degrees. */
     private const val OBLIQUITY = 23.4397
 
     /**
-     * Élévation conventionnelle du centre du soleil au lever et au coucher : un peu
-     * sous l'horizon, pour tenir compte du rayon apparent du disque solaire et de la
-     * réfraction atmosphérique.
+     * Conventional elevation of the sun's center at sunrise and sunset: slightly
+     * below the horizon, to account for the apparent radius of the solar disc and for
+     * atmospheric refraction.
      */
     private const val SUNRISE_ELEVATION = -0.833
 
     sealed interface Result {
-        /** Cas courant : le soleil se lève et se couche ce jour-là. */
+        /** Usual case: the sun rises and sets that day. */
         data class RiseAndSet(val sunriseUtcMillis: Long, val sunsetUtcMillis: Long) : Result
 
-        /** Soleil de minuit : il ne se couche pas. */
+        /** Midnight sun: it does not set. */
         data object PolarDay : Result
 
-        /** Nuit polaire : il ne se lève pas. */
+        /** Polar night: it does not rise. */
         data object PolarNight : Result
     }
 
     /**
-     * Lever et coucher du jour solaire local qui contient [atUtcMillis].
+     * Sunrise and sunset of the local solar day that contains [atUtcMillis].
      *
-     * [longitude] est comptée positive vers l'est.
+     * [longitude] is counted positive toward the east.
      */
     fun compute(latitude: Double, longitude: Double, atUtcMillis: Long): Result {
         val julianDay = atUtcMillis / DAY_MS + JULIAN_EPOCH
 
-        // Numéro du jour solaire local dont le midi est le plus proche de l'instant
-        // demandé. Le décalage en longitude est indispensable : sans lui, une requête
-        // faite après minuit UTC mais avant le lever du soleil renverrait le jour
-        // précédent pour un fuseau à l'est, et l'inverse à l'ouest.
+        // Number of the local solar day whose noon is closest to the requested
+        // instant. The longitude offset is essential: without it, a request
+        // made after midnight UTC but before sunrise would return the previous day
+        // for a zone to the east, and the reverse to the west.
         val dayNumber = (julianDay - J2000 + longitude / 360.0).roundToLong().toDouble()
 
-        // Temps solaire moyen ramené au méridien du lieu. Longitude est ⇒ midi
-        // solaire plus tôt en UTC, d'où la soustraction.
+        // Mean solar time brought back to the place's meridian. East longitude ⇒ solar
+        // noon earlier in UTC, hence the subtraction.
         val meanSolarTime = dayNumber - longitude / 360.0
 
-        // Anomalie moyenne du soleil.
+        // Mean anomaly of the sun.
         val meanAnomaly = (357.5291 + 0.98560028 * meanSolarTime).mod(360.0)
         val meanAnomalyRad = Math.toRadians(meanAnomaly)
 
-        // Équation du centre : écart entre l'orbite réelle, elliptique, et une
-        // orbite circulaire parcourue à vitesse constante.
+        // Equation of the center: gap between the real, elliptical orbit and a
+        // circular orbit traveled at constant speed.
         val center = 1.9148 * sin(meanAnomalyRad) +
                 0.0200 * sin(2 * meanAnomalyRad) +
                 0.0003 * sin(3 * meanAnomalyRad)
 
-        // Longitude écliptique du soleil.
+        // Ecliptic longitude of the sun.
         val eclipticLongitude = (meanAnomaly + center + 180.0 + 102.9372).mod(360.0)
         val eclipticLongitudeRad = Math.toRadians(eclipticLongitude)
 
-        // Midi solaire local, en jour julien.
+        // Local solar noon, in Julian day.
         val solarNoon = J2000 + meanSolarTime +
                 0.0053 * sin(meanAnomalyRad) -
                 0.0069 * sin(2 * eclipticLongitudeRad)
 
-        // Déclinaison du soleil.
+        // Declination of the sun.
         val sinDeclination = sin(eclipticLongitudeRad) * sin(Math.toRadians(OBLIQUITY))
         val declination = asin(sinDeclination)
 
@@ -94,8 +94,8 @@ object SolarTimes {
             (sin(Math.toRadians(SUNRISE_ELEVATION)) - sin(latitudeRad) * sinDeclination) /
                     (cos(latitudeRad) * cos(declination))
 
-        // Hors de [-1, 1] : à cette latitude et à cette date, l'horizon n'est jamais
-        // franchi. Il faut le traiter explicitement, sinon acos renvoie NaN.
+        // Outside [-1, 1]: at this latitude and on this date, the horizon is never
+        // crossed. It must be handled explicitly, otherwise acos returns NaN.
         if (cosHourAngle > 1.0) return Result.PolarNight
         if (cosHourAngle < -1.0) return Result.PolarDay
 
@@ -107,7 +107,7 @@ object SolarTimes {
         )
     }
 
-    /** Fait-il jour à cet endroit et à cet instant ? */
+    /** Is it daytime at this place and this instant? */
     fun isDaylight(latitude: Double, longitude: Double, atUtcMillis: Long): Boolean =
         when (val result = compute(latitude, longitude, atUtcMillis)) {
             is Result.RiseAndSet ->

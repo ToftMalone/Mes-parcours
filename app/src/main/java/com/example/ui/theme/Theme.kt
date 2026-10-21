@@ -90,10 +90,10 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 /**
- * Formes de la maquette : « Moyen » 16 dp (pastilles, champs), « Grand » 28 dp
- * (cartes, groupes de réglages), « Très grand » 36 dp (panneau de statistiques,
- * dialogues). Les boutons, la barre de navigation et les puces actives sont des
- * pilules pleines, que les composants Material dessinent déjà ainsi.
+ * Shapes from the mockup: “Medium” 16 dp (chips, fields), “Large” 28 dp
+ * (cards, settings groups), “Extra large” 36 dp (statistics panel,
+ * dialogs). Buttons, the navigation bar and active chips are
+ * full pills, which Material components already draw that way.
  */
 val MesParcoursShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
@@ -103,22 +103,22 @@ val MesParcoursShapes = Shapes(
     extraLarge = RoundedCornerShape(36.dp)
 )
 
-/** Couleur de l'enregistrement en cours ; voir [RecordingLight]. */
+/** Color of the recording in progress; see [RecordingLight]. */
 val LocalRecordingColor = staticCompositionLocalOf { RecordingLight }
 
 @Composable
 fun MyApplicationTheme(
-    // Dépend du réglage de mode nuit : thème du système ou capteur de luminosité.
+    // Depends on the night mode setting: system theme or light sensor.
     darkTheme: Boolean = rememberIsDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    // Palette fixe, et plus de couleur dynamique (Material You) sur Android 12+ :
-    // choix de l'auteur lors de la refonte, pour une allure identique quel que soit
-    // le fond d'écran du téléphone. Voir Color.kt.
+    // Fixed palette, and no more dynamic color (Material You) on Android 12+:
+    // the author's choice during the redesign, for an identical look whatever
+    // the phone's wallpaper. See Color.kt.
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
-    // Exposé à tout l'arbre : ce qui n'est pas stylé par Material — le filtre de
-    // tuiles de la carte, notamment — doit s'accorder au même état.
+    // Exposed to the whole tree: what Material does not style — the map's tile
+    // filter, notably — must agree with the same state.
     CompositionLocalProvider(
         LocalIsDarkTheme provides darkTheme,
         LocalRecordingColor provides if (darkTheme) RecordingDark else RecordingLight
@@ -128,11 +128,11 @@ fun MyApplicationTheme(
             typography = Typography,
             shapes = MesParcoursShapes
         ) {
-            // Couleur de texte et d'icône par défaut. MaterialTheme ne la pose pas :
-            // seuls Surface et Scaffold le font. Sans elle, un texte sans couleur
-            // explicite posé sur un simple `Modifier.background` — la fiche détail,
-            // hors du Scaffold, ou les réglages en capture — sortait noir en thème
-            // sombre, donc illisible.
+            // Default text and icon color. MaterialTheme does not set it:
+            // only Surface and Scaffold do. Without it, text with no explicit color
+            // placed on a simple `Modifier.background` — the detail sheet,
+            // outside the Scaffold, or the settings in screenshots — came out black in dark
+            // theme, hence unreadable.
             CompositionLocalProvider(
                 androidx.compose.material3.LocalContentColor provides colorScheme.onBackground,
                 content = content

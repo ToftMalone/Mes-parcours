@@ -22,21 +22,21 @@ object OsmConfig {
             // 1. Load default/saved preferences first
             config.load(appContext, prefs)
 
-            // 2. Identité annoncée aux serveurs de tuiles, comme l'exige la politique
-            // d'usage d'OpenStreetMap : elle demande une version réelle, pour pouvoir
-            // écarter une version précise si elle se comportait mal. Le « 1.0 » figé
-            // qui traînait ici n'a jamais correspondu à quoi que ce soit de publié.
-            // Sans espace : c'est un jeton de user-agent.
+            // 2. Identity announced to the tile servers, as OpenStreetMap's usage
+            // policy requires: it asks for a real version, so as to be able to
+            // rule out a specific version if it misbehaved. The frozen “1.0”
+            // that lingered here never matched anything that was published.
+            // No spaces: it is a user-agent token.
             config.userAgentValue =
                 "MesParcours/${BuildConfig.VERSION_NAME} (${appContext.packageName})"
 
-            // 3. Le défaut d'osmdroid (2 téléchargements de tuiles en parallèle) suffisait
-            // à peine en Mapnik, dont les tuiles vectorielles sont petites ; en vue
-            // satellite, les tuiles JPEG de Google pèsent bien plus lourd et le même
-            // écran plein (souvent 20-40 tuiles) se remplissait alors visiblement au
-            // compte-gouttes. De même, le cache mémoire par défaut (9 tuiles au-delà de
-            // l'écran) redemandait des tuiles à peine quittées au moindre zoom ou
-            // recentrage.
+            // 3. osmdroid's default (2 parallel tile downloads) was barely enough
+            // in Mapnik, whose vector tiles are small; in satellite view,
+            // Google's JPEG tiles weigh much more and the same full
+            // screen (often 20-40 tiles) then visibly filled in a
+            // trickle. Likewise, the default memory cache (9 tiles beyond
+            // the screen) asked again for tiles just left at the slightest zoom or
+            // recentering.
             config.tileDownloadThreads = 10.toShort()
             config.cacheMapTileCount = 24.toShort()
 

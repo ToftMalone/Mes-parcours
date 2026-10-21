@@ -30,12 +30,12 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Captures de la base de la refonte : couleurs, polices, barre de navigation.
+ * Screenshots of the redesign's foundation: colors, fonts, navigation bar.
  *
- * Sert à **regarder les pixels** sans téléphone sous la main : l'intégration continue
- * enregistre ces images (`-Proborazzi.test.record=true`) et les joint à son
- * exécution, où l'on peut les comparer à la maquette. Rien n'est comparé à une image
- * de référence : ces tests échouent sur une exception, jamais sur un pixel.
+ * Used to **look at pixels** without a phone at hand: continuous integration
+ * records these images (`-Proborazzi.test.record=true`) and attaches them to its
+ * run, where they can be compared with the mockup. Nothing is compared with a reference
+ * image: these tests fail on an exception, never on a pixel.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -53,7 +53,7 @@ class DesignSystemScreenshotTest {
             }
         }
         composeTestRule.onRoot().captureRoboImage(
-            filePath = "src/test/screenshots/refonte/${name}_${if (darkTheme) "sombre" else "clair"}.png"
+            filePath = "src/test/screenshots/refonte/${name}_${if (darkTheme) "dark" else "light"}.png"
         )
     }
 
@@ -63,8 +63,8 @@ class DesignSystemScreenshotTest {
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(vertical = 8.dp)
         ) {
-            for (tab in listOf("enregistrer", "historique", "outils", "parametres")) {
-                MainNavigationBar(currentTab = tab, onTabSelected = {}, showUpdateBadge = tab != "parametres")
+            for (tab in listOf("record", "history", "tools", "settings")) {
+                MainNavigationBar(currentTab = tab, onTabSelected = {}, showUpdateBadge = tab != "settings")
             }
         }
     }
@@ -78,19 +78,19 @@ class DesignSystemScreenshotTest {
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            Text("3,42 km", style = StatXlTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Text("3.42 km", style = StatXlTextStyle, color = MaterialTheme.colorScheme.onSurface)
             Text("Mes parcours", style = t.displayMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text("Historique", style = t.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text("Reprendre une trace", style = t.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text("00:24:18  12,4  212", style = t.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-            Text("Nouveau parcours", style = t.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text("History", style = t.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text("Resume a track", style = t.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text("00:24:18  12.4  212", style = t.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text("New track", style = t.labelLarge, color = MaterialTheme.colorScheme.onSurface)
             Text(
-                "Tout reste sur votre téléphone, sans compte ni serveur.",
+                "Everything stays on your phone, no account, no server.",
                 style = t.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text("ENREGISTREMENT", style = t.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-            Button(onClick = {}) { Text("Démarrer") }
+            Text("RECORDING", style = t.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+            Button(onClick = {}) { Text("Start") }
         }
     }
 
@@ -118,10 +118,10 @@ class DesignSystemScreenshotTest {
         }
     }
 
-    @Test fun navigation_clair() = capture("navigation", darkTheme = false) { NavigationBars() }
-    @Test fun navigation_sombre() = capture("navigation", darkTheme = true) { NavigationBars() }
-    @Test fun typographie_clair() = capture("typographie", darkTheme = false) { TypeSpecimen() }
-    @Test fun typographie_sombre() = capture("typographie", darkTheme = true) { TypeSpecimen() }
-    @Test fun couleurs_clair() = capture("couleurs", darkTheme = false) { Swatches() }
-    @Test fun couleurs_sombre() = capture("couleurs", darkTheme = true) { Swatches() }
+    @Test fun navigation_light() = capture("navigation", darkTheme = false) { NavigationBars() }
+    @Test fun navigation_dark() = capture("navigation", darkTheme = true) { NavigationBars() }
+    @Test fun typography_light() = capture("typography", darkTheme = false) { TypeSpecimen() }
+    @Test fun typography_dark() = capture("typography", darkTheme = true) { TypeSpecimen() }
+    @Test fun colors_light() = capture("colors", darkTheme = false) { Swatches() }
+    @Test fun colors_dark() = capture("colors", darkTheme = true) { Swatches() }
 }

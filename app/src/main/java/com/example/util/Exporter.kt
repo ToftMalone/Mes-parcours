@@ -8,12 +8,12 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Génère les fichiers GPX/KML.
+ * Generates the GPX/KML files.
  *
- * L'écriture est incrémentale ([GpxWriter], [KmlWriter]) : l'appelant pousse les
- * points au fur et à mesure qu'il les lit en base, et rien n'est accumulé en
- * mémoire. Indispensable pour réexporter une trace importée de plusieurs millions
- * de points, qui ne tiendrait pas dans une String.
+ * Writing is incremental ([GpxWriter], [KmlWriter]): the caller pushes the
+ * points as it reads them from the database, and nothing is accumulated in
+ * memory. Essential to re-export an imported track of several million
+ * points, which would not fit in a String.
  */
 object Exporter {
 
@@ -71,25 +71,25 @@ object Exporter {
     }
 
     /**
-     * Un seul Placemark, dont la géométrie est un `<MultiGeometry>` réunissant un
-     * `<LineString>` par tronçon continu.
+     * A single Placemark, whose geometry is a `<MultiGeometry>` gathering one
+     * `<LineString>` per continuous segment.
      *
-     * Deux exigences à tenir ensemble :
+     * Two requirements to hold together:
      *
-     * - **Les ruptures doivent survivre.** Tout écrire dans un unique bloc
-     *   `<coordinates>` les perdrait : après une pause, une reprise ou une fusion,
-     *   réimporter le fichier relierait les tronçons par une ligne droite.
-     * - **Le parcours doit rester d'un seul tenant.** La version précédente ouvrait
-     *   un Placemark par tronçon, nommés « Nom », « Nom (2) »… : un parcours fusionné
-     *   à partir de dix traces se présentait comme dix entrées distinctes dans Google
-     *   Earth, alors que l'utilisateur venait justement de les réunir.
+     * - **Breaks must survive.** Writing everything in a single `<coordinates>`
+     *   block would lose them: after a pause, a resume or a merge,
+     *   reimporting the file would join the segments with a straight line.
+     * - **The track must stay in one piece.** The previous version opened
+     *   one Placemark per segment, named “Name”, “Name (2)”…: a track merged
+     *   from ten tracks showed up as ten distinct entries in Google
+     *   Earth, when the user had just brought them together.
      *
-     * `<MultiGeometry>` répond aux deux : une seule entrée, des lignes distinctes.
+     * `<MultiGeometry>` answers both: a single entry, distinct lines.
      *
-     * Un tronçon unique donne un `<MultiGeometry>` d'un seul `<LineString>`. C'est
-     * valide, et l'uniformité vaut mieux ici qu'un cas particulier : l'écriture étant
-     * incrémentale, on ne sait pas au moment d'ouvrir la géométrie combien de
-     * tronçons suivront.
+     * A single segment gives a `<MultiGeometry>` of one `<LineString>`. This is
+     * valid, and uniformity is worth more here than a special case: writing being
+     * incremental, we do not know when opening the geometry how many
+     * segments will follow.
      */
     class KmlWriter(private val out: Appendable) {
         private var trackName = ""
@@ -112,8 +112,8 @@ object Exporter {
         }
 
         fun add(pt: TrackPoint) {
-            // Le Placemark n'est ouvert qu'à l'arrivée du premier point : une trace
-            // vide ne doit pas produire une entrée sans géométrie.
+            // The Placemark is only opened when the first point arrives: an empty
+            // track must not produce an entry without geometry.
             if (!placemarkOpen) {
                 openPlacemark()
             }
@@ -123,7 +123,7 @@ object Exporter {
             if (!lineOpen) {
                 openLine()
             }
-            // Format des coordonnées KML : longitude,latitude,altitude
+            // KML coordinate format: longitude,latitude,altitude
             out.append("            ${pt.longitude},${pt.latitude},${pt.altitude}\n")
         }
 

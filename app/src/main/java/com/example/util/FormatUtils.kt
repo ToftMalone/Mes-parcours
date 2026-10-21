@@ -15,9 +15,9 @@ object FormatUtils {
     private var appContext: Context? = null
 
     /**
-     * Donne accès aux ressources pour les rares mots que ces formats contiennent
-     * (« h », « min », « Parcours du … »). Appelé par `TrackApplication` : les formats
-     * sont appelés depuis partout, y compris des endroits sans `Context`.
+     * Gives access to resources for the few words these formats contain
+     * (“h”, “min”, “Track on …”). Called by `TrackApplication`: formats
+     * are called from everywhere, including places with no `Context`.
      */
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -27,16 +27,16 @@ object FormatUtils {
         appContext?.getString(id, *args) ?: String.format(Locale.US, fallback, *args)
 
     /**
-     * Motif de date adapté à la langue (« 27 sept. » en français, « Sep 27 » en
-     * anglais, « 9月27日 » en japonais), là où un motif écrit en dur ne vaut que pour
-     * une langue.
+     * Date pattern adapted to the language (“27 sept.” in French, “Sep 27” in
+     * English, “9月27日” in Japanese), where a hard-coded pattern only suits one
+     * language.
      */
     private fun localizedFormat(skeleton: String): SimpleDateFormat {
         val locale = Locale.getDefault()
         return SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, skeleton), locale)
     }
 
-    /** Heure « 09:14 » ou « 9:14 AM » selon l'usage de la langue et le réglage 12/24 h. */
+    /** Time “09:14” or “9:14 AM” according to the language's usage and the 12/24 h setting. */
     fun formatClock(timestampMs: Long): String {
         val locale = Locale.getDefault()
         val skeleton = if (appContext?.let { DateFormat.is24HourFormat(it) } != false) "Hm" else "hm"
@@ -83,10 +83,10 @@ object FormatUtils {
     }
 
     /**
-     * Altitude formatée, ou un tiret quand elle n'est pas connue.
+     * Formatted altitude, or a dash when it is not known.
      *
-     * Un « 0 m » de repli se lirait comme une mesure au niveau de la mer, alors qu'il
-     * signifie seulement que le GPS n'a pas fourni d'altitude exploitable.
+     * A fallback “0 m” would read as a measurement at sea level, whereas it
+     * only means the GPS did not provide a usable altitude.
      */
     fun formatElevationOrUnknown(elevationMeters: Double?): String =
         if (elevationMeters == null) "—" else formatElevation(elevationMeters)
@@ -108,9 +108,9 @@ object FormatUtils {
     }
 
     /**
-     * Nom d'un parcours terminé : « Parcours du 27/09/2026 à 09:14 à 11:02 ». Stocké
-     * en base dans la langue de l'appareil au moment de l'arrêt, comme le serait un
-     * nom saisi à la main.
+     * Name of a finished track: “Track on 09/27/2026 from 09:14 to 11:02”. Stored
+     * in the database in the device's language at the time of stopping, as a
+     * name typed by hand would be.
      */
     fun formatTrackName(startTimeMs: Long, endTimeMs: Long): String =
         string(
@@ -128,14 +128,14 @@ object FormatUtils {
         )
 
     // ------------------------------------------------------------------
-    // Formats courts de la refonte (« 18,4 km », « 4 h 12 », « Dim. 27 sept. · 09:14 »).
+    // Short formats of the redesign (“18.4 km”, “4 h 12”, “Sun. Sep 27 · 09:14”).
     //
-    // Ils servent à l'affichage dans les listes et les fiches, où la place compte et
-    // où une précision au mètre ou à la seconde n'apprend rien. Les formats longs
-    // ci-dessus restent ceux du suivi en direct.
+    // They serve for display in lists and sheets, where room is tight and
+    // where precision to the meter or second teaches nothing. The long formats
+    // above remain those of live tracking.
     // ------------------------------------------------------------------
 
-    /** « 850 m », « 6,1 km », « 18,4 km », « 142 km » : une décimale sous 100 km. */
+    /** “850 m”, “6.1 km”, “18.4 km”, “142 km”: one decimal under 100 km. */
     fun formatDistanceShort(meters: Double): String {
         val locale = Locale.getDefault()
         return if (isMetric) {
@@ -151,7 +151,7 @@ object FormatUtils {
         }
     }
 
-    /** « 45 min », « 1 h 24 », « 13 h 06 » ; « 0 min » pour une durée nulle. */
+    /** “45 min”, “1 h 24”, “13 h 06”; “0 min” for a zero duration. */
     fun formatDurationShort(seconds: Long): String {
         val totalMinutes = seconds / 60
         val h = totalMinutes / 60
@@ -160,24 +160,24 @@ object FormatUtils {
         else string(R.string.duration_hours_minutes, "%1\$d h %2\$02d", h, m)
     }
 
-    /** Dénivelé groupé par milliers : « 386 m », « 1 204 m ». */
+    /** Elevation grouped by thousands: “386 m”, “1,204 m”. */
     fun formatElevationShort(elevationMeters: Double): String {
         val locale = Locale.getDefault()
         return if (isMetric) String.format(locale, "%,.0f m", elevationMeters)
         else String.format(locale, "%,.0f ft", elevationMeters * 3.28084)
     }
 
-    /** « Dim. 27 sept. · 09:14 ». */
+    /** “Sun. Sep 27 · 09:14”. */
     fun formatDayDate(timestampMs: Long): String {
         val day = localizedFormat("EEEdMMM").format(Date(timestampMs))
         return day.replaceFirstChar { it.uppercase() } + " · " + formatClock(timestampMs)
     }
 
-    /** « 27 sept. » : pour « Importé le 27 sept. ». */
+    /** “Sep 27”: for “Imported on Sep 27”. */
     fun formatShortDate(timestampMs: Long): String =
         localizedFormat("dMMM").format(Date(timestampMs))
 
-    /** « 27 sept. 2026 », ou « 27 sept. » sans l'année. */
+    /** “Sep 27, 2026”, or “Sep 27” without the year. */
     fun formatDateLong(timestampMs: Long, withYear: Boolean): String =
         localizedFormat(if (withYear) "dMMMy" else "dMMM").format(Date(timestampMs))
 }

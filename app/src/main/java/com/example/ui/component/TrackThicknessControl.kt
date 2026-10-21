@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.example.util.TrackStylePreferences
 import java.util.Locale
 
-/** "3,5" plutôt que "3.5" (séparateur de la langue) ; et "6" plutôt que "6,0". */
+/** "3.5" rather than "3,5" (the language's separator); and "6" rather than "6.0". */
 private fun formatThicknessDp(value: Float): String {
     val rounded = Math.round(value * 10) / 10f
     return if (rounded % 1f == 0f) rounded.toInt().toString()
@@ -62,19 +62,19 @@ private fun formatThicknessDp(value: Float): String {
         .replace('.', java.text.DecimalFormatSymbols.getInstance().decimalSeparator)
 }
 
-/** Pas du bouton « − / + » : un demi-dp, la plus petite différence visible. */
+/** Step of the “− / +” button: half a dp, the smallest visible difference. */
 private const val THICKNESS_STEP_DP = 0.5f
 
 /**
- * Épaisseur du trait d'un parcours, choisie dans la même feuille que sa couleur.
+ * Line thickness of a track, chosen in the same sheet as its color.
  *
- * Trois voies qui se répondent : les boutons « − / + » pour un ajustement fin, le
- * champ central pour une valeur précise (virgule acceptée), le curseur pour un
- * réglage rapide. Aucun n'est cranté sur des paliers prédéfinis, sauf le pas des
- * boutons.
+ * Three ways that answer each other: the “− / +” buttons for a fine adjustment, the
+ * central field for a precise value (comma accepted), the slider for a
+ * quick adjustment. None is stepped on predefined levels, except the buttons'
+ * step.
  *
- * Contrôlé de l'extérieur : rien n'est enregistré ici, la feuille n'applique le
- * choix qu'à « Appliquer », comme pour la couleur.
+ * Controlled from outside: nothing is saved here, the sheet only applies the
+ * choice on “Apply”, as for the color.
  */
 @Composable
 fun TrackThicknessControl(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier) {
@@ -85,8 +85,8 @@ fun TrackThicknessControl(value: Float, onValueChange: (Float) -> Unit, modifier
 
     var textValue by remember { mutableStateOf(formatThicknessDp(value)) }
     var editing by remember { mutableStateOf(false) }
-    // Suit les boutons et le curseur, mais pas pendant la saisie : réécrire le champ
-    // à chaque frappe effacerait une virgule qu'on vient juste de taper.
+    // Follows the buttons and the slider, but not during typing: rewriting the field
+    // at every keystroke would erase a comma that was just typed.
     LaunchedEffect(value) { if (!editing) textValue = formatThicknessDp(value) }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -123,9 +123,9 @@ fun TrackThicknessControl(value: Float, onValueChange: (Float) -> Unit, modifier
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier
                         .width(36.dp)
-                        // Une saisie hors bornes ou illisible est ramenée à l'affichage dès
-                        // que l'on quitte le champ, plutôt que de rester là à contredire
-                        // l'épaisseur réellement retenue.
+                        // An out-of-bounds or unreadable entry is brought back to the display as soon
+                        // as the field is left, rather than staying there contradicting
+                        // the thickness actually retained.
                         .onFocusChanged { focus ->
                             editing = focus.isFocused
                             if (!focus.isFocused) textValue = formatThicknessDp(value)
@@ -156,7 +156,7 @@ private fun StepperButton(icon: ImageVector, description: String, testTag: Strin
     }
 }
 
-/** Curseur de la maquette : piste épaisse coupée autour d'une poignée verticale. */
+/** Slider from the mockup: thick track cut around a vertical handle. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ThicknessSlider(value: Float, onValueChange: (Float) -> Unit) {

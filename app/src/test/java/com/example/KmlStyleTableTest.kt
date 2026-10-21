@@ -6,12 +6,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Google Earth n'écrit pas la couleur dans le tracé : le `<Placemark>` renvoie à un
- * style par son identifiant, et ce style peut être un `<StyleMap>` qui distingue
- * l'apparence au repos de celle au survol.
+ * Google Earth does not write the color in the line: the `<Placemark>` refers to a
+ * style by its identifier, and that style may be a `<StyleMap>` that distinguishes
+ * the resting appearance from the hover one.
  *
- * Ces tests fixent la résolution, y compris le cas qui a motivé tout ce détour : un
- * fichier réunissant plusieurs trajets, chacun renvoyant à son propre style.
+ * These tests pin down the resolution, including the case that motivated this whole detour: a
+ * file gathering several trips, each referring to its own style.
  */
 class KmlStyleTableTest {
 
@@ -20,7 +20,7 @@ class KmlStyleTableTest {
     private val vert = 0xFF00FF00.toInt()
 
     @Test
-    fun `un styleUrl direct donne la couleur du style`() {
+    fun `a direct styleUrl gives the style's color`() {
         val table = KmlStyleTable()
         table.putStyle("trace1", rouge)
 
@@ -28,7 +28,7 @@ class KmlStyleTableTest {
     }
 
     @Test
-    fun `le croisillon est facultatif`() {
+    fun `the hash sign is optional`() {
         val table = KmlStyleTable()
         table.putStyle("#trace1", rouge)
 
@@ -36,9 +36,9 @@ class KmlStyleTableTest {
     }
 
     @Test
-    fun `un StyleMap mène au style au repos, pas à celui de survol`() {
-        // C'est tout l'intérêt de la résolution : prendre le premier style venu
-        // ramènerait la couleur de survol, que l'utilisateur ne voit jamais.
+    fun `a StyleMap leads to the resting style, not the hover one`() {
+        // That is the whole point of the resolution: taking the first style at hand
+        // would bring back the hover color, which the user never sees.
         val table = KmlStyleTable()
         table.putStyle("repos", rouge)
         table.putStyle("survol", bleu)
@@ -48,8 +48,8 @@ class KmlStyleTableTest {
     }
 
     @Test
-    fun `chaque trajet garde sa couleur`() {
-        // Le cas réel : un export Google Earth réunissant plusieurs voyages.
+    fun `each trip keeps its color`() {
+        // The real case: a Google Earth export gathering several trips.
         val table = KmlStyleTable()
         table.putStyle("hendaye", rouge)
         table.putStyle("savoie", bleu)
@@ -61,7 +61,7 @@ class KmlStyleTableTest {
     }
 
     @Test
-    fun `un style inconnu ne donne pas de couleur`() {
+    fun `an unknown style gives no color`() {
         val table = KmlStyleTable()
         table.putStyle("trace1", rouge)
 
@@ -71,9 +71,9 @@ class KmlStyleTableTest {
     }
 
     @Test
-    fun `un style sans couleur de ligne ne donne pas de couleur`() {
-        // Un <Style> qui ne porte qu'une icône ou un remplissage : rien à en tirer
-        // pour le tracé, et surtout pas une couleur inventée.
+    fun `a style without a line color gives no color`() {
+        // A <Style> that carries only an icon or a fill: nothing to take from it
+        // for the line, and above all not an invented color.
         val table = KmlStyleTable()
         table.putStyle("iconeSeule", null)
 
@@ -81,10 +81,10 @@ class KmlStyleTableTest {
     }
 
     @Test
-    fun `deux StyleMap qui se renvoient l un à l autre ne bloquent pas l import`() {
-        // Rien dans le format ne l'interdit, et une résolution naïve tournerait en
-        // boucle — sur un fichier de plusieurs centaines de Mo, l'import ne
-        // reviendrait jamais.
+    fun `two StyleMaps referring to each other do not block the import`() {
+        // Nothing in the format forbids it, and a naive resolution would loop
+        // forever — on a file of several hundred MB, the import would
+        // never return.
         val table = KmlStyleTable()
         table.putStyleMap("a", "#b")
         table.putStyleMap("b", "#a")

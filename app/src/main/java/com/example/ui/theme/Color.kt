@@ -2,16 +2,16 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Palette de la refonte : Material 3, tonale, issue d'un vert « sapin » (graine
-// #2E7D5B) avec un tertiaire abricot. Valeurs relevées telles quelles sur la planche
-// « Système de design » de la maquette, rôle par rôle.
+// Palette of the redesign: Material 3, tonal, derived from a “fir” green (seed
+// #2E7D5B) with an apricot tertiary. Values taken as is from the mockup's
+// “Design system” board, role by role.
 //
-// **Palette fixe, choix de l'auteur.** La maquette la prévoyait en secours de la
-// couleur dynamique d'Android 12+ (Material You) ; l'auteur a préféré qu'elle
-// s'applique partout, pour que l'application ait la même allure quel que soit le
-// fond d'écran. Voir `MyApplicationTheme`.
+// **Fixed palette, the author's choice.** The mockup planned it as a fallback for
+// Android 12+ dynamic color (Material You); the author preferred it to
+// apply everywhere, so that the app looks the same whatever the
+// wallpaper. See `MyApplicationTheme`.
 
-// ---------------------------------------------------------------- Clair
+// ---------------------------------------------------------------- Light
 
 val LightPrimary = Color(0xFF1F6A4F)
 val LightOnPrimary = Color(0xFFFFFFFF)
@@ -42,7 +42,7 @@ val LightSurfaceContainer = Color(0xFFE9EFE9)
 val LightSurfaceContainerHigh = Color(0xFFE4EAE4)
 val LightSurfaceContainerHighest = Color(0xFFDEE4DE)
 
-// ---------------------------------------------------------------- Sombre
+// ---------------------------------------------------------------- Dark
 
 val DarkPrimary = Color(0xFF8CD5B3)
 val DarkOnPrimary = Color(0xFF003826)
@@ -73,13 +73,13 @@ val DarkSurfaceContainer = Color(0xFF1B211E)
 val DarkSurfaceContainerHigh = Color(0xFF252B28)
 val DarkSurfaceContainerHighest = Color(0xFF303633)
 
-// ------------------------------------------------ Couleurs hors schéma Material
+// ------------------------------------------------ Colors outside the Material scheme
 
 /**
- * Couleur de l'enregistrement en cours (pastille « ENREGISTREMENT », tracé vivant).
- * Hors du schéma Material, qui n'a pas de rôle pour « ça enregistre » : ni l'erreur,
- * qui dirait que quelque chose ne va pas, ni le primaire, qui ne se distinguerait pas
- * des boutons. D'où [LocalRecordingColor], qui suit le thème clair ou sombre.
+ * Color of the recording in progress (“RECORDING” chip, live line).
+ * Outside the Material scheme, which has no role for “it is recording”: neither error,
+ * which would say something is wrong, nor primary, which would not stand out
+ * from the buttons. Hence [LocalRecordingColor], which follows the light or dark theme.
  */
 val RecordingLight = Color(0xFFE4572E)
 val RecordingDark = Color(0xFFFF8A65)

@@ -13,9 +13,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Mise à jour de l'application depuis GitHub : ouvrir l'installateur système
-         sur l'APK téléchargé. L'installation reste confirmée par l'utilisateur, une
-         application ordinaire ne peut pas installer en silence. -->
+    <!-- App update from GitHub: open the system installer
+         on the downloaded APK. The installation remains confirmed by the user, an
+         ordinary app cannot install silently. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application

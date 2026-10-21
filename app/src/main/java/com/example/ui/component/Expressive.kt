@@ -63,19 +63,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-// Briques d'interface partagées par les écrans de la refonte : formes « cookie » et
-// « soleil » de Material 3 Expressive, dialogues, feuilles, interrupteur à coche,
-// tuile de parcours, et messages en bas d'écran.
+// Interface building blocks shared by the redesigned screens: “cookie” and
+// “sun” shapes from Material 3 Expressive, dialogs, sheets, checkmark switch,
+// track tile, and messages at the bottom of the screen.
 //
-// Tout ce qui se répète d'un écran à l'autre dans la maquette vit ici, pour qu'un
-// réglage de forme ou de couleur ne se fasse qu'une fois.
+// Everything that repeats from one screen to another in the mockup lives here, so that a
+// shape or color tweak is only made once.
 
-// ------------------------------------------------------------------------ Formes
+// ------------------------------------------------------------------------ Shapes
 
-// Contours relevés tels quels dans la maquette (clip-path SVG, coordonnées 0 à 100).
-// Material 3 Expressive les fournit dans androidx.graphics.shapes, absente de la
-// version de Compose du projet : les recopier point par point est plus sûr que d'en
-// approcher la silhouette par une formule.
+// Outlines taken as is from the mockup (SVG clip-path, coordinates 0 to 100).
+// Material 3 Expressive provides them in androidx.graphics.shapes, absent from the
+// project's version of Compose: copying them point by point is safer than
+// approximating the silhouette with a formula.
 
 private val COOKIE_OUTLINE = floatArrayOf(
     98.5f, 50f, 97.8f, 53.1f, 95.9f, 56f, 93.2f, 58.6f, 90.3f, 60.8f, 88f, 62.9f, 86.5f, 65.1f, 86f, 67.7f,
@@ -107,7 +107,7 @@ private val SUN_OUTLINE = floatArrayOf(
     91.6f, 26f, 92.3f, 29.2f, 91.6f, 32.8f, 90.6f, 36.2f, 90.6f, 39.1f, 92.1f, 41.6f, 94.6f, 44.1f, 97f, 46.9f
 )
 
-/** Polygone dont les sommets sont donnés en pourcentage de la boîte (0 à 100). */
+/** Polygon whose vertices are given as a percentage of the box (0 to 100). */
 private class OutlineShape(private val points: FloatArray) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val sx = size.width / 100f
@@ -125,15 +125,15 @@ private class OutlineShape(private val points: FloatArray) : Shape {
     }
 }
 
-/** « Cookie » à huit lobes : icônes héros, états vides, chargement. */
+/** Eight-lobed “cookie”: hero icons, empty states, loading. */
 val CookieShape: Shape = OutlineShape(COOKIE_OUTLINE)
 
-/** « Soleil » à douze rayons : succès, mise à jour. */
+/** Twelve-rayed “sun”: success, update. */
 val SunShape: Shape = OutlineShape(SUN_OUTLINE)
 
 /**
- * Icône posée sur une forme pleine : le motif « héros » de la maquette, en tête des
- * dialogues, des feuilles et des états vides.
+ * Icon placed on a solid shape: the mockup's “hero” motif, at the head of
+ * dialogs, sheets and empty states.
  */
 @Composable
 fun ShapeBadge(
@@ -157,8 +157,8 @@ fun ShapeBadge(
 }
 
 /**
- * Tuile colorée d'un parcours : l'icône d'itinéraire, en blanc sur la couleur du
- * tracé. Elle remplace la pastille ronde de l'ancien historique.
+ * Colored tile of a track: the route icon, in white on the color of the
+ * line. It replaces the round chip of the old history.
  */
 @Composable
 fun TrackTile(
@@ -179,9 +179,9 @@ fun TrackTile(
     }
 }
 
-// ---------------------------------------------------------------- Interrupteur
+// ---------------------------------------------------------------- Switch
 
-/** Interrupteur de la maquette : une coche dans la poignée quand il est activé. */
+/** Switch from the mockup: a checkmark in the handle when it is on. */
 @Composable
 fun MpSwitch(
     checked: Boolean,
@@ -207,9 +207,9 @@ fun MpSwitch(
     )
 }
 
-// -------------------------------------------------------------------- Boutons
+// -------------------------------------------------------------------- Buttons
 
-/** Bouton plein en pilule, 48 dp : l'action principale d'un dialogue ou d'une feuille. */
+/** Solid pill button, 48 dp: the main action of a dialog or sheet. */
 @Composable
 fun MpFilledButton(
     text: String,
@@ -236,7 +236,7 @@ fun MpFilledButton(
     }
 }
 
-/** Bouton texte de la maquette : l'action secondaire, en couleur primaire. */
+/** Text button from the mockup: the secondary action, in primary color. */
 @Composable
 fun MpTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     TextButton(onClick = onClick, modifier = modifier.height(48.dp)) {
@@ -248,14 +248,14 @@ fun MpTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
     }
 }
 
-// ------------------------------------------------------------------- Dialogues
+// ------------------------------------------------------------------- Dialogs
 
 /**
- * Dialogue de la maquette : icône « héros » centrée, titre en Bricolage, texte, et
- * deux boutons alignés à droite. Coins de 32 dp sur `surfaceContainerHigh`.
+ * Dialog from the mockup: centered “hero” icon, title in Bricolage, text, and
+ * two buttons aligned to the right. 32 dp corners on `surfaceContainerHigh`.
  *
- * Un `AlertDialog` de Material, habillé : il garde tout ce qu'un dialogue doit faire
- * (retour arrière, voile, accessibilité) sans rien réécrire.
+ * A Material `AlertDialog`, dressed up: it keeps everything a dialog must do
+ * (back navigation, scrim, accessibility) without rewriting anything.
  */
 @Composable
 fun MpDialog(
@@ -317,11 +317,11 @@ fun MpDialog(
     )
 }
 
-// -------------------------------------------------------------------- Feuilles
+// -------------------------------------------------------------------- Sheets
 
 /**
- * Feuille montante de la maquette : coins de 32 dp en haut, `surfaceContainerLow`,
- * poignée de 32 × 4 dp. Le contenu est déjà dans ses marges.
+ * Rising sheet from the mockup: 32 dp corners at the top, `surfaceContainerLow`,
+ * 32 × 4 dp handle. The content is already within its margins.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -355,7 +355,7 @@ fun MpSheet(
     }
 }
 
-/** Titre de feuille (« Couleur du tracé ») et sa ligne d'explication. */
+/** Sheet title (“Line color”) and its explanation line. */
 @Composable
 fun SheetHeader(title: String, subtitle: String? = null) {
     Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
@@ -371,21 +371,21 @@ fun SheetHeader(title: String, subtitle: String? = null) {
 
 // -------------------------------------------------------------------- Messages
 
-/** Un message bref en bas d'écran, avec une action facultative. */
+/** A brief message at the bottom of the screen, with an optional action. */
 data class AppMessage(
     val text: String,
     val icon: ImageVector,
     val isError: Boolean = false,
     val actionLabel: String? = null,
     val onAction: (() -> Unit)? = null,
-    // Deux messages identiques à la suite doivent tout de même se remontrer.
+    // Two identical messages in a row must still show again.
     val id: Long = System.nanoTime()
 )
 
 /**
- * Messages brefs de la maquette, à la place des `Toast` d'Android : ils prennent les
- * couleurs de l'application, portent une icône, et peuvent offrir une action
- * (« Réessayer »). Un seul à la fois ; le suivant remplace le précédent.
+ * Brief messages from the mockup, in place of Android's `Toast`: they take
+ * the app's colors, carry an icon, and can offer an action
+ * (“Retry”). Only one at a time; the next replaces the previous.
  */
 @Stable
 class AppMessenger {
@@ -410,13 +410,13 @@ class AppMessenger {
 val LocalAppMessenger = staticCompositionLocalOf { AppMessenger() }
 
 /**
- * Affiche le message courant de [messenger], [bottomPadding] au-dessus du bas de
- * l'écran (la barre de navigation, qu'il ne doit pas recouvrir).
+ * Displays the current message of [messenger], [bottomPadding] above the bottom of
+ * the screen (the navigation bar, which it must not cover).
  *
- * **Il glisse, il ne se fond pas.** Le bandeau porte une ombre, et une opacité
- * intermédiaire la trancherait net (voir « L'ombre tranchée » dans CLAUDE.md) ; il
- * entre donc par translation depuis sous le bord de l'écran, où il n'est pas visible,
- * et en ressort de même.
+ * **It slides, it does not fade.** The banner carries a shadow, and an
+ * intermediate opacity would slice it flat (see “The sliced shadow” in CLAUDE.md); it
+ * therefore enters by translation from below the screen edge, where it is not visible,
+ * and leaves the same way.
  */
 @Composable
 fun AppMessageHost(
@@ -425,7 +425,7 @@ fun AppMessageHost(
     modifier: Modifier = Modifier
 ) {
     val message = messenger.current
-    // Le message affiché survit à sa disparition le temps de l'animation de sortie.
+    // The displayed message outlives its disappearance for the time of the exit animation.
     var shown by remember { mutableStateOf<AppMessage?>(null) }
     val slide = remember { Animatable(1f) }
 
@@ -459,7 +459,7 @@ fun AppMessageHost(
             .navigationBarsPadding()
             .padding(start = 16.dp, end = 16.dp, bottom = bottomPadding)
             .graphicsLayer {
-                // Assez bas pour sortir entièrement de l'écran, ombre comprise.
+                // Low enough to leave the screen entirely, shadow included.
                 translationY = slide.value * (size.height + bottomPadding.toPx() + 48.dp.toPx())
             }
     ) {
@@ -498,12 +498,12 @@ fun AppMessageHost(
     }
 }
 
-// ------------------------------------------------------------------ Progression
+// ------------------------------------------------------------------ Progress
 
 /**
- * Progression en vague de la maquette (Material 3 Expressive) : la part accomplie
- * ondule, le reste est un trait plat, séparé d'un vide. La vague avance d'elle-même,
- * ce qui montre que le travail continue même quand le pourcentage stagne.
+ * Wave progress from the mockup (Material 3 Expressive): the completed part
+ * undulates, the rest is a flat line, separated by a gap. The wave moves on its own,
+ * which shows that work continues even when the percentage stalls.
  */
 @Composable
 fun WaveProgress(
@@ -552,7 +552,7 @@ fun WaveProgress(
                 strokeWidth = stroke,
                 cap = androidx.compose.ui.graphics.StrokeCap.Round
             )
-            // Point d'arrivée, comme l'indicateur linéaire de Material 3.
+            // End point, like Material 3's linear indicator.
             drawCircle(color, radius = stroke / 2, center = androidx.compose.ui.geometry.Offset(size.width - stroke / 2, mid))
         }
     }

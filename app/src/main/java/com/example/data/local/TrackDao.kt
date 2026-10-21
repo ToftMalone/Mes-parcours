@@ -12,9 +12,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TrackDao {
-    // La ligne réservée d'un import en cours n'est pas encore un parcours : la montrer
-    // permettrait de l'ouvrir, de la fusionner ou de la supprimer pendant que l'import
-    // y écrit encore.
+    // The reserved row of an import in progress is not yet a track: showing it
+    // would allow opening, merging or deleting it while the import
+    // is still writing to it.
     @Query("SELECT * FROM tracks WHERE startTime != ${Track.IMPORT_PLACEHOLDER_START_TIME} ORDER BY startTime DESC")
     fun getAllTracks(): Flow<List<Track>>
 
@@ -31,16 +31,16 @@ interface TrackDao {
     suspend fun getActiveRecordingTrack(): Track?
 
     /**
-     * Écrit dans `displayColor` la couleur que chaque parcours affichait du temps des
-     * couleurs par catégorie, pour que le passage aux couleurs par parcours ne change
-     * rien à l'écran.
+     * Writes to `displayColor` the color each track displayed in the days of
+     * per-category colors, so that the move to per-track colors changes
+     * nothing on screen.
      *
-     * Reproduit exactement l'ancienne résolution : couleur du fichier si le réglage
-     * « garder les couleurs d'origine » était actif et que le fichier en portait une,
-     * sinon la couleur de la catégorie.
+     * Reproduces the old resolution exactly: the file's color if the “keep original
+     * colors” setting was on and the file carried one,
+     * otherwise the category's color.
      *
-     * En SQL plutôt qu'en Kotlin : une seule requête, aucun parcours chargé en mémoire.
-     * `WHERE displayColor IS NULL` la rend rejouable sans écraser un choix déjà fait.
+     * In SQL rather than Kotlin: a single query, no track loaded into memory.
+     * `WHERE displayColor IS NULL` makes it replayable without overwriting a choice already made.
      */
     @Query(
         """
@@ -65,12 +65,12 @@ interface TrackDao {
     suspend fun getPointsForTrack(trackId: Long): List<TrackPoint>
 
     // ------------------------------------------------------------------
-    // Affichage par fenêtre de vue : on ne charge jamais l'intégralité d'une
-    // trace dense en mémoire, seulement une silhouette globale + le détail
-    // de la zone visible. Les points restent tous en base.
+    // Viewport-based display: we never load a whole dense track into memory,
+    // only an overall silhouette + the detail of the visible
+    // area. All points remain in the database.
     // ------------------------------------------------------------------
 
-    /** Effectif et emprise géographique d'une trace, calculés une fois puis mis en cache. */
+    /** Count and geographic extent of a track, computed once then cached. */
     @Query(
         "SELECT MIN(id) AS minId, COUNT(*) AS pointCount, " +
                 "MIN(latitude) AS minLat, MAX(latitude) AS maxLat, " +
@@ -79,7 +79,7 @@ interface TrackDao {
     )
     suspend fun getTrackPointMeta(trackId: Long): TrackPointMeta?
 
-    /** Nombre de points dans la zone visible. Sert à calibrer le pas d'échantillonnage. */
+    /** Number of points in the visible area. Used to calibrate the sampling step. */
     @Query(
         "SELECT COUNT(*) FROM track_points " +
                 "WHERE trackId = :trackId " +
@@ -95,9 +95,9 @@ interface TrackDao {
     ): Int
 
     /**
-     * Silhouette de la trace entière : un point tous les [stride], plus toutes les
-     * ruptures de segment pour ne pas raccorder deux tronçons distincts.
-     * Calculée une fois par trace puis gardée en cache.
+     * Silhouette of the whole track: one point every [stride], plus all the
+     * segment breaks so as not to join two distinct segments.
+     * Computed once per track then kept in cache.
      */
     @Query(
         "SELECT * FROM track_points " +
@@ -108,8 +108,8 @@ interface TrackDao {
     suspend fun getSkeletonPoints(trackId: Long, minId: Long, stride: Long): List<TrackPoint>
 
     /**
-     * Détail de la zone visible. Avec [stride] = 1 (zoom suffisant), renvoie
-     * absolument tous les points de la trace présents à l'écran.
+     * Detail of the visible area. With [stride] = 1 (enough zoom), returns
+     * absolutely every point of the track present on screen.
      */
     @Query(
         "SELECT * FROM track_points " +
@@ -130,19 +130,19 @@ interface TrackDao {
     ): List<TrackPoint>
 
     // ------------------------------------------------------------------
-    // Fusion de parcours, entièrement côté base : les points sont recopiés
-    // par SQLite sans jamais transiter par la mémoire de l'application.
+    // Track merging, entirely on the database side: points are copied
+    // by SQLite without ever passing through the app's memory.
     // ------------------------------------------------------------------
 
     /**
-     * Horodatage du premier et du dernier point d'un parcours.
+     * Timestamp of the first and last point of a track.
      *
-     * Le rognage s'en sert pour convertir « retirer les cinq premières minutes » en
-     * une borne de temps absolue, sans charger le moindre point : deux entiers
-     * suffisent, quelle que soit la taille du parcours.
+     * Trimming uses them to convert “remove the first five minutes” into
+     * an absolute time bound, without loading a single point: two integers
+     * are enough, whatever the size of the track.
      *
-     * L'ordre est celui des identifiants, pas des horodatages — c'est celui du
-     * trajet, et c'est celui que suit tout le reste du projet.
+     * The order is that of the identifiers, not of the timestamps — it is that of the
+     * trip, and the one the rest of the project follows.
      */
     @Query("SELECT timestamp FROM track_points WHERE trackId = :trackId ORDER BY id ASC LIMIT 1")
     suspend fun getFirstPointTimestamp(trackId: Long): Long?
@@ -160,12 +160,12 @@ interface TrackDao {
     suspend fun countPointsAfter(trackId: Long, afterId: Long): Int
 
     /**
-     * Recopie les points de [sourceId] à la fin de [destinationId].
+     * Copies the points of [sourceId] to the end of [destinationId].
      *
-     * Le ORDER BY est indispensable : sans lui le planificateur pourrait parcourir
-     * l'index (trackId, latitude) et recopier les points dans l'ordre des latitudes.
-     * La borne [maxSourceId] permet de recopier un parcours dans lui-même sans
-     * relire les lignes que l'on vient d'écrire.
+     * The ORDER BY is essential: without it the planner could walk
+     * the (trackId, latitude) index and copy the points in latitude order.
+     * The [maxSourceId] bound makes it possible to copy a track into itself
+     * without rereading the rows just written.
      */
     @Query(
         "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor) " +
@@ -175,16 +175,16 @@ interface TrackDao {
     suspend fun copyPointsInto(destinationId: Long, sourceId: Long, maxSourceId: Long)
 
     /**
-     * Recopie dans [destinationId] les points de [sourceId] dont l'identifiant va de
-     * [fromId] inclus à [untilId] exclu. C'est ce qui permet au découpage de verser
-     * une tranche du parcours d'origine dans un parcours neuf sans charger un seul
-     * point en mémoire.
+     * Copies into [destinationId] the points of [sourceId] whose identifier goes from
+     * [fromId] inclusive to [untilId] exclusive. This is what lets splitting pour
+     * a slice of the original track into a new track without loading a single
+     * point into memory.
      *
-     * Le `ORDER BY` est indispensable pour la même raison que dans [copyPointsInto] :
-     * sans lui, le planificateur peut emprunter l'index (trackId, latitude) et
-     * recopier les points dans l'ordre des latitudes plutôt que dans celui du trajet.
+     * The `ORDER BY` is essential for the same reason as in [copyPointsInto]:
+     * without it, the planner may take the (trackId, latitude) index and
+     * copy the points in latitude order rather than trip order.
      *
-     * Pour la dernière tranche, passer `Long.MAX_VALUE` en [untilId].
+     * For the last slice, pass `Long.MAX_VALUE` as [untilId].
      */
     @Query(
         "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor) " +
@@ -199,12 +199,12 @@ interface TrackDao {
     )
 
     /**
-     * Retire la marque de rupture du premier point d'un parcours.
+     * Removes the break mark from the first point of a track.
      *
-     * Une tranche découpée commence précisément sur le point qui ouvrait un nouveau
-     * tronçon : dans son parcours d'origine c'était une rupture, dans le parcours
-     * neuf c'est simplement le début du tracé. Laisser la marque ferait ouvrir un
-     * tronçon vide avant le premier point.
+     * A split slice starts precisely on the point that opened a new
+     * segment: in its original track that was a break, in the new
+     * track it is simply the start of the line. Leaving the mark would open an
+     * empty segment before the first point.
      */
     @Query(
         "UPDATE track_points SET isDiscontinuous = 0 " +
@@ -212,7 +212,7 @@ interface TrackDao {
     )
     suspend fun clearFirstPointDiscontinuity(trackId: Long)
 
-    /** Marque le premier point inséré après [afterId] comme début d'un nouveau tronçon. */
+    /** Marks the first point inserted after [afterId] as the start of a new segment. */
     @Query(
         "UPDATE track_points SET isDiscontinuous = 1 " +
                 "WHERE id = (SELECT MIN(id) FROM track_points WHERE trackId = :trackId AND id > :afterId)"
@@ -222,25 +222,25 @@ interface TrackDao {
     @Query("DELETE FROM track_points WHERE trackId = :trackId AND id <= :maxId")
     suspend fun deletePointsUpTo(trackId: Long, maxId: Long)
 
-    /** Derniers points d'une trace (ordre décroissant), pour reprendre un enregistrement. */
+    /** Last points of a track (descending order), to resume a recording. */
     @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id DESC LIMIT :limit")
     suspend fun getLastPoints(trackId: Long, limit: Int): List<TrackPoint>
 
-    /** Lecture paginée par clé, pour exporter une trace sans la charger entièrement. */
+    /** Key-paginated read, to export a track without loading it entirely. */
     @Query("SELECT * FROM track_points WHERE trackId = :trackId AND id > :afterId ORDER BY id ASC LIMIT :limit")
     suspend fun getPointsPage(trackId: Long, afterId: Long, limit: Int): List<TrackPoint>
 
     // ------------------------------------------------------------------
-    // Insertions : ABORT, et surtout pas REPLACE.
+    // Inserts: ABORT, and above all not REPLACE.
     //
-    // Toutes les insertions passent un id à 0, donc laissent SQLite l'attribuer : un
-    // conflit de clé primaire ne peut pas se produire aujourd'hui. Mais REPLACE
-    // signifie DELETE puis INSERT, et track_points est lié à tracks par une clé
-    // étrangère ON DELETE CASCADE : le jour où un Track serait réinséré avec un id
-    // existant, la suppression implicite emporterait tous ses points. Un parcours de
-    // plusieurs millions de points disparaîtrait sans le moindre message.
+    // All inserts pass an id of 0, so they let SQLite assign it: a
+    // primary key conflict cannot happen today. But REPLACE
+    // means DELETE then INSERT, and track_points is tied to tracks by a
+    // foreign key ON DELETE CASCADE: the day a Track were reinserted with an
+    // existing id, the implicit deletion would take all its points with it. A track of
+    // several million points would vanish without a single message.
     //
-    // ABORT fait échouer l'insertion à la place. Le piège ne peut plus se refermer.
+    // ABORT makes the insert fail instead. The trap can no longer close.
     // ------------------------------------------------------------------
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -255,9 +255,9 @@ interface TrackDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTrackPoints(points: List<TrackPoint>)
 
-    // Variantes bloquantes, utilisées par l'import en flux : le parsing SAX est
-    // synchrone et ne peut pas appeler de fonction suspend. À n'appeler que
-    // depuis un thread d'arrière-plan.
+    // Blocking variants, used by the streaming import: SAX parsing is
+    // synchronous and cannot call a suspend function. To be called only
+    // from a background thread.
     @Insert(onConflict = OnConflictStrategy.ABORT)
     fun insertTrackBlocking(track: Track): Long
 
@@ -273,11 +273,11 @@ interface TrackDao {
     @Query("DELETE FROM track_points WHERE trackId = :trackId")
     suspend fun deletePointsForTrack(trackId: Long)
 
-    /** Mémorise la pause d'un enregistrement, sans réécrire le reste de la ligne. */
+    /** Stores the pause of a recording, without rewriting the rest of the row. */
     @Query("UPDATE tracks SET isPaused = :paused WHERE id = :trackId")
     suspend fun setTrackPaused(trackId: Long, paused: Boolean)
 
-    /** Lignes laissées par un import interrompu : voir `Track.IMPORT_PLACEHOLDER_START_TIME`. */
+    /** Rows left by an interrupted import: see `Track.IMPORT_PLACEHOLDER_START_TIME`. */
     @Query("DELETE FROM track_points WHERE trackId IN (SELECT id FROM tracks WHERE startTime = ${Track.IMPORT_PLACEHOLDER_START_TIME})")
     fun deleteImportPlaceholderPointsBlocking()
 

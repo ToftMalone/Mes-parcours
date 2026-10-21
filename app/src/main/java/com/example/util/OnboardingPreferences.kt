@@ -7,7 +7,7 @@ import android.preference.PreferenceManager
 import androidx.core.content.ContextCompat
 
 /**
- * L'écran d'accueil ne doit apparaître qu'une fois, au tout premier lancement.
+ * The welcome screen must only appear once, on the very first launch.
  */
 object OnboardingPreferences {
 
@@ -23,21 +23,21 @@ object OnboardingPreferences {
     }
 
     /**
-     * Marque l'accueil comme déjà vu sur une installation déjà en usage avant
-     * l'introduction de cet écran.
+     * Marks the welcome as already seen on an installation that was in use before
+     * this screen was introduced.
      *
-     * Sans cette reprise, l'écran apparaîtrait une fois de trop à un utilisateur qui
-     * a déjà répondu aux demandes d'autorisation et enregistré des parcours depuis
-     * longtemps — même logique que `TrackRepository.backfillDisplayColors` pour les
-     * couleurs par parcours.
+     * Without this backfill, the screen would appear once too often to a user who
+     * has long since answered the permission requests and recorded tracks —
+     * same logic as `TrackRepository.backfillDisplayColors` for
+     * per-track colors.
      *
-     * Deux indices retenus, faute d'un mieux : la permission de localisation déjà
-     * accordée (elle ne peut l'être qu'après un premier passage par la boîte de
-     * dialogue système, donc par une version antérieure de l'application), ou
-     * l'existence déjà du fichier de base — signe qu'un parcours y a été écrit.
+     * Two clues retained, for lack of better: the location permission already
+     * granted (it can only be so after a first pass through the system
+     * dialog, hence through an earlier version of the app), or
+     * the database file already existing — a sign that a track was written to it.
      *
-     * [hasExistingDatabase] doit être vérifié **avant** tout accès à la base : ouvrir
-     * la base la crée si elle n'existait pas encore, ce qui fausserait le résultat.
+     * [hasExistingDatabase] must be checked **before** any database access: opening
+     * the database creates it if it did not exist yet, which would skew the result.
      */
     fun backfillIfAlreadyUsed(context: Context, hasExistingDatabase: Boolean) {
         if (isCompleted(context)) return

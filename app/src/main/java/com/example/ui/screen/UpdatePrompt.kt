@@ -62,7 +62,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Étapes de la proposition de mise à jour. */
+/** Steps of the update proposal. */
 private sealed interface UpdateState {
     data object Idle : UpdateState
     data class Available(val update: AvailableUpdate) : UpdateState
@@ -73,24 +73,24 @@ private sealed interface UpdateState {
 }
 
 /**
- * Recherche une nouvelle version au démarrage et propose de l'installer.
+ * Looks for a new version at startup and offers to install it.
  *
- * N'affiche jamais rien tant qu'aucune mise à jour n'est disponible, et reste
- * entièrement inerte si [UpdateConfig] n'est pas renseigné : aucune requête n'est
- * alors émise. Un échec de recherche est silencieux — ne pas joindre le serveur ne
- * concerne pas l'utilisateur.
+ * Never displays anything as long as no update is available, and stays
+ * entirely inert if [UpdateConfig] is not filled in: no request is
+ * then issued. A failed search is silent — not reaching the server is none
+ * of the user's concern.
  *
- * Chaque étape s'affiche dans une feuille du bas, comme sur la maquette.
+ * Each step is shown in a bottom sheet, as on the mockup.
  *
- * @param reopenTrigger Incrémenté par l'appelant (le bouton des réglages) pour
- * rouvrir la feuille sur la mise à jour déjà détectée, sans relancer une recherche
- * réseau ni redémarrer l'application.
- * @param isVisible Suspend l'affichage sans sortir de la composition, le temps qu'un
- * autre écran occupe la place. Sortir vraiment de la composition effacerait la mise à
- * jour déjà trouvée, et le prochain retour relancerait une requête réseau tout en
- * rouvrant une feuille que l'utilisateur avait écartée.
- * @param onUpdateAvailable Prévient l'appelant dès qu'une mise à jour est détectée,
- * pour qu'il puisse afficher un badge persistant même une fois la feuille ignorée.
+ * @param reopenTrigger Incremented by the caller (the settings button) to
+ * reopen the sheet on the update already detected, without launching a network
+ * search again or restarting the app.
+ * @param isVisible Suspends the display without leaving the composition, while another
+ * screen takes the place. Really leaving the composition would erase the update
+ * already found, and the next return would relaunch a network request while
+ * reopening a sheet the user had dismissed.
+ * @param onUpdateAvailable Notifies the caller as soon as an update is detected,
+ * so that it can show a persistent badge even once the sheet is ignored.
  */
 @Composable
 fun UpdatePrompt(
@@ -104,26 +104,26 @@ fun UpdatePrompt(
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<UpdateState>(UpdateState.Idle) }
     var downloadJob by remember { mutableStateOf<Job?>(null) }
-    // Conservée même une fois la feuille ignorée (state redevenu Idle), pour pouvoir
-    // la rouvrir sur la même mise à jour sans reconsulter le réseau.
+    // Kept even once the sheet is dismissed (state back to Idle), to be able to
+    // reopen it on the same update without consulting the network again.
     var knownUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
-    // « Continuer en arrière-plan » : la feuille se range, le téléchargement se
-    // poursuit tant que l'application est ouverte, et la feuille revient d'elle-même
-    // à l'étape suivante (prêt à installer, ou interrompu).
+    // “Continue in background”: the sheet tucks away, the download continues
+    // as long as the app is open, and the sheet comes back by itself
+    // at the next step (ready to install, or interrupted).
     var hiddenWhileDownloading by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        // Le ménage d'abord, et à chaque lancement plutôt qu'à la seule découverte
-        // d'une version plus récente : un APK déjà téléchargé ne resservira jamais —
-        // `download` réécrit systématiquement le fichier — et n'a donc aucune raison
-        // de survivre au lancement suivant, que l'installation ait abouti ou que
-        // l'utilisateur y ait renoncé. Le faire seulement quand une nouveauté se
-        // présentait laissait une vingtaine de Mio sur le disque entre deux
-        // publications, sauvegardés avec le reste jusqu'à ce que `backup_rules.xml`
-        // les en écarte.
+        // Cleanup first, and at every launch rather than only when a newer
+        // version is discovered: an already downloaded APK will never be used again —
+        // `download` systematically rewrites the file — and therefore has no reason
+        // to survive until the next launch, whether the installation succeeded or
+        // the user gave up on it. Doing it only when something new
+        // showed up left some twenty MiB on disk between two
+        // releases, backed up with the rest until `backup_rules.xml`
+        // excluded them.
         //
-        // Sur Dispatchers.IO : c'est un parcours de répertoire et des suppressions,
-        // rien qui ait sa place sur le thread principal.
+        // On Dispatchers.IO: it is a directory walk and deletions,
+        // nothing that belongs on the main thread.
         withContext(Dispatchers.IO) { UpdateDownloader.clearDownloads(context) }
 
         val update = UpdateChecker.fetchLatest() ?: return@LaunchedEffect
@@ -136,8 +136,8 @@ fun UpdatePrompt(
 
     LaunchedEffect(reopenTrigger) {
         if (reopenTrigger > 0) {
-            // Un téléchargement déjà en cours se montre tel quel plutôt que de repartir
-            // de zéro.
+            // A download already in progress is shown as is rather than starting
+            // from zero.
             if (state is UpdateState.Downloading) {
                 hiddenWhileDownloading = false
             } else {
@@ -170,7 +170,7 @@ fun UpdatePrompt(
         }
     }
 
-    // L'état reste vivant, seul l'affichage est suspendu.
+    // The state stays alive, only the display is suspended.
     if (!isVisible) return
 
     when (val current = state) {
@@ -190,7 +190,8 @@ fun UpdatePrompt(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
-            if (current.update.notes.isNotEmpty()) {
+            val notes = current.update.notesFor(java.util.Locale.getDefault().language)
+            if (notes.isNotEmpty()) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
@@ -200,7 +201,7 @@ fun UpdatePrompt(
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    current.update.notes.forEach { note ->
+                    notes.forEach { note ->
                         Text("• $note", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp))
                     }
                 }
@@ -332,7 +333,7 @@ fun UpdatePrompt(
     }
 }
 
-/** Coquille commune aux étapes, pour garder la même présentation. */
+/** Common shell for the steps, to keep the same presentation. */
 @Composable
 private fun UpdateSheet(onDismiss: () -> Unit, testTag: String, content: @Composable ColumnScope.() -> Unit) {
     MpSheet(onDismissRequest = onDismiss) {

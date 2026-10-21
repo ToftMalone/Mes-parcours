@@ -91,7 +91,7 @@ import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.delay
 
-/** Hauteur de la carte en tête de fiche ; le tiroir de statistiques la recouvre de 32 dp. */
+/** Height of the map at the top of the sheet; the statistics drawer overlaps it by 32 dp. */
 private val MAP_HEIGHT = 340.dp
 private val DRAWER_TOP = 308.dp
 
@@ -124,9 +124,9 @@ fun DetailView(
     val track by viewModel.selectedTrack.collectAsState()
     val points by viewModel.selectedTrackPoints.collectAsState()
 
-    // Les points arrivent après le parcours lui-même. Sans ce délai, un parcours dont
-    // les points sont encore en lecture passerait une fraction de seconde pour « vide »,
-    // son avertissement clignotant avant la carte.
+    // Points arrive after the track itself. Without this delay, a track whose
+    // points are still being read would pass for “empty” for a fraction of a second,
+    // its warning flashing before the map.
     var pointsSettled by remember(trackId) { mutableStateOf(false) }
     LaunchedEffect(trackId) {
         delay(800)
@@ -139,8 +139,8 @@ fun DetailView(
     var showDelete by rememberSaveable { mutableStateOf(false) }
     var showRefused by rememberSaveable { mutableStateOf(false) }
 
-    // Nom de fichier proposé au sélecteur d'Android : celui du parcours, débarrassé
-    // de ce qu'un système de fichiers refuserait.
+    // File name offered to Android's picker: the track's own, stripped
+    // of what a file system would refuse.
     fun fileNameFor(t: Track, extension: String) =
         t.name.replace("[\\\\/:*?\"<>|]".toRegex(), "_").replace("\\s+".toRegex(), "_") + extension
 
@@ -199,9 +199,9 @@ fun DetailView(
             )
         } ?: MaterialTheme.colorScheme.primary
 
-        // Utilisé à la fois pour la couleur de la carte (rouge tant que l'enregistrement
-        // continue, sans quoi ce Détail affiche la trace en cours dans sa couleur par
-        // défaut, comme si elle était déjà terminée) et pour le bouton « Reprendre ».
+        // Used both for the map color (red while the recording
+        // continues, otherwise this Detail shows the current track in its default
+        // color, as if it were already finished) and for the “Resume” button.
         val isCurrentRecording = currentTrack != null &&
             (currentTrack.isRecording || (isTracking && activeTrackId == currentTrack.id))
 
@@ -209,7 +209,7 @@ fun DetailView(
             currentTrack.totalDistance == 0.0
         val isLoading = currentTrack == null
 
-        // ------------------------------------------------------------ Carte
+        // ------------------------------------------------------------ Map
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -266,7 +266,7 @@ fun DetailView(
             }
         }
 
-        // ------------------------------------------------- Tiroir de statistiques
+        // ------------------------------------------------- Statistics drawer
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -296,7 +296,7 @@ fun DetailView(
             }
         }
 
-        // ------------------------------------------------------- Actions en bas
+        // ------------------------------------------------------- Bottom actions
         if (currentTrack != null && !isEmpty) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -343,7 +343,7 @@ fun DetailView(
         }
     }
 
-    // ------------------------------------------------------------ Feuilles
+    // ------------------------------------------------------------ Sheets
 
     if (showExport && track != null) {
         MpSheet(onDismissRequest = { showExport = false }) {
@@ -380,7 +380,7 @@ fun DetailView(
         }
     }
 
-    // ------------------------------------------------------------ Dialogues
+    // ------------------------------------------------------------ Dialogs
 
     if (isRenaming) {
         val current = track
@@ -417,8 +417,8 @@ fun DetailView(
                 onDismiss = { showDelete = false },
                 onConfirm = {
                     showDelete = false
-                    // Un enregistrement qui vient de démarrer est vide, donc présente lui
-                    // aussi ce bouton : c'est le dépôt qui refuse, et l'on reste ici.
+                    // A recording that has just started is empty, hence also presents
+                    // this button: it is the repository that refuses, and we stay here.
                     viewModel.deleteTrack(t.id) { deleted ->
                         if (deleted) {
                             messenger.show(context.getString(R.string.track_deleted_toast), Icons.Rounded.Delete)
@@ -447,7 +447,7 @@ fun DetailView(
     }
 }
 
-// ------------------------------------------------------------------ Contenus
+// ------------------------------------------------------------------ Contents
 
 @Composable
 private fun TrackStatsContent(
@@ -483,7 +483,7 @@ private fun TrackStatsContent(
     TrackMeta(track, trackColor)
 
     Spacer(modifier = Modifier.height(16.dp))
-    // Distance et durée : la carte vedette, sur toute la largeur.
+    // Distance and duration: the feature card, across the full width.
     Row(
         verticalAlignment = Alignment.Bottom,
         modifier = Modifier
@@ -602,7 +602,7 @@ private fun DetailTitleStyle() = MaterialTheme.typography.headlineMedium.copy(
     lineHeight = 31.sp
 )
 
-/** « ● Enregistré · Dim. 27 sept. · 09:14 ». */
+/** “● Recorded · Sun. Sep 27 · 09:14”. */
 @Composable
 private fun TrackMeta(track: Track, trackColor: Color) {
     val category = when {
@@ -734,9 +734,9 @@ private fun ExportCard(
     }
 }
 
-// --------------------------------------------------------- Chargement et vide
+// --------------------------------------------------------- Loading and empty
 
-/** Carte en cours de chargement : un cookie qui tourne sur un fond neutre. */
+/** Map being loaded: a spinning cookie on a neutral background. */
 @Composable
 private fun MapLoadingPlaceholder() {
     val transition = rememberInfiniteTransition(label = "detail_loading")
@@ -797,7 +797,7 @@ private fun NoCoordinatesPlaceholder() {
     }
 }
 
-/** Squelette du tiroir pendant que le parcours se charge. */
+/** Skeleton of the drawer while the track loads. */
 @Composable
 private fun StatsSkeleton() {
     val block = MaterialTheme.colorScheme.surfaceContainer
@@ -830,10 +830,10 @@ private fun StatsSkeleton() {
     }
 }
 
-// ------------------------------------------------------------ Profil d'altitude
+// ------------------------------------------------------------ Elevation profile
 
 private class AltitudeProfile(
-    /** Distance cumulée (m) et altitude (m) de chaque point retenu. */
+    /** Cumulative distance (m) and altitude (m) of each retained point. */
     val distances: FloatArray,
     val altitudes: FloatArray,
     val totalMeters: Double,
@@ -842,16 +842,16 @@ private class AltitudeProfile(
 )
 
 /**
- * Profil d'altitude tiré des points affichés.
+ * Elevation profile drawn from the displayed points.
  *
- * Ce sont les points d'affichage (silhouette et détail de la zone visible, voir
- * l'invariant 3), jamais relus pour l'occasion : pour une courbe de 84 dp de haut,
- * quelques centaines de points suffisent largement. Ils sont remis dans l'ordre du
- * parcours (par identifiant) et dédoublonnés, silhouette et détail pouvant se
- * recouvrir.
+ * These are the display points (silhouette and detail of the visible area, see
+ * invariant 3), never reread for the occasion: for a curve 84 dp high,
+ * a few hundred points are plenty. They are put back in track
+ * order (by identifier) and deduplicated, since silhouette and detail may
+ * overlap.
  *
- * Pas de profil sans altitude exploitable : un KML sans `<ele>` porte des altitudes
- * toutes nulles, qui dessineraient une ligne plate trompeuse.
+ * No profile without usable altitude: a KML without `<ele>` carries altitudes
+ * all at zero, which would draw a misleading flat line.
  */
 private fun altitudeProfile(points: List<TrackPoint>): AltitudeProfile? {
     if (points.size < 2) return null
@@ -864,8 +864,8 @@ private fun altitudeProfile(points: List<TrackPoint>): AltitudeProfile? {
     val distances = FloatArray(ordered.size)
     var total = 0.0
     for (i in 1 until ordered.size) {
-        // Un tronçon qui reprend après une pause ne compte pas la distance à vol
-        // d'oiseau qui le sépare du précédent, comme partout ailleurs.
+        // A segment that resumes after a pause does not count the straight-line
+        // distance separating it from the previous one, as everywhere else.
         if (!ordered[i].isDiscontinuous) {
             total += haversine(ordered[i - 1], ordered[i])
         }
@@ -915,7 +915,7 @@ private fun AltitudeProfileCard(profile: AltitudeProfile, totalLabel: String) {
             val w = size.width
             val h = size.height
             val span = (profile.max - profile.min).toFloat()
-            // Une marge en haut, pour que le sommet ne touche pas le bord.
+            // A margin at the top, so the peak does not touch the edge.
             fun y(alt: Float) = h - (alt - profile.min.toFloat()) / span * h * 0.85f
             fun x(d: Float) = d / profile.totalMeters.toFloat() * w
             val curve = Path().apply {

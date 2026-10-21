@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   Règles de sauvegarde pour Android 11 et antérieur.
+   Backup rules for Android 11 and earlier.
 
-   L'historique des parcours est une donnée de localisation : il ne doit pas partir
-   dans la sauvegarde automatique. Le cache de tuiles non plus, qui trahirait les
-   zones consultées.
+   The track history is location data: it must not go
+   into the automatic backup. Nor must the tile cache, which would reveal the
+   areas consulted.
 
-   Les préférences sont exclues pour la même raison, et ce n'est pas de la prudence
-   de principe : `pref_last_lat` / `pref_last_lng` y conservent la dernière position
-   de carte affichée, réécrite à chaque déplacement. Sans cette exclusion, exclure la
-   base ne servait à rien — le point le plus parlant de tous partait quand même.
+   Preferences are excluded for the same reason, and this is not caution
+   for caution's sake: `pref_last_lat` / `pref_last_lng` keep there the last map
+   position displayed, rewritten at every move. Without this exclusion, excluding the
+   database was pointless — the most telling point of all left anyway.
 
-   Les APK de mise à jour (`files/updates`) sont exclus pour une raison différente :
-   non pas ce qu'ils révèlent — ils sont publics et retéléchargeables — mais leur
-   poids. Une vingtaine de Mio partaient dans la sauvegarde, de quoi en épuiser le
-   quota et la faire échouer en silence, pour un fichier que l'application sait
-   reprendre depuis GitHub.
+   Update APKs (`files/updates`) are excluded for a different reason:
+   not what they reveal — they are public and re-downloadable — but their
+   weight. About twenty MiB went into the backup, enough to exhaust its
+   quota and make it fail silently, for a file the app can fetch
+   again from GitHub.
 -->
 <full-backup-content>
     <exclude domain="database" path="my_tracks_db" />

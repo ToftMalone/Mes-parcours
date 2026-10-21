@@ -14,8 +14,8 @@ import com.example.MainActivity
 import com.example.R
 
 /**
- * Reprise d'un enregistrement sans que l'application soit à l'écran : après un
- * redémarrage du téléphone, une mise à jour, ou un service relancé par le système.
+ * Resuming a recording without the app being on screen: after a phone
+ * reboot, an update, or a service restarted by the system.
  */
 object RecordingRecovery {
 
@@ -23,13 +23,13 @@ object RecordingRecovery {
     private const val NOTIFICATION_ID = 88232
 
     /**
-     * Le service de localisation peut-il repartir sans l'application au premier plan ?
+     * Can the location service restart without the app in the foreground?
      *
-     * Depuis Android 11, un service démarré en arrière-plan n'obtient de positions que
-     * si l'autorisation « Toujours » est accordée ; depuis Android 14, `startForeground`
-     * lève même une exception sans elle. L'exception était attrapée, mais le service
-     * restait alors sans premier plan, et Android tuait l'application quelques
-     * secondes plus tard pour ne pas l'y avoir mis.
+     * Since Android 11, a service started in the background only gets positions
+     * if the “Always” permission is granted; since Android 14, `startForeground`
+     * even throws an exception without it. The exception was caught, but the service
+     * then stayed without a foreground, and Android killed the app a few
+     * seconds later for not having put it there.
      */
     fun canRecordFromBackground(context: Context): Boolean {
         val fine = isGranted(context, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -42,9 +42,9 @@ object RecordingRecovery {
     }
 
     /**
-     * Prévient que l'enregistrement n'a pas pu reprendre seul. Le parcours reste
-     * ouvert en base : l'application le retrouve en pause à l'ouverture, et un appui
-     * sur « Reprendre » le relance depuis le premier plan, où rien ne s'y oppose.
+     * Warns that the recording could not resume on its own. The track stays
+     * open in the database: the app finds it paused on opening, and a tap
+     * on “Resume” restarts it from the foreground, where nothing prevents it.
      */
     fun notifyInterrupted(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -70,8 +70,8 @@ object RecordingRecovery {
             .setContentIntent(openApp)
             .setAutoCancel(true)
             .build()
-        // Sans l'autorisation des notifications (Android 13+), notify() ne fait rien :
-        // le parcours se retrouvera quand même en pause à l'ouverture.
+        // Without the notifications permission (Android 13+), notify() does nothing:
+        // the track will still end up paused on opening.
         runCatching { manager.notify(NOTIFICATION_ID, notification) }
     }
 

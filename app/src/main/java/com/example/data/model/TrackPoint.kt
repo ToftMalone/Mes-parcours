@@ -17,8 +17,8 @@ import androidx.room.PrimaryKey
     ],
     indices = [
         Index(value = ["trackId"]),
-        // Permet de restreindre rapidement une trace très dense à la zone visible
-        // de la carte sans parcourir tous ses points.
+        // Allows quickly restricting a very dense track to the visible area
+        // of the map without walking through all its points.
         Index(value = ["trackId", "latitude"])
     ]
 )
@@ -32,13 +32,13 @@ data class TrackPoint(
     val timestamp: Long,
     val isDiscontinuous: Boolean = false,
     /**
-     * Couleur du tronçon auquel ce point appartient (ARGB), ou null si son fichier
-     * d'origine n'en indiquait pas.
+     * Color of the segment this point belongs to (ARGB), or null if its original
+     * file did not specify one.
      *
-     * Portée par le point et non par le parcours : un seul fichier KML exporté depuis
-     * Google Earth peut réunir des dizaines de trajets, chacun de sa couleur. Une
-     * couleur par parcours les peindrait tous pareil, ce qui reviendrait à perdre
-     * l'information qu'on cherche justement à conserver.
+     * Carried by the point and not by the track: a single KML file exported from
+     * Google Earth can gather dozens of trips, each with its own color. One
+     * color per track would paint them all the same, which would mean losing
+     * the very information we are trying to keep.
      */
     val segmentColor: Int? = null
 )

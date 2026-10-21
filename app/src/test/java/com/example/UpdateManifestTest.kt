@@ -12,14 +12,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Le fichier de mise à jour vient du réseau et décide de ce que l'application
- * proposera de télécharger puis d'installer — le seul endroit du projet où une
- * donnée lue ailleurs détermine ce qui s'exécutera sur l'appareil.
+ * The update file comes from the network and decides what the app
+ * will offer to download and then install — the only place in the project where
+ * data read elsewhere determines what will run on the device.
  *
- * Un manifeste incomplet, malformé, sans empreinte, ou pointant ailleurs que vers
- * GitHub en HTTPS ne doit donc jamais aboutir à une proposition.
+ * An incomplete or malformed manifest, one without a fingerprint, or one pointing anywhere but to
+ * GitHub over HTTPS must therefore never lead to a proposal.
  *
- * Robolectric est nécessaire pour `org.json`, qui est une classe Android.
+ * Robolectric is needed for `org.json`, which is an Android class.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -34,11 +34,11 @@ class UpdateManifestTest {
           "versionName": "0.9.9-thierry",
           "apkUrl": "$validUrl",
           "sha256": "$validSha",
-          "notes": ["Première nouveauté", "Deuxième nouveauté"]
+          "notes": ["First change", "Second change"]
         }
     """.trimIndent()
 
-    /** Un manifeste complet dont on ne change qu'un champ. */
+    /** A complete manifest of which only one field is changed. */
     private fun manifest(
         versionCode: String = "9",
         versionName: String = "0.9.9",
@@ -55,17 +55,17 @@ class UpdateManifestTest {
     """.trimIndent()
 
     @Test
-    fun `un manifeste complet est lu`() {
+    fun `a complete manifest is read`() {
         val update = UpdateManifest.parse(validJson)!!
         assertEquals(9, update.versionCode)
         assertEquals("0.9.9-thierry", update.versionName)
         assertTrue(update.apkUrl.endsWith("app.apk"))
         assertEquals(validSha, update.sha256)
-        assertEquals(listOf("Première nouveauté", "Deuxième nouveauté"), update.notes)
+        assertEquals(listOf("First change", "Second change"), update.notes)
     }
 
     @Test
-    fun `les notes sont facultatives`() {
+    fun `notes are optional`() {
         val json = """
             {"versionCode": 9, "versionName": "0.9.9", "apkUrl": "$validUrl", "sha256": "$validSha"}
         """.trimIndent()
@@ -74,52 +74,52 @@ class UpdateManifestTest {
     }
 
     @Test
-    fun `un manifeste incomplet est rejete`() {
+    fun `an incomplete manifest is rejected`() {
         val cases = mapOf(
-            "sans versionCode" to """{"versionName": "1.0", "apkUrl": "$validUrl", "sha256": "$validSha"}""",
+            "without versionCode" to """{"versionName": "1.0", "apkUrl": "$validUrl", "sha256": "$validSha"}""",
             "versionCode nul" to manifest(versionCode = "0"),
-            "sans versionName" to """{"versionCode": 9, "apkUrl": "$validUrl", "sha256": "$validSha"}""",
-            "sans apkUrl" to """{"versionCode": 9, "versionName": "1.0", "sha256": "$validSha"}""",
-            "sans sha256" to """{"versionCode": 9, "versionName": "1.0", "apkUrl": "$validUrl"}"""
+            "without versionName" to """{"versionCode": 9, "apkUrl": "$validUrl", "sha256": "$validSha"}""",
+            "without apkUrl" to """{"versionCode": 9, "versionName": "1.0", "sha256": "$validSha"}""",
+            "without sha256" to """{"versionCode": 9, "versionName": "1.0", "apkUrl": "$validUrl"}"""
         )
         for ((label, json) in cases) {
-            assertNull("doit être rejeté : $label", UpdateManifest.parse(json))
+            assertNull("must be rejected: $label", UpdateManifest.parse(json))
         }
     }
 
     @Test
-    fun `une url non securisee est rejetee`() {
-        // On va télécharger puis installer ce fichier : le transport doit être
-        // authentifié, sans quoi n'importe quel intermédiaire pourrait le remplacer.
+    fun `an insecure url is rejected`() {
+        // We are going to download and then install this file: the transport must be
+        // authenticated, otherwise any intermediary could replace it.
         assertNull(UpdateManifest.parse(manifest(apkUrl = "http://github.com/a/b/a.apk")))
     }
 
     @Test
-    fun `une url servie ailleurs que par github est rejetee`() {
-        // Un manifeste altéré ne doit pas pouvoir détourner l'installation vers un
-        // serveur quelconque.
+    fun `a url served by anything other than github is rejected`() {
+        // A tampered manifest must not be able to hijack the installation to an
+        // arbitrary server.
         assertNull(UpdateManifest.parse(manifest(apkUrl = "https://exemple.test/a.apk")))
     }
 
     @Test
-    fun `un hote qui imite github est rejete`() {
-        // Le piège que la comparaison sur le texte de l'adresse laisserait passer :
-        // ces trois-là commencent par « https://github.com » ou le contiennent, sans
-        // être GitHub. La vérification porte donc sur l'hôte analysé.
+    fun `a host that imitates github is rejected`() {
+        // The trap that comparing the address text would let through:
+        // these three start with “https://github.com” or contain it, without
+        // being GitHub. The check therefore covers the parsed host.
         val imitations = listOf(
             "https://github.com.exemple.test/a/b/a.apk",
             "https://github.com%2eexemple.test/a/b/a.apk",
             "https://exemple.test/https://github.com/a/b/a.apk"
         )
         for (url in imitations) {
-            assertNull("doit être rejeté : $url", UpdateManifest.parse(manifest(apkUrl = url)))
+            assertNull("must be rejected: $url", UpdateManifest.parse(manifest(apkUrl = url)))
         }
     }
 
     @Test
-    fun `un apk d un autre depot github est rejete`() {
-        // N'importe qui peut publier un APK sur github.com : l'hôte ne suffit pas,
-        // seules les publications de ce dépôt-ci sont acceptées.
+    fun `an apk from another github repository is rejected`() {
+        // Anyone can publish an APK on github.com: the host is not enough,
+        // only the releases of this repository are accepted.
         val ailleurs = listOf(
             "https://github.com/quelquun/autre/releases/download/v1/app.apk",
             "https://github.com/ToftMalone/autre/releases/download/v1/app.apk",
@@ -127,14 +127,14 @@ class UpdateManifestTest {
             "https://github.com/ToftMalone/Mes-parcours-faux/releases/download/v1/app.apk"
         )
         for (url in ailleurs) {
-            assertNull("doit être rejeté : $url", UpdateManifest.parse(manifest(apkUrl = url)))
+            assertNull("must be rejected: $url", UpdateManifest.parse(manifest(apkUrl = url)))
         }
     }
 
     @Test
-    fun `le prefixe du depot ne peut pas etre contourne`() {
-        // Chacune commence par le bon préfixe, ou le semble, mais désigne une fois
-        // résolue autre chose qu'une publication de ce dépôt.
+    fun `the repository prefix cannot be bypassed`() {
+        // Each starts with the right prefix, or seems to, but designates once
+        // resolved something other than a release of this repository.
         val contournements = listOf(
             "https://github.com/ToftMalone/Mes-parcours/releases/download/../../../autre/depot/releases/download/v1/app.apk",
             "https://github.com/ToftMalone/Mes-parcours/releases/download/./../../x/app.apk",
@@ -144,67 +144,67 @@ class UpdateManifestTest {
             "https://github.com:8443/ToftMalone/Mes-parcours/releases/download/v1/app.apk"
         )
         for (url in contournements) {
-            assertNull("doit être rejeté : $url", UpdateManifest.parse(manifest(apkUrl = url)))
+            assertNull("must be rejected: $url", UpdateManifest.parse(manifest(apkUrl = url)))
         }
     }
 
     @Test
-    fun `l adresse produite par release yml est acceptee`() {
-        // La forme exacte qu'écrit le workflow de publication : la contrainte ne doit
-        // jamais la refuser, sans quoi plus aucune mise à jour ne serait proposée.
+    fun `the address produced by release yml is accepted`() {
+        // The exact form the publishing workflow writes: the constraint must
+        // never refuse it, otherwise no update would ever be offered.
         val url = "https://github.com/ToftMalone/Mes-parcours/releases/download/v1.4/mes-parcours-1.4.apk"
         assertEquals(url, UpdateManifest.parse(manifest(apkUrl = url))?.apkUrl)
-        // Port explicite 443 et casse différente du compte : même destination.
+        // Explicit port 443 and a different case of the account: same destination.
         val variante = "https://github.com:443/toftmalone/mes-parcours/releases/download/v1.4/mes-parcours-1.4.apk"
         assertEquals(variante, UpdateManifest.parse(manifest(apkUrl = variante))?.apkUrl)
     }
 
     @Test
-    fun `un json malforme ne fait pas echouer l application`() {
+    fun `malformed json does not make the app fail`() {
         assertNull(UpdateManifest.parse(""))
-        assertNull(UpdateManifest.parse("pas du json"))
+        assertNull(UpdateManifest.parse("not json"))
         assertNull(UpdateManifest.parse("{"))
     }
 
     @Test
-    fun `seule une version strictement plus recente est proposee`() {
+    fun `only a strictly newer version is offered`() {
         val update = AvailableUpdate(9, "0.9.9", validUrl, emptyList(), validSha)
         assertTrue("9 > 8", update.isNewerThan(8))
-        assertTrue("pas de proposition à version égale", !update.isNewerThan(9))
-        assertTrue("pas de retour en arrière", !update.isNewerThan(10))
+        assertTrue("no offer for an equal version", !update.isNewerThan(9))
+        assertTrue("no going backward", !update.isNewerThan(10))
     }
 
     @Test
-    fun `la comparaison porte sur le numero et non sur le texte`() {
-        // « 0.9.10 » est plus récent que « 0.9.9 », alors qu'une comparaison de
-        // chaînes conclurait l'inverse. C'est pourquoi versionCode fait foi.
+    fun `the comparison is on the number and not on the text`() {
+        // “0.9.10” is more recent than “0.9.9”, whereas a string comparison
+        // would conclude the opposite. That is why versionCode is authoritative.
         val ten = AvailableUpdate(10, "0.9.10-thierry", validUrl, emptyList(), validSha)
         assertTrue(ten.isNewerThan(9))
     }
 
     // ------------------------------------------------------------------
-    // Empreinte de l'APK. Obligatoire : sans elle, le téléchargement ne serait
-    // vérifié que par sa taille, contrôle inopérant en découpage par blocs.
+    // Fingerprint of the APK. Mandatory: without it, the download would only be
+    // checked by its size, a useless check with chunked encoding.
     // ------------------------------------------------------------------
 
     @Test
-    fun `une empreinte valide est retenue`() {
+    fun `a valid fingerprint is retained`() {
         assertEquals(validSha, UpdateManifest.parse(manifest(sha256 = validSha))?.sha256)
     }
 
     @Test
-    fun `une empreinte en majuscules est ramenee en minuscules`() {
-        // sha256sum produit des minuscules, et c'est à cette forme que le
-        // téléchargement se compare. Comparer sans normaliser échouerait toujours.
+    fun `an uppercase fingerprint is brought back to lowercase`() {
+        // sha256sum produces lowercase, and it is to this form that the
+        // download is compared. Comparing without normalizing would always fail.
         val update = UpdateManifest.parse(manifest(sha256 = "A".repeat(64)))
         assertEquals("a".repeat(64), update?.sha256)
     }
 
     @Test
-    fun `un manifeste sans empreinte est rejete`() {
-        // Proposer une mise à jour que l'on ne saura pas vérifier serait pire que ne
-        // rien proposer : le contrôle de taille seul laisse passer un fichier tronqué
-        // dès que le serveur répond en découpage par blocs.
+    fun `a manifest without a fingerprint is rejected`() {
+        // Offering an update that cannot be verified would be worse than offering
+        // nothing: the size check alone lets a truncated file through
+        // as soon as the server answers with chunked encoding.
         val json = """
             {"versionCode": 9, "versionName": "1.0", "apkUrl": "$validUrl", "notes": []}
         """.trimIndent()
@@ -212,9 +212,24 @@ class UpdateManifestTest {
     }
 
     @Test
-    fun `une empreinte malformee est rejetee`() {
-        assertNull(UpdateManifest.parse(manifest(sha256 = "trop court")))
+    fun `a malformed fingerprint is rejected`() {
+        assertNull(UpdateManifest.parse(manifest(sha256 = "too short")))
         assertNull(UpdateManifest.parse(manifest(sha256 = "z".repeat(64))))
         assertNull(UpdateManifest.parse(manifest(sha256 = "a".repeat(63))))
+    }
+
+    @Test
+    fun `translated notes are chosen by language with an English fallback`() {
+        val update = UpdateManifest.parse(
+            validJson.replace(
+                "\"notes\": [\"First change\", \"Second change\"]",
+                "\"notes\": [\"First change\"], \"notesI18n\": {\"fr\": [\"Première nouveauté\"], \"ES\": [\"Primera novedad\"], \"de\": []}"
+            )
+        )!!
+        assertEquals(listOf("Première nouveauté"), update.notesFor("fr"))
+        assertEquals(listOf("Primera novedad"), update.notesFor("es"))
+        // An empty or missing translation falls back on the English notes.
+        assertEquals(listOf("First change"), update.notesFor("de"))
+        assertEquals(listOf("First change"), update.notesFor("ja"))
     }
 }

@@ -51,9 +51,9 @@ object EnvironmentUtils {
                 board.contains("cuttlefish") ||
                 board.contains("cf_")
 
-        // Journal de diagnostic réservé au debug. Ces champs identifient l'appareil
-        // assez précisément pour le distinguer d'un autre ; ils n'ont rien à faire
-        // dans les journaux d'une version distribuée, où ils ne servent personne.
+        // Diagnostic log reserved for debug. These fields identify the device
+        // precisely enough to tell it from another; they have no business
+        // in the logs of a distributed version, where they serve no one.
         if (BuildConfig.DEBUG) {
             Log.d(
                 TAG,
