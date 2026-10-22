@@ -1,0 +1,24 @@
+# One-off: rewrites the notes of old releases in English. Removed right after its run.
+name: Translate old release notes
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Edit notes
+        run: |
+          set -euo pipefail
+          gh release edit v2.0.3 --notes $'- Bug fixes\n- Battery usage optimization'
+          gh release edit v2.0.2 --notes $'- New floating navigation bar\n- Line thickness can be chosen for each track, together with its color'
+          gh release edit v2.0.1 --notes $'- The position dot is blue again'
+          gh release edit v2.0 --notes $'- Interface redesign'
+          gh release edit v1.3.1 --notes $'- Fixes for several security flaws'
+          gh release edit v1.3 --notes $'- Reduced battery consumption'
+          gh release edit v1.2 --notes $'- Fix for a security flaw'
+          gh release edit v1.1 --notes $'- Much faster map loading, especially in satellite view\n- The CSV conversion tool was removed'
+          gh release edit v1.0 --notes $'First stable version'
