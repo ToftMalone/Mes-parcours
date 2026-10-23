@@ -33,6 +33,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -206,6 +207,44 @@ class ScreensScreenshotTest {
         compose.onNodeWithTag("track_color_button_6").performClick()
         waitForTag("color_swatch_from_file")
         shoot("historique_couleur", false)
+    }
+
+    /**
+     * Rapporté après la 2.1.0 : « quand il change l'épaisseur d'un parcours, la valeur a
+     * changé dans la feuille d'un autre ». Ce test rejoue le geste — épaissir A,
+     * appliquer, ouvrir B, l'affiner, rouvrir A, ouvrir C — et vérifie la base comme
+     * l'écran. Il passe : le défaut n'a pas pu être reproduit ici (voir CLAUDE.md).
+     */
+    @Test fun epaisseur_propre_a_chaque_parcours() {
+        seed(); history(false); waitForTag("history_list")
+        fun champ() = compose.onNodeWithTag("track_thickness_field").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+        fun ouvrir(id: Long) {
+            compose.onNodeWithTag("track_color_button_$id").performClick()
+            waitForTag("track_thickness_field")
+        }
+        fun appliquer() {
+            compose.onNodeWithTag("color_apply_button").performClick()
+            compose.waitForIdle(); Thread.sleep(500); compose.waitForIdle()
+        }
+        fun epaisseurs() = runBlocking { (1L..7L).map { db.trackDao.getTrackById(it)!!.displayWidthDp } }
+
+        ouvrir(1)
+        repeat(6) { compose.onNodeWithTag("track_thickness_plus").performClick() }
+        appliquer()
+        assertEquals(listOf(7f, null, null, null, null, null, null), epaisseurs())
+
+        ouvrir(2)
+        assertEquals("B garde l'épaisseur générale", "4", champ())
+        repeat(4) { compose.onNodeWithTag("track_thickness_minus").performClick() }
+        appliquer()
+        assertEquals(listOf(7f, 2f, null, null, null, null, null), epaisseurs())
+
+        ouvrir(1)
+        assertEquals("A garde la sienne", "7", champ())
+        appliquer()
+        ouvrir(3)
+        assertEquals("C n'a hérité de rien", "4", champ())
     }
 
     @Test fun historique_suppression() {

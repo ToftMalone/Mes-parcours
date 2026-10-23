@@ -685,7 +685,7 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 207 tests unitaires en 24 suites : `ScreensScreenshotTest` (34, captures seules —
+- 208 tests unitaires en 24 suites : `ScreensScreenshotTest` (35, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `TrimTrackTest` (14), `SplitTrackTest` (13), `CleanTrackTest` (11), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
@@ -1319,15 +1319,18 @@ cache de polylignes par trace serait la marche suivante.
 
 ### En attente d'arbitrage
 
-- **« Quand je change l'épaisseur d'un parcours, ça change aussi les autres »**,
-  rapporté par le père de l'auteur après la 2.1.0. Relecture faite : l'épaisseur est
-  écrite sur le seul parcours choisi (`setTrackStyle`), la feuille repart de zéro pour
-  chaque parcours, et la carte dessine chaque tracé à sa propre épaisseur. Rien dans le
-  code ne relie un parcours aux autres. Hypothèse retenue, **non vérifiée** : des
-  parcours refaits sur le même chemin, qu'un trait épais dessiné par-dessus recouvrait
-  entièrement. D'où l'ordre de dessin, les plus épais en dessous. Si le défaut revient,
-  **demander une capture avant et après** plutôt que de chercher un autre mécanisme
-  (voir les leçons de « L'ombre tranchée » et du zoom).
+- **« Quand il change l'épaisseur d'un parcours, la valeur a changé quand il ouvre
+  la feuille d'un autre »**, rapporté par le père de l'auteur après la 2.1.0, sur des
+  parcours sans rapport entre eux. Première lecture fausse (des tracés superposés sur
+  la carte) : la 2.2 dessine bien les traits épais en dessous, mais ce n'était pas le
+  défaut — il est dans la feuille « Apparence du tracé ». Relecture faite : l'épaisseur
+  est écrite sur le seul parcours choisi (`setTrackStyle`), la feuille repart de la
+  valeur du parcours ouvert, et sa logique n'a pas bougé depuis la 2.0.2.
+  `ScreensScreenshotTest.epaisseur_propre_a_chaque_parcours` rejoue le geste (A épaissi,
+  B affiné, A rouvert, C ouvert) et **passe** : non reproduit. Un parcours sans
+  épaisseur propre affiche l'épaisseur générale (4 dp, ou l'ancien réglage) : tous ces
+  parcours montrent donc la même valeur, ce qui peut se confondre avec le défaut.
+  **Demander un enregistrement d'écran du geste exact** avant tout correctif.
 - `VIEWPORT_MARGIN` est passé de 0,35 à 0,60 à la demande de l'auteur. À évaluer.
   Surveiller l'effet indirect documenté au-dessus de la constante : la zone élargie
   sert aussi à `coversMostOfTrack`, donc l'affichage se rabat plus tôt sur la seule
