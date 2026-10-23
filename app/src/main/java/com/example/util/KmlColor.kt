@@ -1,25 +1,25 @@
 package com.example.util
 
 /**
- * Reading of line colors written in a KML file.
+ * Lecture des couleurs de tracé écrites dans un fichier KML.
  *
- * KML writes its colors as **AABBGGRR** — blue channel before red, exactly
- * the opposite of the ARGB Android expects. Copying the value as is
- * would therefore swap red and blue: a red line drawn in Google Earth
- * would display in blue, and nobody would understand why.
+ * KML note ses couleurs en **AABBGGRR** — le canal bleu avant le rouge, exactement
+ * l'inverse de l'ARGB attendu par Android. Recopier la valeur telle quelle
+ * échangerait donc le rouge et le bleu : un tracé rouge dessiné dans Google Earth
+ * s'afficherait en bleu, et personne ne comprendrait pourquoi.
  *
- * No Android dependency: directly testable.
+ * Aucune dépendance Android : directement testable.
  */
 object KmlColor {
 
     /**
-     * Converts a KML color to an ARGB color, or returns null if the string is
-     * not usable.
+     * Convertit une couleur KML en couleur ARGB, ou renvoie null si la chaîne n'est
+     * pas exploitable.
      *
-     * A fully transparent color is rejected rather than honored: it
-     * would make the line invisible on the map, which the user would read as
-     * a lost track and not as a color choice. We then fall back on the
-     * palette color.
+     * Une couleur entièrement transparente est refusée plutôt que respectée : elle
+     * rendrait le tracé invisible sur la carte, ce que l'utilisateur lirait comme
+     * une trace perdue et non comme un choix de couleur. On retombe alors sur la
+     * couleur de la palette.
      */
     fun parse(kmlColor: String?): Int? {
         val raw = kmlColor?.trim()?.removePrefix("#") ?: return null
@@ -40,29 +40,29 @@ object KmlColor {
 }
 
 /**
- * Style directory of a KML document, and resolution of a `<styleUrl>` to a
- * line color.
+ * Répertoire des styles d'un document KML, et résolution d'un `<styleUrl>` vers une
+ * couleur de ligne.
  *
- * Google Earth does not write the color in the line: the `<Placemark>` refers to a
- * style by its identifier, and that style may itself be a `<StyleMap>` that
- * distinguishes the resting appearance from the hover one. Without this resolution, one can
- * only guess — and taking the first style at hand amounts to painting all the
- * trips of a single file in the color of just one.
+ * Google Earth n'écrit pas la couleur dans le tracé : le `<Placemark>` renvoie à un
+ * style par son identifiant, et ce style peut lui-même être un `<StyleMap>` qui
+ * distingue l'apparence au repos de celle au survol. Sans cette résolution, on ne
+ * peut que deviner — et prendre le premier style venu revient à peindre tous les
+ * trajets d'un même fichier de la couleur d'un seul.
  *
- * No Android dependency: directly testable.
+ * Aucune dépendance Android : directement testable.
  */
 class KmlStyleTable {
 
     private val lineColors = HashMap<String, Int>()
     private val normalStyleOf = HashMap<String, String>()
 
-    /** Records the line color of a `<Style id="…">`. */
+    /** Enregistre la couleur de ligne d'un `<Style id="…">`. */
     fun putStyle(id: String?, color: Int?) {
         val key = normalize(id) ?: return
         if (color != null) lineColors[key] = color
     }
 
-    /** Records the “resting” style designated by a `<StyleMap id="…">`. */
+    /** Enregistre le style « au repos » désigné par un `<StyleMap id="…">`. */
     fun putStyleMap(id: String?, normalStyleUrl: String?) {
         val key = normalize(id) ?: return
         val target = normalize(normalStyleUrl) ?: return
@@ -70,11 +70,11 @@ class KmlStyleTable {
     }
 
     /**
-     * Line color associated with [styleUrl], or null if it remains unfound.
+     * Couleur de ligne associée à [styleUrl], ou null si elle reste introuvable.
      *
-     * Follows the `<StyleMap>`s down to the resting style. The depth is bounded: a
-     * file in which two StyleMaps refer to each other would otherwise make
-     * the import loop, and nothing in the format forbids writing one.
+     * Suit les `<StyleMap>` jusqu'au style au repos. La profondeur est bornée : un
+     * fichier dont deux StyleMap se renvoient l'un à l'autre ferait sinon tourner
+     * l'import en boucle, et rien dans le format n'interdit d'en écrire un.
      */
     fun resolve(styleUrl: String?): Int? {
         var key = normalize(styleUrl) ?: return null
@@ -85,7 +85,7 @@ class KmlStyleTable {
         return null
     }
 
-    /** Identifier without its leading hash or its blanks. */
+    /** Identifiant sans son croisillon de référence ni ses blancs. */
     private fun normalize(raw: String?): String? {
         val cleaned = raw?.trim()?.removePrefix("#")?.trim()
         return if (cleaned.isNullOrEmpty()) null else cleaned

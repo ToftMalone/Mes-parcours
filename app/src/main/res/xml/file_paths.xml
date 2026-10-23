@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <!--
-       The “exports/” subfolder disappeared with the sharing function, removed from
-       the interface without its code or this path being removed. Expose nothing that is not
-       used: every path declared here is readable by the app to which a URI is passed,
-       and an unused path is a surface offered for nothing.
+       Le sous-dossier « exports/ » a disparu avec la fonction de partage, retirée de
+       l'interface sans que son code ni ce chemin ne le soient. Ne rien exposer qui ne
+       serve : chaque chemin déclaré ici est lisible par l'application à qui l'on passe
+       une URI, et un chemin sans usage est une surface offerte pour rien.
 
-       If sharing ever comes back, this is where a dedicated subfolder will have to be
-       reopened — never the whole cache, which also contains the map tiles.
+       Si le partage revient un jour, c'est ici qu'il faudra rouvrir un sous-dossier
+       dédié — jamais tout le cache, qui contient aussi les tuiles de carte.
     -->
 
     <!--
-       APKs of downloaded updates. Necessary to present them to
-       Android's installer: passing it a file:// would throw a
-       FileUriExposedException since Android 7.
+       APK des mises à jour téléchargées. Nécessaire pour les présenter à
+       l'installateur d'Android : lui passer un file:// lèverait une
+       FileUriExposedException depuis Android 7.
 
-       **Internal** storage (`files-path`), not external: see
-       `UpdateDownloader.downloadDir`. The external folder remained modifiable by
-       any app with the storage permission on Android 9 and earlier,
-       even after the fingerprint check.
+       Stockage **interne** (`files-path`), et non externe : voir
+       `UpdateDownloader.downloadDir`. Le dossier externe restait modifiable par
+       toute application ayant la permission de stockage sur Android 9 et antérieur,
+       y compris après la vérification de l'empreinte.
     -->
     <files-path name="updates" path="updates/" />
 </paths>

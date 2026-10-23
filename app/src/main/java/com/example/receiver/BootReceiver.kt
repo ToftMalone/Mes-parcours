@@ -20,16 +20,16 @@ class BootReceiver : BroadcastReceiver() {
                     val repo = TrackRepository.getInstance(context)
                     if (repo.getActiveRecordingTrack() == null) return@launch
 
-                    // Without the “Always” permission, the service could not move to the
-                    // foreground and Android would kill the app: we notify instead,
-                    // and the track waits in pause (see RecordingRecovery).
+                    // Sans l'autorisation « Toujours », le service ne pourrait pas passer
+                    // au premier plan et Android tuerait l'application : on prévient
+                    // plutôt, le parcours attend en pause (voir RecordingRecovery).
                     if (!RecordingRecovery.canRecordFromBackground(context)) {
                         RecordingRecovery.notifyInterrupted(context)
                         return@launch
                     }
 
-                    // RESTORE and not RESUME: the service picks up the state stored in the database.
-                    // A pause must remain a pause after a reboot.
+                    // RESTORE et non RESUME : le service reprend l'état mémorisé en base.
+                    // Une pause doit rester une pause après un redémarrage.
                     val serviceIntent = Intent(context, TrackingService::class.java).apply {
                         action = TrackingService.ACTION_RESTORE
                     }
@@ -40,7 +40,7 @@ class BootReceiver : BroadcastReceiver() {
                             context.startService(serviceIntent)
                         }
                     } catch (e: Exception) {
-                        // Start refused by the system: same fallback as above.
+                        // Démarrage refusé par le système : même repli que ci-dessus.
                         e.printStackTrace()
                         RecordingRecovery.notifyInterrupted(context)
                     }

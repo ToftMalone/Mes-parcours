@@ -1,21 +1,21 @@
 package com.example.data.model
 
 /**
- * A track overlaid on the map, with what is needed to choose its color.
+ * Un tracé superposé sur la carte, accompagné de quoi choisir sa couleur.
  *
- * Replaces the `(isImported, points)` pair used until now: the color can no longer
- * be deduced from the track's category alone, since an imported track can now
- * carry the one from its original file.
+ * Remplace la paire `(estImporté, points)` employée jusqu'ici : la couleur ne se
+ * déduit plus de la seule catégorie du parcours, puisqu'un parcours importé peut
+ * désormais porter celle de son fichier d'origine.
  */
 data class MapTrack(
     val isImported: Boolean,
-    /** A merged track forms its own category, with its own color. */
+    /** Un parcours fusionné forme sa propre catégorie, avec sa propre couleur. */
     val isMerged: Boolean,
-    /** Color read from the imported file, null if it carried none. */
+    /** Couleur lue dans le fichier importé, null s'il n'en portait pas. */
     val sourceColor: Int?,
-    /** Color chosen by the user for this track, null if nothing was chosen. */
+    /** Couleur choisie par l'utilisateur pour ce parcours, null s'il n'a rien choisi. */
     val displayColor: Int? = null,
-    /** Thickness chosen for this track, in dp, null if nothing was chosen. */
+    /** Épaisseur choisie pour ce parcours, en dp, null s'il n'a rien choisi. */
     val displayWidthDp: Float? = null,
     val points: List<TrackPoint>
 )

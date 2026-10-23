@@ -1,27 +1,27 @@
 package com.example.util
 
 /**
- * Accumulates the positive and negative elevation of a track.
+ * Cumule le dénivelé positif et négatif d'un parcours.
  *
- * The previous implementation compared each altitude with the previous one and only
- * kept the gap if it exceeded 0.80 m. That criterion was wrong in both
- * directions:
+ * L'implémentation précédente comparait chaque altitude à la précédente et ne
+ * retenait l'écart que s'il dépassait 0,80 m. Ce critère se trompait dans les deux
+ * sens :
  *
- * - **It missed steady climbs.** At 1 Hz, walking at 1.4 m/s up a 10% slope,
- *   the altitude only rises by 0.14 m per second. No gap between
- *   two consecutive points reached the threshold, and a 300 m climb counted for
- *   zero.
- * - **It inflated elevation when stopped.** GPS vertical noise reaches several
- *   meters from one reading to the next. Each oscillation exceeding the threshold was counted,
- *   in one direction then the other: a walk on the flat accumulated hundreds of
- *   fictitious meters.
+ * - **Il ratait les montées régulières.** À 1 Hz, en marchant à 1,4 m/s sur une pente
+ *   de 10 %, l'altitude ne progresse que de 0,14 m par seconde. Aucun écart entre
+ *   deux points consécutifs n'atteignait le seuil, et une côte de 300 m comptait pour
+ *   zéro.
+ * - **Il gonflait le dénivelé à l'arrêt.** Le bruit vertical du GPS atteint plusieurs
+ *   mètres d'un relevé à l'autre. Chaque oscillation dépassant le seuil était comptée,
+ *   dans un sens puis dans l'autre : une marche à plat accumulait des centaines de
+ *   mètres fictifs.
  *
- * Accumulation is therefore done against a **reference altitude** that only moves
- * when the gap exceeds [thresholdMeters]. A slow climb eventually crosses
- * the threshold against the reference, so it counts; an oscillation around the
- * reference never gets there, so it is ignored.
+ * Le cumul se fait donc par rapport à une **altitude de référence** qui ne se déplace
+ * que lorsque l'écart dépasse [thresholdMeters]. Une montée lente finit par franchir
+ * le seuil face à la référence, donc elle compte ; une oscillation autour de la
+ * référence n'y parvient jamais, donc elle est ignorée.
  *
- * No Android dependency: directly testable.
+ * Sans dépendance Android : directement testable.
  */
 class ElevationAccumulator(
     private val thresholdMeters: Double = THRESHOLD_METERS
@@ -36,31 +36,31 @@ class ElevationAccumulator(
         private set
 
     /**
-     * Breaks continuity without erasing the totals.
+     * Rompt la continuité sans effacer les totaux.
      *
-     * To be called when a new segment opens — exit from pause, resume of a
-     * track — so as not to count as elevation the altitude gap between the place
-     * where we stopped and the one where we start again.
+     * À appeler à l'ouverture d'un nouveau tronçon — sortie de pause, reprise d'une
+     * trace — pour ne pas compter comme un dénivelé l'écart d'altitude entre l'endroit
+     * où l'on s'était arrêté et celui où l'on repart.
      */
     fun breakSegment() {
         reference = null
     }
 
-    /** Erases everything, totals included. */
+    /** Efface tout, totaux compris. */
     fun reset() {
         reference = null
         gainMeters = 0.0
         lossMeters = 0.0
     }
 
-    /** Takes over already computed totals, to continue an existing track. */
+    /** Reprend des totaux déjà calculés, pour continuer un parcours existant. */
     fun restore(gainMeters: Double, lossMeters: Double) {
         this.gainMeters = gainMeters
         this.lossMeters = lossMeters
         reference = null
     }
 
-    /** Integrates an altitude, in meters above sea level. */
+    /** Intègre une altitude, en mètres au-dessus du niveau de la mer. */
     fun add(meters: Double) {
         val current = reference
         if (current == null) {
@@ -80,10 +80,10 @@ class ElevationAccumulator(
 
     companion object {
         /**
-         * Minimum gap retained as a real change of altitude.
+         * Écart minimal retenu comme un vrai changement d'altitude.
          *
-         * Chosen above the residual noise that remains after smoothing — of the order
-         * of a meter — and well below what counts in a real track.
+         * Choisi au-dessus du bruit résiduel qui subsiste après lissage — de l'ordre
+         * du mètre — et bien en dessous de ce qui compte dans un parcours réel.
          */
         const val THRESHOLD_METERS = 3.0
     }

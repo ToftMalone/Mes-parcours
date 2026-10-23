@@ -101,7 +101,7 @@ import com.example.util.FormatUtils
 import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.delay
 
-/** The three history categories, which do not overlap. */
+/** Les trois catégories de l'historique, qui ne se recouvrent pas. */
 private enum class HistoryCategory(@StringRes val labelRes: Int) {
     RECORDED(R.string.history_recorded),
     IMPORTED(R.string.history_imported),
@@ -114,11 +114,11 @@ fun HistoryTab(
     onNavigateToDetails: (Long) -> Unit,
     onResumeTrack: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
-    /** Margins left by the status bar and the floating navigation bar. */
+    /** Marges laissées par la barre d'état et la barre de navigation flottante. */
     contentPadding: PaddingValues = PaddingValues(),
-    /** “Start a recording” (empty state) and “View recording”. */
+    /** « Démarrer un enregistrement » (état vide) et « Voir l'enregistrement ». */
     onOpenRecording: () -> Unit = {},
-    /** “Open tools”, from the empty state of merged tracks. */
+    /** « Ouvrir les outils », depuis l'état vide des fusionnés. */
     onOpenTools: () -> Unit = {}
 ) {
     val tracks by viewModel.allTracks.collectAsState()
@@ -127,9 +127,9 @@ fun HistoryTab(
     val messenger = LocalAppMessenger.current
     var selectedCategory by rememberSaveable { mutableStateOf(HistoryCategory.RECORDED) }
 
-    // Track whose actions sheet, palette or deletion confirmation
-    // is open; null = closed. We keep the identifier rather than the track: the
-    // list recomposes at every write, and the sheet must show the up-to-date state.
+    // Parcours dont la feuille d'actions, la palette ou la confirmation de suppression
+    // est ouverte ; null = fermée. On garde l'identifiant plutôt que le parcours : la
+    // liste se recompose à chaque écriture, et la feuille doit montrer l'état à jour.
     var actionsTrackId by remember { mutableStateOf<Long?>(null) }
     var colorTrackId by remember { mutableStateOf<Long?>(null) }
     var deleteTrackId by remember { mutableStateOf<Long?>(null) }
@@ -155,13 +155,13 @@ fun HistoryTab(
     }
     val importFile = { filePickerLauncher.launch("*/*") }
 
-    // Three categories that do not overlap: a merged track leaves the one
-    // it came from, otherwise it would appear twice in the history.
+    // Trois catégories qui ne se recouvrent pas : un parcours fusionné quitte celle
+    // dont il venait, sinon il apparaîtrait deux fois dans l'historique.
     //
-    // Merges made between the tab's removal and its return carry isMerged
-    // at false in the database: they therefore stay in their original category. Nothing
-    // makes it possible to recognize them afterwards, and moving them unprompted would be worse than
-    // leaving them where the user has seen them so far.
+    // Les fusions faites entre le retrait de l'onglet et son retour portent isMerged
+    // à false en base : elles restent donc dans leur catégorie d'origine. Rien ne
+    // permet de les reconnaître après coup, et les déplacer d'office serait pire que
+    // de les laisser où l'utilisateur les a vues jusqu'ici.
     val byCategory = mapOf(
         HistoryCategory.RECORDED to tracks.filter { !it.isImported && !it.isMerged },
         HistoryCategory.IMPORTED to tracks.filter { it.isImported && !it.isMerged },
@@ -169,7 +169,7 @@ fun HistoryTab(
     )
     val shown = byCategory.getValue(selectedCategory)
 
-    // Resuming a track: refused, with an explanation, while a recording is running.
+    // Reprise d'une trace : refusée, avec explication, tant qu'un enregistrement court.
     val resume: (Track) -> Unit = { track ->
         if (isTracking) {
             refusedTrackId = track.id
@@ -204,7 +204,7 @@ fun HistoryTab(
             ) {
                 HistoryCategory.entries.forEach { category ->
                     CategoryChip(
-                        // Stable identifier: the label changes with the language.
+                        // Identifiant stable, indépendant du libellé affiché.
                         tag = category.name,
                         label = stringResource(category.labelRes),
                         count = byCategory.getValue(category).size,
@@ -229,8 +229,8 @@ fun HistoryTab(
                 } else {
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        // The bottom lets the import button and the floating bar through:
-                        // the last card must be able to scroll up above both.
+                        // Le bas laisse passer le bouton d'import et la barre flottante :
+                        // la dernière carte doit pouvoir remonter au-dessus des deux.
                         contentPadding = PaddingValues(
                             start = 16.dp,
                             end = 16.dp,
@@ -266,7 +266,7 @@ fun HistoryTab(
         )
     }
 
-    // ------------------------------------------------------------ Sheets
+    // ------------------------------------------------------------ Feuilles
 
     tracks.firstOrNull { it.id == actionsTrackId }?.let { track ->
         TrackActionsSheet(
@@ -282,7 +282,7 @@ fun HistoryTab(
                 actionsTrackId = null
                 resume(track)
             },
-            // No deletion for the track being recorded: see TrackRepository.deleteTrack.
+            // Pas de suppression pour le parcours en cours : voir TrackRepository.deleteTrack.
             onDelete = if (viewModel.isBeingRecorded(track)) null else {
                 {
                     actionsTrackId = null
@@ -303,7 +303,7 @@ fun HistoryTab(
         )
     }
 
-    // ------------------------------------------------------------ Dialogs
+    // ------------------------------------------------------------ Dialogues
 
     tracks.firstOrNull { it.id == deleteTrackId }?.let { track ->
         DeleteTrackDialog(
@@ -332,42 +332,42 @@ fun HistoryTab(
 }
 
 /**
- * Makes a history card appear by sliding in, with a slight offset depending on
- * [index], and also animates its place in the list ([LazyItemScope.animateItem]) —
- * useful on deletion or category change, where the remaining
- * cards slide to their new place rather than jump.
+ * Fait apparaître une carte de l'historique en glissant, avec un léger décalage selon
+ * [index], et anime aussi son emplacement dans la liste ([LazyItemScope.animateItem]) —
+ * utile lors d'une suppression ou d'un changement de catégorie, où les cartes
+ * restantes glissent à leur nouvelle place plutôt que de sauter.
  *
- * The offset between cards is capped: beyond a dozen, waiting one's turn
- * would take longer than the user takes to scroll there. It is
- * a trim, not a slowdown — an app sometimes consulted one-handed
- * mid-trip must not make people wait to read their statistics.
+ * Le décalage entre cartes est plafonné : au-delà d'une douzaine, attendre son tour
+ * prendrait plus de temps que l'utilisateur n'en met à faire défiler jusque-là. C'est
+ * une garniture, pas un ralentissement — une appli consultée parfois d'une main en
+ * plein trajet ne doit pas faire patienter pour lire ses statistiques.
  *
- * **The slide is driven by hand, and above all not entrusted to `AnimatedVisibility`**,
- * which **clips its content to its own bounds** as soon as a transition moves it. Content
- * moved down by a sixth of its height is therefore sliced off flat at the bottom —
- * rounded corner and shadow included. Measured frame by frame on the author's screen recording:
- * throughout the animation the card stopped on a sharp edge with
- * the background right below, not one pixel of shadow, then the shadow reappeared all
- * at once on the last frame. That is exactly the reported defect.
+ * **Le glissement est piloté à la main, et surtout pas confié à `AnimatedVisibility`**,
+ * qui **rogne son contenu à ses propres bornes** dès qu'une transition le déplace. Un
+ * contenu descendu d'un sixième de sa hauteur s'y trouve donc tranché net en bas —
+ * coin arrondi et ombre compris. Mesuré image par image sur l'enregistrement d'écran
+ * de l'auteur : pendant toute l'animation la carte s'arrêtait sur un bord franc avec
+ * le fond juste en dessous, pas un pixel d'ombre, puis l'ombre réapparaissait d'un
+ * coup à la dernière image. C'est exactement le défaut rapporté.
  *
- * A `graphicsLayer` clips nothing (`clip` is `false` by default): what overflows
- * is drawn whole from one end of the movement to the other.
+ * Un `graphicsLayer` ne rogne rien (`clip` vaut `false` par défaut) : ce qui déborde
+ * se dessine entier d'un bout à l'autre du mouvement.
  *
- * **No progressive fade here either, and for a separate reason.** As soon as an
- * *intermediate* opacity is applied, Android composes the element offscreen in a
- * buffer **at the exact dimensions of the card**: everything that overflows ends up
- * sliced. The cards of the redesign no longer carry a shadow, but the rule holds for
- * whoever gives them one back. The fade that `animateItem()` applies by itself is
- * turned off for this reason (`fadeInSpec` and `fadeOutSpec` are not null by default,
- * which its name does not let you guess). Only the **binary** opacity below is
- * allowed: at zero, nothing is drawn, so there is nothing to slice.
+ * **Aucun fondu progressif ici non plus, et pour une raison distincte.** Dès qu'une
+ * opacité *intermédiaire* est appliquée, Android compose l'élément hors écran dans un
+ * tampon **aux dimensions exactes de la carte** : tout ce qui déborde se retrouve
+ * tranché. Les cartes de la refonte ne portent plus d'ombre, mais la règle tient pour
+ * qui leur en redonnerait une. Le fondu qu'`animateItem()` applique de lui-même est
+ * coupé pour cette raison (`fadeInSpec` et `fadeOutSpec` ne sont pas nuls par défaut,
+ * ce que son nom ne laisse pas deviner). Seule l'opacité **binaire** ci-dessous est
+ * permise : à zéro, rien n'est dessiné, il n'y a donc rien à trancher.
  *
- * Do not reintroduce a progressive fade or an `AnimatedVisibility` transition on an
- * element that carries a shadow without first removing its elevation.
+ * Ne réintroduire ni fondu progressif ni transition d'`AnimatedVisibility` sur un
+ * élément qui porte une ombre sans lui retirer d'abord son élévation.
  */
 @Composable
 private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable () -> Unit) {
-    // 1 = card still offset downward, 0 = in place.
+    // 1 = carte encore décalée vers le bas, 0 = en place.
     val slide = remember { Animatable(1f) }
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -380,8 +380,8 @@ private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable 
             .animateItem(fadeInSpec = null, fadeOutSpec = null)
             .graphicsLayer {
                 translationY = slide.value * 24.dp.toPx()
-                // All or nothing: the card is not drawn before its turn. An intermediate
-                // value would slice its shadow (see above).
+                // Tout ou rien : la carte n'est pas dessinée avant son tour. Une
+                // valeur intermédiaire trancherait son ombre (voir ci-dessus).
                 alpha = if (visible) 1f else 0f
             }
     ) {
@@ -390,10 +390,10 @@ private fun LazyItemScope.StaggeredHistoryCard(index: Int, content: @Composable 
 }
 
 /**
- * Display color of a track: its explicit choice, failing that its file's,
- * failing that the default of its category.
+ * Couleur d'affichage d'un parcours : son choix explicite, à défaut celle de son
+ * fichier, à défaut celle par défaut de sa catégorie.
  *
- * A simple shortcut so as not to rewrite the four arguments on every card.
+ * Simple raccourci pour ne pas réécrire les quatre arguments sur chaque carte.
  */
 private fun trackDisplayColor(track: Track): Int =
     TrackStylePreferences.resolveTrackColor(
@@ -404,8 +404,8 @@ private fun trackDisplayColor(track: Track): Int =
     )
 
 /**
- * Category chip: full and rounded as a pill when chosen, a soft
- * rectangle otherwise — the change of radius is the mockup's animation.
+ * Puce de catégorie : pleine et arrondie en pilule quand elle est choisie, en
+ * rectangle doux sinon — le changement de rayon est l'animation de la maquette.
  */
 @Composable
 private fun CategoryChip(
@@ -456,11 +456,11 @@ private fun CategoryChip(
 }
 
 /**
- * Card of a track in the history: colored tile, name, date, three figures,
- * then the eye that shows it on the map and the actions menu.
+ * Carte d'un parcours dans l'historique : tuile colorée, nom, date, trois chiffres,
+ * puis l'œil qui l'affiche sur la carte et le menu d'actions.
  *
- * The colored tile always opens the track's palette, like the chip it
- * replaces; the actions sheet leads there too, for those who would not guess the gesture.
+ * La tuile colorée ouvre toujours la palette du parcours, comme la pastille qu'elle
+ * remplace ; la feuille d'actions y mène aussi, pour qui ne devinerait pas le geste.
  */
 @Composable
 fun TrackHistoryCard(
@@ -468,11 +468,11 @@ fun TrackHistoryCard(
     onClick: () -> Unit,
     isSelectedForMap: Boolean = false,
     onMapSelectionToggle: (Boolean) -> Unit = {},
-    /** Opens this track's palette; null makes the tile inert. */
+    /** Ouvre la palette de ce parcours ; null rend la tuile inerte. */
     onColorClick: (() -> Unit)? = null,
-    /** Opens the actions sheet; null hides the button. */
+    /** Ouvre la feuille d'actions ; null masque le bouton. */
     onMoreClick: (() -> Unit)? = null,
-    /** Display color of this specific track. */
+    /** Couleur d'affichage de ce parcours précis. */
     trackColor: Color = Color(
         TrackStylePreferences.defaultColorFor(track.isImported, track.isMerged)
     )
@@ -512,8 +512,8 @@ fun TrackHistoryCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                // A track that still carries its file's color says so: it is
-                // the only possible origin of a file color here.
+                // Un parcours qui porte encore la couleur de son fichier le dit : c'est
+                // la seule origine possible d'une couleur de fichier ici.
                 if (track.sourceColor != null && track.displayColor == null) {
                     OutlinedTag(stringResource(R.string.tag_google_earth))
                 }
@@ -576,7 +576,7 @@ fun TrackHistoryCard(
     }
 }
 
-/** Date, or origin for an imported or merged track. */
+/** Date, ou provenance pour un parcours importé ou fusionné. */
 @Composable
 private fun trackSubtitle(track: Track): String = when {
     track.isMerged -> stringResource(R.string.track_subtitle_merged, FormatUtils.formatShortDate(track.startTime))
@@ -616,7 +616,7 @@ private fun OutlinedTag(text: String) {
     }
 }
 
-/** Floating “Import GPX / KML” button, above the navigation bar. */
+/** Bouton flottant « Importer GPX / KML », au-dessus de la barre de navigation. */
 @Composable
 private fun ImportFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
@@ -640,12 +640,12 @@ private fun ImportFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-// --------------------------------------------------------------------- Empty states
+// --------------------------------------------------------------------- États vides
 
 /**
- * Empty state of a category: an illustration on an expressive shape, a title, a
- * sentence, and the action that fills the category — it is not always found in
- * the history (record, merge), nothing would let you guess.
+ * État vide d'une catégorie : une illustration sur forme expressive, un titre, une
+ * phrase, et l'action qui remplit la catégorie — elle ne se trouve pas toujours dans
+ * l'historique (enregistrer, fusionner), rien ne le laisserait deviner.
  */
 @Composable
 private fun CategoryEmptyState(
@@ -720,8 +720,8 @@ private fun CategoryEmptyState(
 }
 
 /**
- * Empty state of the “Imported” category, with its import button. Kept public for
- * the legacy screenshot test (`GreetingScreenshotTest`).
+ * État vide de la catégorie « Importés », avec son bouton d'import. Gardé public pour
+ * le test de capture d'écran hérité (`GreetingScreenshotTest`).
  */
 @Composable
 fun EmptyHistoryState(onImportClick: () -> Unit) {
@@ -730,9 +730,9 @@ fun EmptyHistoryState(onImportClick: () -> Unit) {
     }
 }
 
-// ------------------------------------------------------------------ Sheets
+// ------------------------------------------------------------------ Feuilles
 
-/** Actions sheet of a track: map, color, resume, deletion. */
+/** Feuille d'actions d'un parcours : carte, couleur, reprise, suppression. */
 @Composable
 private fun TrackActionsSheet(
     track: Track,
@@ -820,16 +820,16 @@ private fun SheetRow(
 }
 
 /**
- * Appearance of a track: its color and line thickness, chosen
- * together since the preview shows them together.
+ * Apparence d'un parcours : sa couleur et l'épaisseur de son trait, choisies
+ * ensemble puisque l'aperçu les montre ensemble.
  *
- * The choice is only applied on “Apply”: one tries a color or thickness
- * on the preview without redrawing the track at each chip touched.
+ * Le choix n'est appliqué qu'à « Appliquer » : on essaie une couleur ou une épaisseur
+ * sur l'aperçu sans redessiner le tracé à chaque pastille touchée.
  *
- * A track whose file carried a color can get it back: “Keep the
- * Google Earth color” sets `displayColor` to null, which is exactly “original
- * color” (see TrackStylePreferences.resolveTrackColor). Offering it on a GPX,
- * or on a recording, would be an option that does nothing: it does not appear.
+ * Un parcours dont le fichier portait une couleur peut la retrouver : « Garder la
+ * couleur Google Earth » remet `displayColor` à null, ce qui est exactement « couleur
+ * d'origine » (voir TrackStylePreferences.resolveTrackColor). La proposer sur un GPX,
+ * ou sur un enregistrement, serait une option qui ne fait rien : elle n'apparaît pas.
  */
 @Composable
 private fun TrackColorSheet(
@@ -878,8 +878,8 @@ private fun TrackColorSheet(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        // The chips fade while the file color is kept: two checked
-        // choices at once would read as a bug.
+        // Les pastilles s'estompent tant que la couleur du fichier est gardée : deux
+        // choix cochés à la fois se liraient comme un bug.
         val dim = if (keepFileColor) 0.38f else 1f
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -918,7 +918,7 @@ private fun TrackColorSheet(
     }
 }
 
-/** Color chip: round at rest, rounded square checked when chosen. */
+/** Pastille de couleur : ronde au repos, carré arrondi cochée quand elle est choisie. */
 @Composable
 private fun ColorSwatch(
     color: Color,
@@ -945,9 +945,9 @@ private fun ColorSwatch(
 }
 
 /**
- * Preview of the chosen appearance: a wavy line on a neutral map background, at
- * the real thickness — dp converted by the screen density, exactly as
- * `TrackStylePreferences.getStrokeWidth` does for the map.
+ * Aperçu de l'apparence choisie : un tracé ondulé sur un fond de carte neutre, à
+ * l'épaisseur réelle — dp convertis par la densité de l'écran, exactement comme
+ * `TrackStylePreferences.getStrokeWidth` le fait pour la carte.
  */
 @Composable
 private fun TrackColorPreview(color: Color, widthDp: Float) {
@@ -969,7 +969,7 @@ private fun TrackColorPreview(color: Color, widthDp: Float) {
     }
 }
 
-// ----------------------------------------------------------------- Dialogs
+// ----------------------------------------------------------------- Dialogues
 
 @Composable
 fun DeleteTrackDialog(trackName: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
@@ -994,7 +994,7 @@ fun DeleteTrackDialog(trackName: String, onDismiss: () -> Unit, onConfirm: () ->
     )
 }
 
-/** Resume refused: only one track can be recorded at a time. */
+/** Reprise refusée : on ne peut enregistrer qu'une trace à la fois. */
 @Composable
 fun ResumeRefusedDialog(trackName: String, onDismiss: () -> Unit, onOpenRecording: () -> Unit) {
     MpDialog(

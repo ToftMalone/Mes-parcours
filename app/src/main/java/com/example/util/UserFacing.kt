@@ -4,12 +4,11 @@ import android.content.Context
 import androidx.annotation.StringRes
 
 /**
- * Error message meant for the user, which travels as a resource.
+ * Message d'erreur destiné à l'utilisateur, qui voyage sous forme de ressource.
  *
- * The data layer has no `Context`: it cannot write a message in the device's
- * language itself. It therefore throws an exception that carries the text's
- * identifier, and it is the screen that resolves it when displaying it —
- * hence in the current language, even if it changed in the meantime.
+ * Le dépôt de données n'a pas de `Context` : il ne peut pas lire lui-même un texte
+ * dans les ressources. Il lève donc une exception qui porte l'identifiant du texte,
+ * et c'est l'écran qui le résout au moment de l'afficher.
  */
 interface UserFacing {
     @get:StringRes
@@ -17,27 +16,27 @@ interface UserFacing {
     val messageArgs: List<Any>
 }
 
-/** [IllegalArgumentException] whose message is a resource (see [UserFacing]). */
+/** [IllegalArgumentException] dont le message est une ressource (voir [UserFacing]). */
 class UserFacingArgumentException(
     @StringRes override val messageRes: Int,
     override val messageArgs: List<Any> = emptyList()
 ) : IllegalArgumentException("string resource #$messageRes"), UserFacing
 
-/** [IllegalStateException] whose message is a resource (see [UserFacing]). */
+/** [IllegalStateException] dont le message est une ressource (voir [UserFacing]). */
 class UserFacingStateException(
     @StringRes override val messageRes: Int,
     override val messageArgs: List<Any> = emptyList()
 ) : IllegalStateException("string resource #$messageRes"), UserFacing
 
 /**
- * The text to show for this error: the resource if it carries one, otherwise the
- * system message, otherwise [fallbackRes].
+ * Le texte à montrer pour cette erreur : la ressource si elle en porte une, sinon le
+ * message du système, sinon [fallbackRes].
  */
 fun Throwable.userMessage(context: Context, @StringRes fallbackRes: Int): String =
     if (this is UserFacing) context.getString(messageRes, *messageArgs.toTypedArray())
     else localizedMessage ?: context.getString(fallbackRes)
 
-/** Like [userMessage], but with a prefix when the error does not come from us. */
+/** Comme [userMessage], mais avec un préfixe quand l'erreur ne vient pas de nous. */
 fun Throwable.userMessageOr(context: Context, wrap: (String?) -> String): String =
     if (this is UserFacing) context.getString(messageRes, *messageArgs.toTypedArray())
     else wrap(localizedMessage)

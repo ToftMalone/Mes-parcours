@@ -6,23 +6,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The tunnel detector replaces a simple absolute threshold, which confused “it is
- * dark” with “I am indoors in broad daylight” and made the
- * app switch to dark theme in a lit room.
+ * Le détecteur de tunnel remplace un simple seuil absolu, qui confondait « il fait
+ * sombre » et « je suis à l'intérieur en pleine journée » et faisait basculer
+ * l'application en thème sombre dans une pièce éclairée.
  *
- * These tests pin down the distinction: only a sudden and deep drop in
- * brightness counts, and it must persist.
+ * Ces tests fixent la distinction : seule une chute brutale et profonde de la
+ * luminosité compte, et elle doit persister.
  */
 class TunnelDetectorTest {
 
     private val detector = TunnelDetector()
 
-    /** Sensor rate at the SENSOR_DELAY_NORMAL setting. */
+    /** Rythme du capteur au réglage SENSOR_DELAY_NORMAL. */
     private val sampleIntervalMs = 200L
 
     private var clock = 0L
 
-    /** Feeds the detector for [durationMs] at constant brightness. */
+    /** Alimente le détecteur pendant [durationMs] à luminosité constante. */
     private fun feed(lux: Float, durationMs: Long): Boolean {
         var last = detector.isInside
         var elapsed = 0L
@@ -35,64 +35,64 @@ class TunnelDetectorTest {
     }
 
     @Test
-    fun `staying indoors in broad daylight triggers nothing`() {
-        // The case that was a problem: a lit interior by day, around
-        // 150 lux. It is dark compared with outdoors, but it is not a tunnel.
-        feed(12_000f, durationMs = 10_000) // outdoors, full daylight
-        assertFalse("entering the house must trigger nothing", feed(150f, 30_000))
-        assertFalse("and staying indoors neither", feed(150f, 120_000))
+    fun `rester a l interieur en pleine journee ne declenche rien`() {
+        // Le cas qui posait problème : un intérieur éclairé de jour, autour de
+        // 150 lux. C'est sombre par rapport au dehors, mais ce n'est pas un tunnel.
+        feed(12_000f, durationMs = 10_000) // dehors, plein jour
+        assertFalse("l'entrée dans la maison ne doit rien déclencher", feed(150f, 30_000))
+        assertFalse("et rester à l'intérieur non plus", feed(150f, 120_000))
     }
 
     @Test
-    fun `a tunnel switches to dark then back to light`() {
-        feed(20_000f, durationMs = 10_000) // road in full sun
-        assertTrue("the tunnel entrance must switch to dark", feed(4f, 5_000))
-        assertTrue("and stay so throughout the tunnel", feed(6f, 60_000))
-        assertFalse("the exit must return to light", feed(20_000f, 5_000))
+    fun `un tunnel fait basculer en sombre puis revenir au clair`() {
+        feed(20_000f, durationMs = 10_000) // route en plein soleil
+        assertTrue("l'entrée du tunnel doit basculer en sombre", feed(4f, 5_000))
+        assertTrue("et le rester pendant tout le tunnel", feed(6f, 60_000))
+        assertFalse("la sortie doit revenir au clair", feed(20_000f, 5_000))
     }
 
     @Test
-    fun `a momentary darkness does not make the display flicker`() {
+    fun `une obscurite d un instant ne fait pas clignoter l affichage`() {
         feed(20_000f, durationMs = 10_000)
-        // Passing under a bridge: dark, but much shorter than the confirmation
-        // delay. Without that delay, the display would flicker at every structure.
-        assertFalse("passing under a bridge must not switch", feed(3f, 400))
+        // Passage sous un pont : sombre, mais bien plus bref que le délai de
+        // confirmation. Sans ce délai, l'affichage clignoterait à chaque ouvrage.
+        assertFalse("un passage sous un pont ne doit pas basculer", feed(3f, 400))
         assertFalse(feed(20_000f, 2_000))
     }
 
     @Test
-    fun `a covered car park stays dark as long as one is parked there`() {
+    fun `un parking couvert reste sombre tant qu on y stationne`() {
         feed(15_000f, durationMs = 10_000)
         assertTrue(feed(8f, 5_000))
-        // The ambient reference is frozen indoors. Without this freeze, it
-        // would drift to the car park's level, the relative collapse would disappear and
-        // the display would go back to light while we are still in the dark.
-        assertTrue("ten minutes of parking must not turn it back on", feed(8f, 600_000))
-        assertFalse("the exit must return to light", feed(15_000f, 5_000))
+        // La référence ambiante est gelée à l'intérieur. Sans ce gel, elle
+        // rejoindrait le niveau du parking, l'effondrement relatif disparaîtrait et
+        // l'affichage repasserait au clair alors qu'on est toujours dans le noir.
+        assertTrue("dix minutes de stationnement ne doivent pas rallumer", feed(8f, 600_000))
+        assertFalse("la sortie doit revenir au clair", feed(15_000f, 5_000))
     }
 
     @Test
-    fun `nightfall is not mistaken for a tunnel`() {
-        // Dusk is a slow decay: the ambient reference follows it,
-        // so there is never a relative collapse. It is the solar computation that
-        // must handle this case, not the sensor.
+    fun `la tombee de la nuit ne passe pas pour un tunnel`() {
+        // Le crépuscule est une décroissance lente : la référence ambiante la suit,
+        // il n'y a donc jamais d'effondrement relatif. C'est le calcul solaire qui
+        // doit traiter ce cas, pas le capteur.
         feed(8_000f, durationMs = 20_000)
         for (lux in listOf(4_000f, 2_000f, 900f, 400f, 150f, 60f, 25f, 10f, 4f)) {
             feed(lux, durationMs = 60_000)
         }
-        assertFalse("nightfall must not be seen as a tunnel", detector.isInside)
+        assertFalse("la tombée de la nuit ne doit pas être vue comme un tunnel", detector.isInside)
     }
 
     @Test
-    fun `reset forgets the ambient reference`() {
+    fun `reset oublie la reference ambiante`() {
         feed(20_000f, durationMs = 10_000)
         assertTrue(feed(4f, 5_000))
 
         detector.reset()
-        assertFalse("after reset, no state retained", detector.isInside)
+        assertFalse("après reset, plus aucun état retenu", detector.isInside)
 
-        // The first measurement after a reset sets the new reference: a stable
-        // low brightness no longer constitutes a drop.
+        // La première mesure après un reset fixe la nouvelle référence : une
+        // luminosité stable et faible ne constitue plus une chute.
         assertFalse(feed(4f, 30_000))
     }
 }

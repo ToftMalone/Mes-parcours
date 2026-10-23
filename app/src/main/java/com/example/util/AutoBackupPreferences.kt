@@ -6,13 +6,13 @@ import android.content.Context
 import android.preference.PreferenceManager
 
 /**
- * Settings of the automatic backup: is it active, and in which formats.
+ * Réglages de la sauvegarde automatique : est-elle active, et dans quels formats.
  *
- * There is no destination setting: files go to
- * `Downloads/Mes parcours`, and nothing else is offered. The
- * `isDestLocal` / `setDestLocal` pair that lingered here was a remnant of a backup
- * to Drive since removed — never read, it suggested a choice that does not
- * exist.
+ * Il n'y a pas de réglage de destination : les fichiers vont dans
+ * `Téléchargements/Mes parcours`, et rien d'autre n'est proposé. Le couple
+ * `isDestLocal` / `setDestLocal` qui traînait ici est un vestige d'une sauvegarde
+ * vers Drive retirée depuis — jamais lu, il laissait croire à un choix qui n'existe
+ * pas.
  */
 object AutoBackupPreferences {
     private const val KEY_ENABLED = "pref_auto_backup_enabled"

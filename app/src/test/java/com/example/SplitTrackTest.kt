@@ -21,11 +21,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Splitting creates several tracks from one, by having SQLite copy the
- * points slice by slice. These tests lock down what it rests on:
- * that slices follow one another without losing or duplicating a point, that the
- * statistics of each piece are really those of its own points, and that the
- * original track is only touched if that was requested.
+ * Le découpage crée plusieurs parcours à partir d'un seul, en faisant recopier les
+ * points par SQLite tranche par tranche. Ces tests verrouillent ce sur quoi il
+ * repose : que les tranches se suivent sans perdre ni dupliquer un point, que les
+ * statistiques de chaque morceau sont bien celles de ses propres points, et que le
+ * parcours d'origine n'est touché que si on l'a demandé.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -49,10 +49,10 @@ class SplitTrackTest {
     }
 
     /**
-     * Creates a track from a description of segments: each element gives
-     * the number of points of the segment and the number of seconds separating it from the
-     * previous one. The first point of each segment (except the very first) carries the
-     * break mark.
+     * Crée un parcours à partir d'une description de tronçons : chaque élément donne
+     * le nombre de points du tronçon et le nombre de secondes qui le sépare du
+     * précédent. Le premier point de chaque tronçon (sauf le tout premier) porte la
+     * marque de rupture.
      */
     private suspend fun createTrack(
         name: String,
@@ -68,7 +68,7 @@ class SplitTrackTest {
             repeat(count) { positionInSegment ->
                 points += TrackPoint(
                     trackId = trackId,
-                    // About 11 m between two points: above the anti-drift filter.
+                    // Environ 11 m entre deux points : au-dessus du filtre anti-dérive.
                     latitude = 45.0 + index / 10_000.0,
                     longitude = 5.0,
                     altitude = 100.0 + index,
@@ -88,44 +88,44 @@ class SplitTrackTest {
         db.trackDao.getPointsForTrack(trackId)
 
     // ------------------------------------------------------------------
-    // Splitting at segment breaks
+    // Découpage aux ruptures de tronçon
     // ------------------------------------------------------------------
 
     @Test
-    fun `splitting at segments gives one track per segment`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(3 to 0L, 4 to 0L, 2 to 0L))
+    fun `le decoupage aux troncons rend un parcours par troncon`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(3 to 0L, 4 to 0L, 2 to 0L))
 
         val newIds = repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = false
         )
 
-        assertEquals("three segments, three tracks", 3, newIds.size)
+        assertEquals("trois tronçons, trois parcours", 3, newIds.size)
         assertEquals(listOf(3, 4, 2), newIds.map { pointsOf(it).size })
         assertEquals(
-            listOf("Trips (1)", "Trips (2)", "Trips (3)"),
+            listOf("Voyages (1)", "Voyages (2)", "Voyages (3)"),
             newIds.map { db.trackDao.getTrackById(it)!!.name }
         )
     }
 
     @Test
-    fun `no point is lost or duplicated`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(3 to 0L, 4 to 0L, 2 to 0L))
+    fun `aucun point n est perdu ni duplique`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(3 to 0L, 4 to 0L, 2 to 0L))
         val original = pointsOf(sourceId)
 
         val newIds = repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = false
         )
 
-        // Glued end to end, the pieces give back exactly the starting track —
-        // same coordinates, in the same order.
+        // Recollés bout à bout, les morceaux redonnent exactement le parcours de
+        // départ — mêmes coordonnées, dans le même ordre.
         val rebuilt = newIds.flatMap { pointsOf(it) }
         assertEquals(original.size, rebuilt.size)
         assertEquals(
@@ -135,70 +135,70 @@ class SplitTrackTest {
     }
 
     @Test
-    fun `the first point of a piece is no longer a break`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(3 to 0L, 4 to 0L))
+    fun `le premier point d un morceau n est plus une rupture`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(3 to 0L, 4 to 0L))
 
         val newIds = repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = false
         )
 
-        // In its original track this was a break; in the new track
-        // it is simply the start of the line. Leaving the mark would open an empty
-        // segment before the first point.
+        // Dans son parcours d'origine c'était une rupture ; dans le parcours neuf
+        // c'est simplement le début du tracé. Laisser la marque ouvrirait un tronçon
+        // vide avant le premier point.
         for (id in newIds) {
             assertFalse(pointsOf(id).first().isDiscontinuous)
         }
     }
 
     @Test
-    fun `the original track stays intact by default`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(3 to 0L, 4 to 0L))
+    fun `le parcours d origine reste intact par defaut`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(3 to 0L, 4 to 0L))
         val before = pointsOf(sourceId)
 
         repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = false
         )
 
-        assertNotNull("the original track still exists", db.trackDao.getTrackById(sourceId))
+        assertNotNull("le parcours d'origine existe toujours", db.trackDao.getTrackById(sourceId))
         assertEquals(before.size, pointsOf(sourceId).size)
-        assertTrue("its first break is kept", pointsOf(sourceId)[3].isDiscontinuous)
+        assertTrue("sa première rupture est conservée", pointsOf(sourceId)[3].isDiscontinuous)
     }
 
     @Test
-    fun `the original track is deleted when requested`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(3 to 0L, 4 to 0L))
+    fun `le parcours d origine est supprime si on le demande`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(3 to 0L, 4 to 0L))
 
         val newIds = repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = true
         )
 
         assertNull(db.trackDao.getTrackById(sourceId))
-        assertTrue("its points left with it", pointsOf(sourceId).isEmpty())
-        // The pieces, for their part, did keep everything.
+        assertTrue("ses points sont partis avec lui", pointsOf(sourceId).isEmpty())
+        // Les morceaux, eux, ont bien tout gardé.
         assertEquals(7, newIds.sumOf { pointsOf(it).size })
     }
 
     // ------------------------------------------------------------------
-    // Splitting at long pauses
+    // Découpage aux longues pauses
     // ------------------------------------------------------------------
 
     @Test
-    fun `splitting at pauses cuts on time gaps`() = runBlocking {
-        // Three blocks separated by an hour, with no segment break at all: it is
-        // time, and time alone, that must decide the cuts.
-        val trackId = db.trackDao.insertTrack(Track(name = "Outings", startTime = 1_000_000L))
+    fun `le decoupage aux pauses coupe sur les trous de temps`() = runBlocking {
+        // Trois blocs séparés par une heure, sans aucune rupture de tronçon : c'est
+        // le temps, et lui seul, qui doit décider des coupures.
+        val trackId = db.trackDao.insertTrack(Track(name = "Sorties", startTime = 1_000_000L))
         val points = mutableListOf<TrackPoint>()
         var clock = 1_000_000L
         var index = 0
@@ -221,7 +221,7 @@ class SplitTrackTest {
             sourceTrackId = trackId,
             mode = TrackRepository.SplitMode.TIME_GAP,
             gapMillis = 30 * 60_000L,
-            baseName = "Outings",
+            baseName = "Sorties",
             deleteSource = false
         )
 
@@ -230,14 +230,14 @@ class SplitTrackTest {
     }
 
     @Test
-    fun `a pause shorter than the threshold does not cut`() = runBlocking {
-        val trackId = db.trackDao.insertTrack(Track(name = "Outing", startTime = 1_000_000L))
+    fun `une pause plus courte que le seuil ne coupe pas`() = runBlocking {
+        val trackId = db.trackDao.insertTrack(Track(name = "Sortie", startTime = 1_000_000L))
         val points = (0 until 6).map { i ->
             TrackPoint(
                 trackId = trackId,
                 latitude = 45.0 + i / 10_000.0,
                 longitude = 5.0,
-                // Ten minutes between each point: below the one-hour threshold.
+                // Dix minutes entre chaque point : en dessous du seuil d'une heure.
                 timestamp = 1_000_000L + i * 600_000L
             )
         }
@@ -248,49 +248,49 @@ class SplitTrackTest {
                 sourceTrackId = trackId,
                 mode = TrackRepository.SplitMode.TIME_GAP,
                 gapMillis = 60 * 60_000L,
-                baseName = "Outing",
+                baseName = "Sortie",
                 deleteSource = false
             )
         }.exceptionOrNull()
 
-        assertTrue("the split must be refused", failure is IllegalStateException)
+        assertTrue("le découpage doit être refusé", failure is IllegalStateException)
     }
 
     // ------------------------------------------------------------------
-    // Refusal
+    // Refus
     // ------------------------------------------------------------------
 
     @Test
-    fun `a single-segment track cannot be split`() = runBlocking {
-        val sourceId = createTrack("Walk", listOf(5 to 0L))
+    fun `un parcours d un seul troncon n est pas decoupable`() = runBlocking {
+        val sourceId = createTrack("Balade", listOf(5 to 0L))
 
         val failure = runCatching {
             repository.splitTrack(
                 sourceTrackId = sourceId,
                 mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
                 gapMillis = 0L,
-                baseName = "Walk",
+                baseName = "Balade",
                 deleteSource = false
             )
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
-        // Splitting into a single piece would only make a duplicate: the refusal must leave
-        // the original track exactly as it was.
+        // Découper en un seul morceau ne ferait qu'un doublon : le refus doit laisser
+        // le parcours d'origine exactement tel qu'il était.
         assertEquals(5, pointsOf(sourceId).size)
         assertNotNull(db.trackDao.getTrackById(sourceId))
     }
 
     @Test
-    fun `a track without points cannot be split`() = runBlocking {
-        val sourceId = db.trackDao.insertTrack(Track(name = "Empty", startTime = 1_000_000L))
+    fun `un parcours sans point n est pas decoupable`() = runBlocking {
+        val sourceId = db.trackDao.insertTrack(Track(name = "Vide", startTime = 1_000_000L))
 
         val failure = runCatching {
             repository.splitTrack(
                 sourceTrackId = sourceId,
                 mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
                 gapMillis = 0L,
-                baseName = "Empty",
+                baseName = "Vide",
                 deleteSource = false
             )
         }.exceptionOrNull()
@@ -299,9 +299,9 @@ class SplitTrackTest {
     }
 
     @Test
-    fun `a track being recorded cannot be split`() = runBlocking {
+    fun `un parcours en cours d enregistrement n est pas decoupable`() = runBlocking {
         val sourceId = db.trackDao.insertTrack(
-            Track(name = "Recording", startTime = 1_000_000L, isRecording = true)
+            Track(name = "En cours", startTime = 1_000_000L, isRecording = true)
         )
 
         val failure = runCatching {
@@ -309,7 +309,7 @@ class SplitTrackTest {
                 sourceTrackId = sourceId,
                 mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
                 gapMillis = 0L,
-                baseName = "Recording",
+                baseName = "En cours",
                 deleteSource = false
             )
         }.exceptionOrNull()
@@ -318,25 +318,25 @@ class SplitTrackTest {
     }
 
     // ------------------------------------------------------------------
-    // Statistics
+    // Statistiques
     // ------------------------------------------------------------------
 
     @Test
-    fun `each piece carries the statistics of its own points`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(5 to 0L, 6 to 0L, 4 to 0L))
+    fun `chaque morceau porte les statistiques de ses propres points`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(5 to 0L, 6 to 0L, 4 to 0L))
 
         val newIds = repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = false
         )
 
-        // The statistics are accumulated as a stream while reading the original
-        // track. They must be exactly those the list computation
-        // would give for the same points: that is what guarantees the two
-        // paths have not diverged.
+        // Les statistiques sont cumulées en flux pendant la lecture du parcours
+        // d'origine. Elles doivent être exactement celles que le calcul sur liste
+        // donnerait pour les mêmes points : c'est ce qui garantit que les deux
+        // chemins n'ont pas divergé.
         for (id in newIds) {
             val track = db.trackDao.getTrackById(id)!!
             val expected = repository.calculateStatsFromPoints(pointsOf(id))
@@ -351,33 +351,33 @@ class SplitTrackTest {
     }
 
     @Test
-    fun `the distance of a piece is less than that of the whole track`() = runBlocking {
-        val sourceId = createTrack("Trips", listOf(5 to 0L, 6 to 0L))
+    fun `la distance d un morceau est inferieure a celle du parcours entier`() = runBlocking {
+        val sourceId = createTrack("Voyages", listOf(5 to 0L, 6 to 0L))
         val whole = repository.calculateStatsFromPoints(pointsOf(sourceId))
 
         val newIds = repository.splitTrack(
             sourceTrackId = sourceId,
             mode = TrackRepository.SplitMode.SEGMENT_BREAKS,
             gapMillis = 0L,
-            baseName = "Trips",
+            baseName = "Voyages",
             deleteSource = false
         )
 
-        // The trap splitting must avoid: copying onto each piece the statistics of
-        // the whole track. Each would then display the total
-        // distance, and two pieces added together would be worth double the trip.
+        // Le piège que le découpage doit éviter : recopier sur chaque morceau les
+        // statistiques du parcours entier. Chacun afficherait alors la distance
+        // totale, et deux morceaux additionnés vaudraient le double du trajet.
         for (id in newIds) {
             val track = db.trackDao.getTrackById(id)!!
             assertTrue(
-                "a piece cannot be as long as the whole",
+                "un morceau ne peut pas être aussi long que le tout",
                 track.totalDistance < whole.distanceMeters
             )
-            assertTrue("but it does have a distance", track.totalDistance > 0.0)
+            assertTrue("mais il a bien une distance", track.totalDistance > 0.0)
         }
     }
 
     @Test
-    fun `pieces inherit the appearance and origin of the parent`() = runBlocking {
+    fun `les morceaux heritent de l apparence et de la provenance du parent`() = runBlocking {
         val sourceId = db.trackDao.insertTrack(
             Track(
                 name = "Import",
@@ -409,10 +409,10 @@ class SplitTrackTest {
 
         for (id in newIds) {
             val track = db.trackDao.getTrackById(id)!!
-            assertTrue("a piece of an import stays an import", track.isImported)
+            assertTrue("un morceau d'import reste un import", track.isImported)
             assertEquals(0xFF123456.toInt(), track.sourceColor)
             assertEquals(0xFFABCDEF.toInt(), track.displayColor)
-            assertFalse("never displayed by default on the map", track.isSelectedForMap)
+            assertFalse("jamais affiché d'office sur la carte", track.isSelectedForMap)
             assertFalse(track.isRecording)
         }
     }

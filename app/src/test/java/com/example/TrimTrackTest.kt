@@ -21,10 +21,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Trimming creates a copy cut of its start and end. These tests lock down
- * what it rests on: that bounds are read on **timestamps** and not on
- * a rank, that the result's statistics are those of its own points, and that
- * the original track is only touched if that was requested.
+ * Le rognage crée une copie amputée de son début et de sa fin. Ces tests verrouillent
+ * ce sur quoi il repose : que les bornes se lisent sur les **horodatages** et non sur
+ * un rang, que les statistiques du résultat sont celles de ses propres points, et que
+ * le parcours d'origine n'est touché que si on l'a demandé.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -50,14 +50,14 @@ class TrimTrackTest {
         db.close()
     }
 
-    /** A track of one point per minute, over [minutes] minutes. */
-    private suspend fun createTrack(minutes: Int, name: String = "Outing"): Long {
+    /** Un parcours d'un point par minute, sur [minutes] minutes. */
+    private suspend fun createTrack(minutes: Int, name: String = "Sortie"): Long {
         val trackId = db.trackDao.insertTrack(Track(name = name, startTime = start))
         db.trackDao.insertTrackPoints(
             (0 until minutes).map { i ->
                 TrackPoint(
                     trackId = trackId,
-                    // About 11 m between two points: above the anti-drift filter.
+                    // Environ 11 m entre deux points : au-dessus du filtre anti-dérive.
                     latitude = 45.0 + i / 10_000.0,
                     longitude = 5.0,
                     altitude = 100.0 + i,
@@ -73,54 +73,54 @@ class TrimTrackTest {
         db.trackDao.getPointsForTrack(trackId)
 
     // ------------------------------------------------------------------
-    // What is removed, what remains
+    // Ce qui est retiré, ce qui reste
     // ------------------------------------------------------------------
 
     @Test
-    fun `the start is removed`() = runBlocking {
+    fun `le debut est retire`() = runBlocking {
         val sourceId = createTrack(minutes = 10)
 
         val newId = repository.trimTrack(
             sourceTrackId = sourceId,
             dropStartMillis = 3 * minute,
             dropEndMillis = 0L,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
         val kept = pointsOf(newId)
-        assertEquals("ten points minus the first three", 7, kept.size)
+        assertEquals("dix points moins les trois premiers", 7, kept.size)
         assertEquals(start + 3 * minute, kept.first().timestamp)
         assertEquals(start + 9 * minute, kept.last().timestamp)
     }
 
     @Test
-    fun `the end is removed`() = runBlocking {
+    fun `la fin est retiree`() = runBlocking {
         val sourceId = createTrack(minutes = 10)
 
         val newId = repository.trimTrack(
             sourceTrackId = sourceId,
             dropStartMillis = 0L,
             dropEndMillis = 4 * minute,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
         val kept = pointsOf(newId)
-        assertEquals("ten points minus the last four", 6, kept.size)
+        assertEquals("dix points moins les quatre derniers", 6, kept.size)
         assertEquals(start, kept.first().timestamp)
         assertEquals(start + 5 * minute, kept.last().timestamp)
     }
 
     @Test
-    fun `both ends are removed together`() = runBlocking {
+    fun `les deux bouts sont retires ensemble`() = runBlocking {
         val sourceId = createTrack(minutes = 20)
 
         val newId = repository.trimTrack(
             sourceTrackId = sourceId,
             dropStartMillis = 5 * minute,
             dropEndMillis = 5 * minute,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
@@ -131,11 +131,11 @@ class TrimTrackTest {
     }
 
     @Test
-    fun `bounds are read on time and not on rank`() = runBlocking {
-        // A track with a gap: two points, then an hour of silence, then eight
-        // points. Removing “the first ten minutes” must only remove the first
-        // two points — a trim counted in number of points would have taken ten.
-        val trackId = db.trackDao.insertTrack(Track(name = "Gappy", startTime = start))
+    fun `les bornes se lisent sur le temps et non sur le rang`() = runBlocking {
+        // Un parcours à trou : deux points, puis une heure de silence, puis huit
+        // points. Retirer « les dix premières minutes » ne doit retirer que les deux
+        // premiers points — un rognage compté en nombre de points en aurait pris dix.
+        val trackId = db.trackDao.insertTrack(Track(name = "À trou", startTime = start))
         val points = mutableListOf<TrackPoint>()
         var clock = start
         repeat(2) { i ->
@@ -163,18 +163,18 @@ class TrimTrackTest {
             sourceTrackId = trackId,
             dropStartMillis = 10 * minute,
             dropEndMillis = 0L,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
-        assertEquals("only the two points before the gap go", 8, pointsOf(newId).size)
+        assertEquals("seuls les deux points d'avant le trou partent", 8, pointsOf(newId).size)
     }
 
     @Test
-    fun `the first kept point is not a break`() = runBlocking {
-        // The point that becomes first opened a segment in the original track:
-        // in the new track, it only opens the line.
-        val trackId = db.trackDao.insertTrack(Track(name = "Segments", startTime = start))
+    fun `le premier point conserve n est pas une rupture`() = runBlocking {
+        // Le point qui devient premier ouvrait un tronçon dans le parcours d'origine :
+        // dans le parcours neuf, il ne fait qu'ouvrir le tracé.
+        val trackId = db.trackDao.insertTrack(Track(name = "Tronçons", startTime = start))
         db.trackDao.insertTrackPoints(
             (0 until 10).map { i ->
                 TrackPoint(
@@ -191,7 +191,7 @@ class TrimTrackTest {
             sourceTrackId = trackId,
             dropStartMillis = 3 * minute,
             dropEndMillis = 0L,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
@@ -199,79 +199,79 @@ class TrimTrackTest {
     }
 
     // ------------------------------------------------------------------
-    // The original track
+    // Le parcours d'origine
     // ------------------------------------------------------------------
 
     @Test
-    fun `the original track stays intact by default`() = runBlocking {
+    fun `le parcours d origine reste intact par defaut`() = runBlocking {
         val sourceId = createTrack(minutes = 10)
 
         repository.trimTrack(
             sourceTrackId = sourceId,
             dropStartMillis = 3 * minute,
             dropEndMillis = 3 * minute,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
         assertNotNull(db.trackDao.getTrackById(sourceId))
-        assertEquals("it keeps all its points", 10, pointsOf(sourceId).size)
+        assertEquals("il garde tous ses points", 10, pointsOf(sourceId).size)
     }
 
     @Test
-    fun `the original track is deleted when requested`() = runBlocking {
+    fun `le parcours d origine est supprime si on le demande`() = runBlocking {
         val sourceId = createTrack(minutes = 10)
 
         val newId = repository.trimTrack(
             sourceTrackId = sourceId,
             dropStartMillis = 3 * minute,
             dropEndMillis = 0L,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = true
         )
 
         assertNull(db.trackDao.getTrackById(sourceId))
         assertTrue(pointsOf(sourceId).isEmpty())
-        assertEquals("the copy, for its part, has its points", 7, pointsOf(newId).size)
+        assertEquals("la copie, elle, a bien ses points", 7, pointsOf(newId).size)
     }
 
     // ------------------------------------------------------------------
-    // Refusal
+    // Refus
     // ------------------------------------------------------------------
 
     @Test
-    fun `removing nothing is refused`() = runBlocking {
+    fun `ne rien retirer est refuse`() = runBlocking {
         val sourceId = createTrack(minutes = 10)
 
         val failure = runCatching {
-            repository.trimTrack(sourceId, 0L, 0L, "Trimmed", false)
+            repository.trimTrack(sourceId, 0L, 0L, "Rogné", false)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
-        assertEquals("nothing was created in the database", 10, pointsOf(sourceId).size)
+        assertEquals("rien n'a été créé en base", 10, pointsOf(sourceId).size)
     }
 
     @Test
-    fun `removing more than the track's duration is refused`() = runBlocking {
+    fun `retirer plus que la duree du parcours est refuse`() = runBlocking {
         val sourceId = createTrack(minutes = 10)
 
         val failure = runCatching {
-            repository.trimTrack(sourceId, 20 * minute, 0L, "Trimmed", false)
+            repository.trimTrack(sourceId, 20 * minute, 0L, "Rogné", false)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
-        assertNotNull("the original is intact", db.trackDao.getTrackById(sourceId))
+        assertNotNull("l'original est intact", db.trackDao.getTrackById(sourceId))
     }
 
     @Test
-    fun `a trim that would leave a single point is refused`() = runBlocking {
-        // Three points, a long gap, then an isolated point. Removing the first five
-        // minutes leaves that single final point: neither distance nor duration to draw from it.
+    fun `un rognage qui ne laisserait qu un point est refuse`() = runBlocking {
+        // Trois points, un long trou, puis un point isolé. Retirer les cinq premières
+        // minutes laisse ce seul point final : ni distance ni durée à en tirer.
         //
-        // A track with a gap is needed to reach this safeguard: on evenly spaced
-        // points, any trim wide enough to leave only one makes the two bounds
-        // cross, and it is the previous refusal that triggers.
-        val trackId = db.trackDao.insertTrack(Track(name = "Isolated", startTime = start))
+        // Il faut un parcours à trou pour atteindre ce garde-fou : sur des points
+        // régulièrement espacés, tout rognage assez large pour n'en laisser qu'un fait
+        // se croiser les deux bornes, et c'est le refus précédent qui se déclenche.
+        val trackId = db.trackDao.insertTrack(Track(name = "Isolé", startTime = start))
         db.trackDao.insertTrackPoints(
             listOf(0L, 1L, 2L, 20L).mapIndexed { i, m ->
                 TrackPoint(
@@ -284,39 +284,39 @@ class TrimTrackTest {
         )
 
         val failure = runCatching {
-            repository.trimTrack(trackId, 5 * minute, 0L, "Trimmed", false)
+            repository.trimTrack(trackId, 5 * minute, 0L, "Rogné", false)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
-        assertNotNull("the original is intact", db.trackDao.getTrackById(trackId))
+        assertNotNull("l'original est intact", db.trackDao.getTrackById(trackId))
     }
 
     @Test
-    fun `a track being recorded cannot be trimmed`() = runBlocking {
+    fun `un parcours en cours d enregistrement n est pas rognable`() = runBlocking {
         val sourceId = db.trackDao.insertTrack(
-            Track(name = "Recording", startTime = start, isRecording = true)
+            Track(name = "En cours", startTime = start, isRecording = true)
         )
 
         val failure = runCatching {
-            repository.trimTrack(sourceId, minute, 0L, "Trimmed", false)
+            repository.trimTrack(sourceId, minute, 0L, "Rogné", false)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
     }
 
     // ------------------------------------------------------------------
-    // Statistics and inheritance
+    // Statistiques et héritage
     // ------------------------------------------------------------------
 
     @Test
-    fun `statistics are those of the kept points only`() = runBlocking {
+    fun `les statistiques sont celles des seuls points conserves`() = runBlocking {
         val sourceId = createTrack(minutes = 20)
 
         val newId = repository.trimTrack(
             sourceTrackId = sourceId,
             dropStartMillis = 5 * minute,
             dropEndMillis = 5 * minute,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
@@ -332,7 +332,7 @@ class TrimTrackTest {
     }
 
     @Test
-    fun `the trimmed track is shorter than the original`() = runBlocking {
+    fun `le parcours rogne est plus court que l original`() = runBlocking {
         val sourceId = createTrack(minutes = 20)
         val whole = repository.calculateStatsFromPoints(pointsOf(sourceId))
 
@@ -340,20 +340,20 @@ class TrimTrackTest {
             sourceTrackId = sourceId,
             dropStartMillis = 5 * minute,
             dropEndMillis = 5 * minute,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
         val track = db.trackDao.getTrackById(newId)!!
-        // The trap trimming must avoid: copying the parent's statistics,
-        // which would give the result the distance of the whole trip.
+        // Le piège que le rognage doit éviter : recopier les statistiques du parent,
+        // qui donneraient au résultat la distance du trajet entier.
         assertTrue(track.totalDistance < whole.distanceMeters)
-        assertTrue("but it does have a distance", track.totalDistance > 0.0)
+        assertTrue("mais il a bien une distance", track.totalDistance > 0.0)
         assertTrue(track.duration < 20 * 60)
     }
 
     @Test
-    fun `the result inherits the appearance and origin`() = runBlocking {
+    fun `le resultat herite de l apparence et de la provenance`() = runBlocking {
         val sourceId = db.trackDao.insertTrack(
             Track(
                 name = "Import",
@@ -378,16 +378,16 @@ class TrimTrackTest {
             sourceTrackId = sourceId,
             dropStartMillis = 2 * minute,
             dropEndMillis = 0L,
-            newName = "Trimmed",
+            newName = "Rogné",
             deleteSource = false
         )
 
         val track = db.trackDao.getTrackById(newId)!!
-        assertTrue("a trim of an import stays an import", track.isImported)
+        assertTrue("un rognage d'import reste un import", track.isImported)
         assertEquals(0xFF123456.toInt(), track.sourceColor)
         assertEquals(0xFFABCDEF.toInt(), track.displayColor)
-        assertFalse("never displayed by default on the map", track.isSelectedForMap)
+        assertFalse("jamais affiché d'office sur la carte", track.isSelectedForMap)
         assertFalse(track.isRecording)
-        assertEquals("Trimmed", track.name)
+        assertEquals("Rogné", track.name)
     }
 }

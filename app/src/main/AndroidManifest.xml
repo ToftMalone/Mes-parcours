@@ -13,9 +13,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- App update from GitHub: open the system installer
-         on the downloaded APK. The installation remains confirmed by the user, an
-         ordinary app cannot install silently. -->
+    <!-- Mise à jour de l'application depuis GitHub : ouvrir l'installateur système
+         sur l'APK téléchargé. L'installation reste confirmée par l'utilisateur, une
+         application ordinaire ne peut pas installer en silence. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
@@ -26,7 +26,6 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">

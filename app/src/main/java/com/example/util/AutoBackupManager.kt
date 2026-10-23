@@ -51,10 +51,10 @@ object AutoBackupManager {
 
                 var localSuccess = false
 
-                // Points are reread page by page and written as we go: a
-                // very dense track is backed up in full without exhausting memory.
+                // Les points sont relus page par page et écrits au fil de l'eau : une
+                // trace très dense est sauvegardée intégralement sans saturer la mémoire.
 
-                // 1. Export GPX if requested
+                // 1. Export GPX s'il est demandé
                 if (isGpx) {
                     val ok = MediaStoreExporter.saveToLocalDownloadsStreaming(
                         context = context,
@@ -69,7 +69,7 @@ object AutoBackupManager {
                     if (ok) localSuccess = true
                 }
 
-                // 2. Export KML if requested
+                // 2. Export KML s'il est demandé
                 if (isKml) {
                     val ok = MediaStoreExporter.saveToLocalDownloadsStreaming(
                         context = context,
@@ -100,7 +100,7 @@ object AutoBackupManager {
         }
     }
 
-    /** Walks through all the points of a track, page by page. */
+    /** Parcourt tous les points d'une trace, page par page. */
     private suspend fun forEachPointOf(
         db: AppDatabase,
         trackId: Long,

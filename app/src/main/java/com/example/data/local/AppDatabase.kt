@@ -10,25 +10,25 @@ import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 
 /**
- * Schema version of the database.
+ * Version du schéma de la base.
  *
- * Declared separately rather than hard-coded in the annotation: `MigrationChainTest`
- * compares it with the migration chain, and an annotation cannot always be read back
- * at runtime. Incrementing it without adding the matching migration makes that
- * test fail — which is exactly what we ask of it.
+ * Déclarée à part plutôt qu'écrite en dur dans l'annotation : `MigrationChainTest` la
+ * compare à la chaîne de migrations, et une annotation ne se relit pas toujours à
+ * l'exécution. L'incrémenter sans ajouter la migration correspondante fait échouer ce
+ * test — c'est précisément ce qu'on lui demande.
  */
 internal const val DATABASE_VERSION = 10
 
 /**
- * `exportSchema = true`: Room writes the schema of each version to
- * `app/schemas/`, and these files are versioned along with the code.
+ * `exportSchema = true` : Room écrit le schéma de chaque version dans
+ * `app/schemas/`, ces fichiers étant versionnés avec le code.
  *
- * This is not documentation. It is what lets `AppDatabaseMigrationTest`
- * open a database of an old version, apply the declared migrations to it and
- * check that the result matches the expected schema. Without these files, no
- * test can do that, and invariant no. 2 of CLAUDE.md — “every new schema version
- * comes with its migration” — rests only on human vigilance, whereas forgetting it
- * erases every user's tracks without a word.
+ * Ce n'est pas de la documentation. C'est ce qui permet à `AppDatabaseMigrationTest`
+ * d'ouvrir une base d'ancienne version, d'y appliquer les migrations déclarées et de
+ * vérifier que le résultat correspond au schéma attendu. Sans ces fichiers, aucun
+ * test ne peut le faire, et l'invariant nº 2 de CLAUDE.md — « toute nouvelle version
+ * de schéma vient avec sa migration » — ne repose que sur la vigilance humaine, alors
+ * que l'oublier efface tous les parcours des utilisateurs sans un mot.
  */
 @Database(
     entities = [Track::class, TrackPoint::class],
@@ -43,11 +43,11 @@ abstract class AppDatabase : RoomDatabase() {
         private var INSTANCE: AppDatabase? = null
 
         /**
-         * Adds the (trackId, latitude) index used by the viewport-based display.
+         * Ajoute l'index (trackId, latitude) utilisé par l'affichage par fenêtre de vue.
          *
-         * Explicit, non-destructive migration: the database is built with
-         * fallbackToDestructiveMigration(), so without this migration the move to
-         * version 5 would erase every recorded track.
+         * Migration explicite et non destructive : la base est construite avec
+         * fallbackToDestructiveMigration(), donc sans cette migration le passage en
+         * version 5 effacerait tous les parcours enregistrés.
          */
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -59,14 +59,14 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds the `sourceColor` column, the track color read from the
-         * imported file.
+         * Ajoute la colonne `sourceColor`, la couleur de tracé lue dans le fichier
+         * importé.
          *
-         * Same requirement as the previous migration: without it,
-         * fallbackToDestructiveMigration() would erase all of the user's tracks on the
-         * first launch of the new version. The column is nullable and has no default
-         * value — tracks already in the database have no original color, and that is
-         * exactly what should be recorded.
+         * Même exigence que la migration précédente : sans elle,
+         * fallbackToDestructiveMigration() effacerait tous les parcours de
+         * l'utilisateur au premier lancement de la nouvelle version. La colonne est
+         * nullable et sans valeur par défaut — les parcours déjà en base n'ont pas
+         * de couleur d'origine, et c'est bien ce qu'il faut enregistrer.
          */
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -75,14 +75,14 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds `segmentColor` to points: color at the track level was not enough, since a
-         * single KML file can gather dozens of trips of different colors.
+         * Ajoute `segmentColor` sur les points : la couleur ne suffisait pas au niveau
+         * du parcours, un seul fichier KML pouvant réunir des dizaines de trajets de
+         * couleurs différentes.
          *
-         *
-         * `ALTER TABLE … ADD COLUMN` on a nullable column without a default value
-         * only touches the schema in SQLite: the table is not rewritten. That is
-         * what makes the migration instantaneous even on a database of several million
-         * points, where a column with a default value would rewrite them all.
+         * `ALTER TABLE … ADD COLUMN` sur une colonne nullable et sans valeur par défaut
+         * ne touche que le schéma dans SQLite : la table n'est pas réécrite. C'est ce
+         * qui rend la migration instantanée même sur une base de plusieurs millions de
+         * points, là où une colonne avec valeur par défaut les réécrirait toutes.
          */
         private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -91,18 +91,18 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds `displayColor`: the color chosen by the user for a given track, color
-         * having stopped belonging to the category to belong to the track itself.
+         * Ajoute `displayColor` : la couleur choisie par l'utilisateur pour un parcours
+         * donné, la couleur ayant cessé d'appartenir à la catégorie pour appartenir au
+         * parcours lui-même.
          *
+         * Nullable et sans valeur par défaut, comme les précédentes : « aucune couleur
+         * choisie » doit rester distinct de « noir choisi », et une valeur par défaut
+         * ferait réécrire toute la table au lieu du seul schéma.
          *
-         * Nullable and without a default value, like the previous ones: “no color
-         * chosen” must remain distinct from “black chosen”, and a default value
-         * would rewrite the whole table instead of just the schema.
-         *
-         * Tracks already in the database therefore leave this migration with `displayColor`
-         * set to null. It is `TrackRepository.backfillDisplayColors` that then writes to them,
-         * once, the color they displayed until now: that color came from
-         * the preferences, which the SQL of a migration cannot read.
+         * Les parcours déjà en base sortent donc de cette migration avec `displayColor`
+         * à null. C'est `TrackRepository.backfillDisplayColors` qui leur écrit ensuite,
+         * une seule fois, la couleur qu'ils affichaient jusqu'ici : cette couleur venait
+         * des préférences, que le SQL d'une migration ne sait pas lire.
          */
         private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -111,10 +111,10 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds `displayWidthDp`: the line thickness, which became a per-track
-         * choice like the color. Nullable and without a default value, for the same
-         * reason as the previous ones: at null, the track keeps the general thickness
-         * it displayed until now, with no backfill needed.
+         * Ajoute `displayWidthDp` : l'épaisseur du trait, devenue un choix par
+         * parcours comme la couleur. Nullable et sans valeur par défaut, pour la même
+         * raison que les précédentes : à null, le parcours garde l'épaisseur générale
+         * qu'il affichait jusqu'ici, sans qu'aucune reprise ne soit nécessaire.
          */
         private val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -123,10 +123,10 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds `isPaused`: the pause of a recording, stored so it survives the
-         * process being killed. A default value costs nothing here, the tracks table
-         * has only a few hundred rows — unlike
-         * `track_points`, where invariant 2 forbids it.
+         * Ajoute `isPaused` : la pause d'un enregistrement, mémorisée pour survivre à
+         * l'arrêt du processus. Une valeur par défaut est sans coût ici, la table des
+         * parcours ne compte que quelques centaines de lignes — à l'inverse de
+         * `track_points`, où l'invariant 2 l'interdit.
          */
         private val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -135,35 +135,35 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * All declared migrations, in order.
+         * Toutes les migrations déclarées, dans l'ordre.
          *
-         * Exposed so that the migration test applies exactly the same list as
-         * the app: copying it into the test would let a migration added here
-         * and forgotten there slip through.
+         * Exposée pour que le test de migration applique exactement la même liste que
+         * l'application : la recopier dans le test laisserait passer une migration
+         * ajoutée ici et oubliée là.
          */
         @androidx.annotation.VisibleForTesting
         val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                // Re-check under the lock: without it, two simultaneous calls
-                // each build a Room instance on the same file. Each
-                // instance has its own connection pool and its own invalidation
-                // tracking, so the Flows of one ignore the writes of
-                // the other — the interface silently stops updating.
+                // Re-vérification sous le verrou : sans elle, deux appels simultanés
+                // construisent chacun une instance Room sur le même fichier. Chaque
+                // instance a son propre pool de connexions et son propre suivi
+                // d'invalidation, donc les Flow de l'une ignorent les écritures de
+                // l'autre — l'interface cesse silencieusement de se mettre à jour.
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "my_tracks_db"
                 )
                     .addMigrations(*MIGRATIONS)
-                    // Only on version downgrade: a database newer than
-                    // the code can only happen by reinstalling an earlier version,
-                    // and Room would not know how to read it. The general variant, on the other hand,
-                    // also erased tracks at the slightest forgotten migration on
-                    // an upgrade — the exact case we must
-                    // protect against. Better a clear crash, which is seen and
-                    // fixed, than a history silently erased.
+                    // Uniquement à la descente de version : une base plus récente que
+                    // le code ne peut arriver qu'en réinstallant une version antérieure,
+                    // et Room ne saurait pas la relire. La variante générale, elle,
+                    // effaçait aussi les parcours à la moindre migration oubliée en
+                    // montée de version — le cas exact contre lequel il faut se
+                    // protéger. Mieux vaut alors un plantage franc, qui se voit et se
+                    // corrige, qu'un historique effacé en silence.
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                     .also { INSTANCE = it }

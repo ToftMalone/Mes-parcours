@@ -1,11 +1,11 @@
 import java.util.Properties
 
 /**
- * Signing secrets, looked up first in `keystore.properties` — a local file
- * never versioned — then in the environment, the route taken by continuous
- * integration, where the values come from the repository's secrets.
+ * Secrets de signature, cherchés d'abord dans `keystore.properties` — fichier local
+ * jamais versionné — puis dans l'environnement, voie qu'emprunte l'intégration
+ * continue où les valeurs viennent des secrets du dépôt.
  *
- * No password therefore appears in the code or in the git history.
+ * Aucun mot de passe n'apparaît donc dans le code ni dans l'historique git.
  */
 val keystoreProperties = Properties().apply {
   val file = rootProject.file("keystore.properties")
@@ -33,10 +33,10 @@ android {
     versionCode = 43
     versionName = "2.1.0"
 
-    // Package name that an update APK must carry before being presented to
-    // the installer (see UpdateDownloader.isExpectedApk). The release's, including
-    // in the debug build: it is always the release that gets published, and
-    // `context.packageName` there would be the `.debug`-suffixed name.
+    // Nom de paquet que doit porter un APK de mise à jour avant d'être présenté à
+    // l'installateur (voir UpdateDownloader.isExpectedApk). Celui de la release, y
+    // compris dans le build de debug : c'est toujours la release que l'on publie, et
+    // `context.packageName` y vaudrait le nom suffixé `.debug`.
     buildConfigField("String", "UPDATE_PACKAGE_NAME", "\"$applicationId\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -44,10 +44,10 @@ android {
 
   signingConfigs {
     create("release") {
-      // Signing secrets: first keystore.properties, a local file never
-      // versioned, then the environment — this second route is the one taken by
-      // continuous integration, where the values come from the repository's secrets.
-      // No password therefore appears in the code or in the git history.
+      // Secrets de signature : d'abord keystore.properties, un fichier local jamais
+      // versionné, puis l'environnement — c'est cette seconde voie qu'emprunte
+      // l'intégration continue, où les valeurs viennent des secrets du dépôt.
+      // Aucun mot de passe n'apparaît donc dans le code ni dans l'historique git.
       storeFile = file(signingSecret("storeFile", "KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks")
       storePassword = signingSecret("storePassword", "STORE_PASSWORD")
       keyAlias = signingSecret("keyAlias", "KEY_ALIAS") ?: "upload"
@@ -69,15 +69,15 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // An applicationId distinct from the release's: the two then install side
-      // by side on the same device instead of overwriting each other, and the
-      // version suffix avoids confusing the two in the “About” screen.
+      // Un applicationId distinct de la release : les deux s'installent alors côte
+      // à côte sur le même appareil au lieu de s'écraser l'une l'autre, et le
+      // suffixe de version évite de confondre les deux dans l'écran « À propos ».
       applicationIdSuffix = ".debug"
       versionNameSuffix = "-debug"
 
-      // The debug keystore is not versioned: on a fresh clone it is absent.
-      // We therefore only impose it if it is there, otherwise AGP applies its default debug key
-      // — without which `assembleDebug` would fail on any new machine.
+      // Le trousseau de debug n'est pas versionné : sur un clone frais il est absent.
+      // On ne l'impose donc que s'il est là, sinon AGP applique sa clé de debug par
+      // défaut — sans quoi `assembleDebug` échouerait sur toute nouvelle machine.
       if (rootProject.file("debug.keystore").exists()) {
         signingConfig = signingConfigs.getByName("debugConfig")
       }
@@ -95,28 +95,28 @@ android {
 }
 
 /**
- * Where Room drops the schema of each version of the database.
+ * Où Room dépose le schéma de chaque version de la base.
  *
- * Required as soon as `AppDatabase` declares `exportSchema = true`: without this path,
- * compilation fails. These files make the schema inspectable and verifiable, instead
- * of existing only in generated code.
+ * Exigé dès lors que `AppDatabase` déclare `exportSchema = true` : sans ce chemin, la
+ * compilation échoue. Ces fichiers rendent le schéma inspectable et vérifiable, au
+ * lieu de n'exister que dans le code généré.
  */
 ksp {
   arg("room.schemaLocation", "${projectDir}/schemas")
 }
 
-// Dependencies put in comments were set aside without being deleted: putting
-// them back costs only an uncomment.
+// Les dépendances mises en commentaire ont été écartées sans être supprimées : les
+// remettre ne coûte alors qu'un décommentage.
 //
-// Retrofit, OkHttp, Moshi and the Google credentials libraries, on the other hand,
-// were removed for good: remnants of an abandoned backup to Drive, no line
-// of code called them, and they nevertheless traveled in every installed
-// APK.
+// Retrofit, OkHttp, Moshi et les bibliothèques d'identifiants Google ont en revanche
+// été retirées pour de bon : vestiges d'une sauvegarde vers Drive abandonnée, aucune
+// ligne de code ne les appelait, et elles voyageaient malgré tout dans chaque APK
+// installé.
 //
-// WorkManager had suffered the same fate, for the same reason — then came back with
-// the daily update check (UpdateCheckWorker), which needs
-// a periodic task that survives the app restarting and is battery-friendly,
-// exactly what WorkManager knows how to do.
+// WorkManager avait subi le même sort, pour la même raison — puis est revenue avec
+// la vérification quotidienne des mises à jour (UpdateCheckWorker), qui a besoin
+// d'une tâche périodique survivant au redémarrage de l'application et respectueuse
+// de la batterie, exactement ce que WorkManager sait faire.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   // implementation(libs.accompanist.permissions)

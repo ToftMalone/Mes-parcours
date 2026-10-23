@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.annotation.StringRes
 import com.example.ui.theme.LocalRecordingColor
 
-/** A bar tab: its navigation key (see `MainScreen`), and its appearance. */
+/** Un onglet de la barre : sa clé de navigation (voir `MainScreen`), et son apparence. */
 private data class NavDestination(
     val route: String,
     @StringRes val labelRes: Int,
@@ -58,28 +58,28 @@ private data class NavDestination(
 )
 
 private val DESTINATIONS = listOf(
-    NavDestination("record", R.string.nav_record, Icons.Outlined.RadioButtonChecked, Icons.Rounded.RadioButtonChecked, "tab_button_tracking"),
-    NavDestination("history", R.string.nav_history, Icons.Outlined.History, Icons.Rounded.History, "tab_button_history"),
-    NavDestination("tools", R.string.nav_tools, Icons.Outlined.Handyman, Icons.Rounded.Handyman, "tab_button_tools"),
-    NavDestination("settings", R.string.nav_settings, Icons.Outlined.Settings, Icons.Rounded.Settings, "tab_button_settings")
+    NavDestination("enregistrer", R.string.nav_record, Icons.Outlined.RadioButtonChecked, Icons.Rounded.RadioButtonChecked, "tab_button_tracking"),
+    NavDestination("historique", R.string.nav_history, Icons.Outlined.History, Icons.Rounded.History, "tab_button_history"),
+    NavDestination("outils", R.string.nav_tools, Icons.Outlined.Handyman, Icons.Rounded.Handyman, "tab_button_tools"),
+    NavDestination("parametres", R.string.nav_settings, Icons.Outlined.Settings, Icons.Rounded.Settings, "tab_button_settings")
 )
 
 /**
- * Navigation bar of the redesign: a floating pill, above the map
- * as well as the lists, where only the active tab shows its label.
+ * Barre de navigation de la refonte : une pilule flottante, au-dessus de la carte
+ * comme des listes, où seul l'onglet actif affiche son libellé.
  *
- * Replaces Material's `NavigationBar`, whose every tab reserves room for a
- * label and an indicator: it is impossible to get the active tab widening
- * while the others shrink to their icon.
+ * Remplace la `NavigationBar` de Material, dont chaque onglet réserve la place d'un
+ * libellé et d'un indicateur : impossible d'y obtenir l'onglet actif qui s'élargit
+ * pendant que les autres se réduisent à leur icône.
  *
- * The widening goes through `animateContentSize`, the mockup's “fast spatial” spring
- * (stiffness 800, damping 0.6). It clips the content to its animated size,
- * with no consequence here: a tab's pill carries no shadow — see
- * “The sliced shadow of the cards” in CLAUDE.md for what clipping does to a
- * shadow. The shadow is that of the whole bar, outside any animation.
+ * L'élargissement passe par `animateContentSize`, ressort « spatial rapide » de la
+ * maquette (raideur 800, amortissement 0,6). Il rogne le contenu à sa taille animée,
+ * sans conséquence ici : la pilule d'un onglet ne porte aucune ombre — voir
+ * « L'ombre tranchée des cartes » dans CLAUDE.md pour ce qu'un rognage fait à une
+ * ombre. L'ombre est celle de la barre entière, hors de toute animation.
  *
- * [showUpdateBadge]: red dot on “Settings” when an update has been
- * ignored, enough to find it again without repeating what the banner already offered.
+ * [showUpdateBadge] : pastille rouge sur « Paramètres » quand une mise à jour a été
+ * ignorée, de quoi la retrouver sans redire ce que le bandeau a déjà proposé.
  */
 @Composable
 fun MainNavigationBar(
@@ -89,8 +89,8 @@ fun MainNavigationBar(
     modifier: Modifier = Modifier,
     isRecording: Boolean = false
 ) {
-    // The full-width container only serves to center the pill, which has only the
-    // width of its content: a bar stretched edge to edge no longer floats.
+    // Le conteneur pleine largeur ne sert qu'à centrer la pilule, qui n'a que la
+    // largeur de son contenu : une barre étirée d'un bord à l'autre ne flotte plus.
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -101,8 +101,8 @@ fun MainNavigationBar(
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
-            // The mockup's “level 3”: statistics panel and navigation,
-            // floating above the map.
+            // « Niveau 3 » de la maquette : panneau de statistiques et navigation,
+            // flottants au-dessus de la carte.
             shadowElevation = 8.dp,
             modifier = Modifier.testTag("bottom_nav_bar")
         ) {
@@ -116,12 +116,12 @@ fun MainNavigationBar(
                     NavItem(
                         destination = destination,
                         selected = selected,
-                        // The update dot only shows while we are not
-                        // on the tab: once on it, the card at the top replaces it.
-                        showBadge = showUpdateBadge && destination.route == "settings" && !selected,
-                        // Recording in progress seen from another tab: a dot in
-                        // the recording color reminds of it.
-                        showRecordingDot = isRecording && destination.route == "record" && !selected,
+                        // La pastille de mise à jour ne se montre que tant qu'on n'est pas
+                        // sur l'onglet : une fois dessus, la carte en tête la remplace.
+                        showBadge = showUpdateBadge && destination.route == "parametres" && !selected,
+                        // Enregistrement en cours vu depuis un autre onglet : un point de
+                        // la couleur d'enregistrement le rappelle.
+                        showRecordingDot = isRecording && destination.route == "enregistrer" && !selected,
                         onClick = { onTabSelected(destination.route) }
                     )
                 }
@@ -157,7 +157,7 @@ private fun NavItem(
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
             .height(56.dp)
-            // Collapsed tab: a 60 dp target, not just the width of the icon.
+            // Onglet réduit : une cible de 60 dp, pas seulement la largeur de l'icône.
             .then(if (selected) Modifier else Modifier.width(60.dp))
             .clip(CircleShape)
             .background(containerColor)
@@ -169,8 +169,8 @@ private fun NavItem(
         Box {
             Icon(
                 imageVector = if (selected) destination.selectedIcon else destination.icon,
-                // Tab reduced to its icon: it is the icon that carries the name, for
-                // TalkBack. When active, the displayed label is enough.
+                // Onglet réduit à son icône : c'est elle qui porte le nom, pour
+                // TalkBack. Actif, le libellé affiché suffit.
                 contentDescription = if (selected) null else stringResource(destination.labelRes),
                 tint = contentColor,
                 modifier = Modifier.size(26.dp)

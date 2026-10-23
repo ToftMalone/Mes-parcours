@@ -18,10 +18,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Merging permanently deletes tracks and copies their points via
- * SQLite. These tests check the two assumptions it rests on:
- * that Room accepts an INSERT … SELECT, and that the order imposed by the ORDER BY is
- * indeed the one in which the new rows receive their identifier.
+ * La fusion supprime définitivement des parcours et recopie leurs points via
+ * SQLite. Ces tests vérifient les deux hypothèses sur lesquelles elle repose :
+ * que Room accepte un INSERT … SELECT, et que l'ordre imposé par le ORDER BY est
+ * bien celui dans lequel les nouvelles lignes reçoivent leur identifiant.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -44,7 +44,7 @@ class MergeTracksTest {
         db.close()
     }
 
-    /** Creates a track whose points are numbered in a recognizable way. */
+    /** Crée un parcours dont les points sont numérotés de façon reconnaissable. */
     private suspend fun createTrack(name: String, startTime: Long, marker: Double, count: Int): Long {
         val trackId = db.trackDao.insertTrack(
             Track(name = name, startTime = startTime, endTime = startTime + count * 1000L)
@@ -62,10 +62,10 @@ class MergeTracksTest {
     }
 
     @Test
-    fun `merge respects the chronological order of the tracks`() = runBlocking {
-        // The oldest is created last: its point identifiers are therefore
-        // the highest. If the merge relied on id order alone, it would end up
-        // at the end instead of the start.
+    fun `fusion respecte l ordre chronologique des parcours`() = runBlocking {
+        // Le plus ancien est créé en dernier : ses identifiants de points sont donc
+        // les plus élevés. Si la fusion se contentait de l'ordre des id, il finirait
+        // à la fin au lieu du début.
         val recent = createTrack("recent", startTime = 3_000_000L, marker = 3.0, count = 4)
         val middle = createTrack("milieu", startTime = 2_000_000L, marker = 2.0, count = 3)
         val oldest = createTrack("ancien", startTime = 1_000_000L, marker = 1.0, count = 5)
@@ -73,49 +73,49 @@ class MergeTracksTest {
         val mergedId = repository.mergeAndSaveTracks(
             trackIds = listOf(recent, middle, oldest),
             destinationTrackId = recent,
-            mergedName = "Merged"
+            mergedName = "Fusionne"
         )
         assertEquals(recent, mergedId)
 
         val points = db.trackDao.getPointsForTrack(mergedId)
         assertEquals(12, points.size)
 
-        // Longitudes serve as an origin marker: 1.0 then 2.0 then 3.0.
+        // Les longitudes servent de marqueur d'origine : 1.0 puis 2.0 puis 3.0.
         val order = points.map { it.longitude }
         assertEquals(
             listOf(1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0),
             order
         )
 
-        // Inside a track, the original order is kept.
+        // À l'intérieur d'un parcours, l'ordre d'origine est conservé.
         val oldestLats = points.filter { it.longitude == 1.0 }.map { it.latitude }
         assertEquals(oldestLats.sorted(), oldestLats)
 
-        // Identifiers stay strictly increasing.
+        // Les identifiants restent strictement croissants.
         val ids = points.map { it.id }
         assertEquals(ids.sorted(), ids)
         assertEquals(ids.distinct().size, ids.size)
     }
 
     @Test
-    fun `each added track opens a new segment`() = runBlocking {
+    fun `chaque parcours ajoute ouvre un nouveau troncon`() = runBlocking {
         val first = createTrack("a", startTime = 1_000_000L, marker = 1.0, count = 3)
         val second = createTrack("b", startTime = 2_000_000L, marker = 2.0, count = 3)
 
-        repository.mergeAndSaveTracks(listOf(first, second), first, "Merged")
+        repository.mergeAndSaveTracks(listOf(first, second), first, "Fusionne")
 
         val points = db.trackDao.getPointsForTrack(first)
         assertEquals(6, points.size)
 
-        // No break at the head: the first point naturally opens the line.
+        // Pas de rupture en tête : le premier point ouvre naturellement le tracé.
         assertTrue(!points[0].isDiscontinuous)
-        // Break exactly at the junction, so as not to join the two tracks.
+        // Rupture exactement au raccord, pour ne pas relier les deux parcours.
         assertTrue(points[3].isDiscontinuous)
         assertEquals(1, points.count { it.isDiscontinuous })
     }
 
     @Test
-    fun `source tracks are deleted and the destination keeps its category`() = runBlocking {
+    fun `les parcours sources sont supprimes et la destination conserve sa categorie`() = runBlocking {
         val destination = db.trackDao.insertTrack(
             Track(name = "dest", startTime = 1_000_000L, isImported = true)
         )
@@ -124,41 +124,41 @@ class MergeTracksTest {
         )
         val source = createTrack("source", startTime = 2_000_000L, marker = 2.0, count = 2)
 
-        repository.mergeAndSaveTracks(listOf(destination, source), destination, "Final name")
+        repository.mergeAndSaveTracks(listOf(destination, source), destination, "Nom final")
 
         assertEquals(null, db.trackDao.getTrackById(source))
         assertEquals(0, db.trackDao.getPointsForTrack(source).size)
 
         val merged = db.trackDao.getTrackById(destination)!!
-        assertEquals("Final name", merged.name)
-        assertTrue("the imported destination must stay imported", merged.isImported)
+        assertEquals("Nom final", merged.name)
+        assertTrue("la destination importee doit le rester", merged.isImported)
         assertEquals(3, db.trackDao.getPointsForTrack(destination).size)
     }
 
     @Test
-    fun `the result of a merge is marked as merged`() = runBlocking {
-        // It is this marking alone that files the track in the history's “Merged” tab,
-        // and files it there *instead of* its original category. Without
-        // it, the merge gets lost among the tracks it came from.
+    fun `le resultat d une fusion est marque comme fusionne`() = runBlocking {
+        // C'est ce marquage seul qui range le parcours dans l'onglet « Fusionnés » de
+        // l'historique, et qui l'y range *à la place* de sa catégorie d'origine. Sans
+        // lui, la fusion se perd parmi les parcours dont elle est issue.
         val first = createTrack("a", startTime = 1_000_000L, marker = 1.0, count = 2)
         val second = createTrack("b", startTime = 2_000_000L, marker = 2.0, count = 2)
 
         repository.mergeAndSaveTracks(listOf(first, second), first, "Fusion")
 
         val merged = db.trackDao.getTrackById(first)!!
-        assertTrue("the result must carry the merged category", merged.isMerged)
+        assertTrue("le résultat doit porter la catégorie « fusionné »", merged.isMerged)
     }
 
     @Test
-    fun `a track without points does not disturb the merge`() = runBlocking {
-        val empty = db.trackDao.insertTrack(Track(name = "empty", startTime = 1_000_000L))
+    fun `un parcours sans point ne perturbe pas la fusion`() = runBlocking {
+        val empty = db.trackDao.insertTrack(Track(name = "vide", startTime = 1_000_000L))
         val withPoints = createTrack("plein", startTime = 2_000_000L, marker = 2.0, count = 3)
 
-        repository.mergeAndSaveTracks(listOf(empty, withPoints), withPoints, "Merged")
+        repository.mergeAndSaveTracks(listOf(empty, withPoints), withPoints, "Fusionne")
 
         val points = db.trackDao.getPointsForTrack(withPoints)
         assertEquals(3, points.size)
-        // No extra segment opened by the empty track.
+        // Aucun tronçon supplémentaire ouvert par le parcours vide.
         assertEquals(0, points.count { it.isDiscontinuous })
     }
 }

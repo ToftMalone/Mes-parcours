@@ -23,8 +23,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Safeguards around the recording in progress and the state it leaves in the database:
- * each fixes a data loss or a wrong state found in review.
+ * Garde-fous autour de l'enregistrement en cours et de l'état qu'il laisse en base :
+ * chacun corrige une perte de données ou un état faux constaté à la relecture.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -70,7 +70,7 @@ class RecordingGuardsTest {
     }
 
     @Test
-    fun `the track being recorded cannot be deleted`() = runBlocking {
+    fun `le parcours en cours ne peut pas etre supprime`() = runBlocking {
         val recording = createTrack("en cours", startTime = 1_000L, count = 3, isRecording = true)
 
         assertFalse(repository.deleteTrack(recording))
@@ -79,7 +79,7 @@ class RecordingGuardsTest {
     }
 
     @Test
-    fun `a finished track is deleted with its points`() = runBlocking {
+    fun `un parcours termine se supprime avec ses points`() = runBlocking {
         val done = createTrack("fini", startTime = 1_000L, count = 3)
 
         assertTrue(repository.deleteTrack(done))
@@ -88,24 +88,24 @@ class RecordingGuardsTest {
     }
 
     @Test
-    fun `merging refuses the track being recorded`() = runBlocking {
+    fun `la fusion refuse le parcours en cours`() = runBlocking {
         val old = createTrack("ancien", startTime = 1_000L, count = 3)
         val recording = createTrack("en cours", startTime = 9_000L, count = 3, isRecording = true)
 
         try {
             repository.mergeAndSaveTracks(listOf(old, recording), old, "Fusion")
-            fail("The merge should have been refused")
+            fail("La fusion aurait dû être refusée")
         } catch (e: IllegalArgumentException) {
-            // expected
+            // attendu
         }
-        // Nothing moved: both tracks and their points are intact.
+        // Rien n'a bougé : les deux parcours et leurs points sont intacts.
         assertNotNull(db.trackDao.getTrackById(recording))
         assertEquals(3, db.trackDao.getPointsForTrack(recording).size)
         assertEquals(3, db.trackDao.getPointsForTrack(old).size)
     }
 
     @Test
-    fun `the pause is stored in the database and lifted at the end`() = runBlocking {
+    fun `la pause est memorisee en base et levee a la fin`() = runBlocking {
         val recording = createTrack("en cours", startTime = 1_000L, count = 3, isRecording = true)
 
         repository.setTrackPaused(recording, true)
@@ -118,7 +118,7 @@ class RecordingGuardsTest {
     }
 
     @Test
-    fun `resuming a paused track lifts the pause`() = runBlocking {
+    fun `reprendre un parcours en pause leve la pause`() = runBlocking {
         val track = createTrack("ancien", startTime = 1_000L, count = 3)
         repository.setTrackPaused(track, true)
 
@@ -127,21 +127,21 @@ class RecordingGuardsTest {
     }
 
     @Test
-    fun `the resume carries what is needed to extend the average speed`() = runBlocking {
+    fun `la reprise transmet de quoi prolonger la vitesse moyenne`() = runBlocking {
         val track = createTrack("ancien", startTime = 1_000L, count = 5, speed = 3f)
 
         val resume = repository.loadResumeState(db.trackDao.getTrackById(track)!!)
-        // The first point brings no speed (see TrackStatsAccumulator).
+        // Le premier point n'apporte pas de vitesse (voir TrackStatsAccumulator).
         assertEquals(4, resume.speedSamples)
         assertEquals(12.0, resume.speedSumMps, 1e-6)
         assertEquals(3.0, resume.stats.avgSpeedMps, 1e-6)
     }
 
     @Test
-    fun `the reserved row of an import is hidden then cleaned up`() = runBlocking {
+    fun `la ligne reservee d un import est cachee puis nettoyee`() = runBlocking {
         val visible = createTrack("visible", startTime = 1_000L, count = 2)
         val placeholder = db.trackDao.insertTrack(
-            Track(name = "Import in progress", startTime = Track.IMPORT_PLACEHOLDER_START_TIME, isImported = true)
+            Track(name = "Import en cours", startTime = Track.IMPORT_PLACEHOLDER_START_TIME, isImported = true)
         )
         db.trackDao.insertTrackPoints(listOf(TrackPoint(trackId = placeholder, latitude = 1.0, longitude = 1.0, timestamp = 0L)))
 

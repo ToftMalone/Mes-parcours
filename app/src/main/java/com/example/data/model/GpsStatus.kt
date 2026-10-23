@@ -1,18 +1,18 @@
 package com.example.data.model
 
 /**
- * State of the GPS signal as tracked by [com.example.data.repository.TrackRepository].
+ * État du signal GPS tel que le suit [com.example.data.repository.TrackRepository].
  *
- * This used to be a French string compared character for character (“Signal trouvé”…) in
- * six places: translating the interface would have silently broken the logic. The
- * label to display is chosen on screen; here we only hold the state.
+ * C'était une chaîne comparée au caractère près (« Signal trouvé »…) à six endroits :
+ * retoucher le libellé aurait cassé la logique en silence. Le libellé affiché se
+ * choisit à l'écran ; ici, on ne tient que l'état.
  */
 enum class GpsStatus {
-    /** No position received recently: searching, or signal lost. */
+    /** Aucune position reçue récemment : recherche, ou signal perdu. */
     SEARCHING,
     FOUND,
-    /** No location provider active on the device. */
+    /** Aucun fournisseur de position actif sur l'appareil. */
     DISABLED,
-    /** Positions invented by the simulation (debug only). */
+    /** Positions inventées par la simulation (debug uniquement). */
     SIMULATION
 }

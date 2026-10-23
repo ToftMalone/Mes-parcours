@@ -20,20 +20,20 @@ import com.example.MainActivity
 import java.util.concurrent.TimeUnit
 
 /**
- * Checks, in the background, whether a new version is published, and warns
- * the user with a notification if so.
+ * Vérifie, en tâche de fond, si une nouvelle version est publiée, et prévient
+ * l'utilisateur par une notification si c'est le cas.
  *
- * Complements `UpdatePrompt`, which only consults the network when the
- * app opens: without this task, an update published while
- * the app stays closed for several days was only seen at the next
- * launch — if there was one.
+ * Complète `UpdatePrompt`, qui ne consulte le réseau qu'à l'ouverture de
+ * l'application : sans cette tâche, une mise à jour publiée pendant que
+ * l'application reste fermée plusieurs jours ne se voyait qu'au prochain
+ * lancement — s'il y en avait un.
  *
- * **Every [CHECK_INTERVAL_HOURS] hours, never continuously.** Scheduled via
- * WorkManager rather than a home-made timer: the system shifts the callback within a
- * wide window and batches the tasks of several apps to limit
- * processor wake-ups, the opposite of a continuous check that would drain the
- * battery. `setRequiresBatteryNotLow(true)` even gives up that beat when
- * the device is already low.
+ * **Toutes les [CHECK_INTERVAL_HOURS] heures, jamais en continu.** Programmée via
+ * WorkManager plutôt qu'un minuteur maison : le système bat le rappel dans une
+ * fenêtre large et regroupe les tâches de plusieurs applications pour limiter les
+ * réveils du processeur, l'inverse d'une vérification continue qui viderait la
+ * batterie. `setRequiresBatteryNotLow(true)` renonce même à ce battement quand
+ * l'appareil est déjà en réserve.
  */
 class UpdateCheckWorker(
     context: Context,
@@ -87,9 +87,9 @@ class UpdateCheckWorker(
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
-        // No POST_NOTIFICATIONS check before this call: without it,
-        // notify() silently does nothing on versions that require it —
-        // same stance as TrackingService and AutoBackupManager for their own
+        // Pas de vérification de POST_NOTIFICATIONS avant cet appel : sans elle,
+        // notify() ne fait rien, silencieusement, sur les versions qui l'exigent —
+        // même parti pris que TrackingService et AutoBackupManager pour leurs propres
         // notifications.
         manager.notify(NOTIFICATION_ID, notification)
     }
@@ -100,32 +100,32 @@ class UpdateCheckWorker(
         private const val WORK_NAME = "update_check"
 
         /**
-         * Check rate. WorkManager refuses anything under 15 minutes
-         * (`PeriodicWorkRequest.MIN_PERIODIC_INTERVAL_MILLIS`); well above
-         * here, the margin serves to let the system batch this task with
-         * others rather than wake the processor on the dot.
+         * Cadence de vérification. WorkManager refuse en dessous de 15 minutes
+         * (`PeriodicWorkRequest.MIN_PERIODIC_INTERVAL_MILLIS`) ; largement au-dessus
+         * ici, la marge sert à laisser le système regrouper cette tâche avec
+         * d'autres plutôt qu'à réveiller le processeur pile à l'heure.
          */
         private const val CHECK_INTERVAL_HOURS = 3L
 
         /**
-         * Schedules the periodic check. No effect if it already is:
-         * [ExistingPeriodicWorkPolicy.KEEP] keeps the existing task rather than
-         * starting from zero at each app start — replacing it at
-         * each launch would amount, on an app opened several times
-         * a day, to never letting the first delay elapse.
+         * Programme la vérification périodique. Sans effet si elle l'est déjà :
+         * [ExistingPeriodicWorkPolicy.KEEP] conserve la tâche existante plutôt que de
+         * repartir de zéro à chaque démarrage de l'application — la remplacer à
+         * chaque lancement reviendrait, sur une application ouverte plusieurs fois
+         * par jour, à ne jamais laisser le premier délai s'écouler.
          *
-         * Downside of KEEP: a change of [CHECK_INTERVAL_HOURS] between two
-         * versions will not apply by itself to installations that had
-         * already scheduled it with the old rate — the existing task is never
-         * replaced. Harmless as long as the app has not yet been
-         * published with the previous rate; to watch if this delay is touched
-         * after a release.
+         * Revers de KEEP : un changement de [CHECK_INTERVAL_HOURS] entre deux
+         * versions ne s'appliquera pas tout seul aux installations qui l'avaient
+         * déjà programmée avec l'ancienne cadence — la tâche existante n'est jamais
+         * remplacée. Sans conséquence tant que l'application n'a pas encore été
+         * publiée avec la cadence précédente ; à surveiller si ce délai est retouché
+         * après une publication.
          *
-         * `WorkManager.getInstance` assumes its own initializer has already run —
-         * automatic in a real app, absent in Robolectric tests,
-         * which instantiate `TrackApplication` (hence call this function) without it.
-         * That failure must no more prevent the app from starting than a failure
-         * of the color backfill or of the welcome.
+         * `WorkManager.getInstance` suppose son propre initialiseur déjà passé —
+         * automatique dans une vraie application, absent dans les tests Robolectric,
+         * qui instancient `TrackApplication` (donc appellent cette fonction) sans lui.
+         * Cet échec-là ne doit pas plus empêcher l'application de démarrer qu'un
+         * échec de la reprise des couleurs ou de l'accueil.
          */
         fun schedule(context: Context) {
             if (!UpdateConfig.isConfigured) return

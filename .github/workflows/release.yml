@@ -1,40 +1,36 @@
-name: Publish a release
+name: Publier une version
 
-# Two ways to publish, for the same result: a signed APK, update.json, and the
-# GitHub release that the app queries to offer the update.
+# Deux façons de publier, pour un même résultat : APK signé, update.json, et la
+# publication GitHub que l'application interroge pour proposer la mise à jour.
 #
-# 1. Push an annotated tag — the canonical route from a development machine:
+# 1. Poser un tag annoté — la voie canonique depuis un poste de développement :
 #
-#      git tag -a v2.1.0 -m "Title" -m "First change" -m "Second change"
-#      git push origin v2.1.0
+#      git tag -a v0.9.9-thierry -m "Titre" -m "Première nouveauté" -m "Deuxième"
+#      git push origin v0.9.9-thierry
 #
-#    The tag body becomes the release notes, one bullet per line.
+#    Le corps du tag devient les notes de version, une puce par ligne.
 #
-# 2. Run the workflow by hand (Actions tab), entering the notes. The tag is then
-#    deduced from versionName and created by the publication itself.
+# 2. Lancer le workflow à la main (onglet Actions), en saisissant les notes. Le tag
+#    est alors déduit du versionName et créé par la publication elle-même.
 #
-#    This second route is not a mere convenience: creating a tag requires write
-#    rights on refs that not every environment has — a remote session can push
-#    code and still be refused a tag. Without it, a development machine would be
-#    needed to publish anything at all.
-#
-# Notes are written in English. A manual run can also carry translations (the
-# `notes_i18n` input, a JSON object keyed by language code): the app shows the ones
-# matching the phone's language and falls back on the English notes.
+#    Cette seconde voie n'est pas un raccourci de confort : créer un tag exige des
+#    droits d'écriture sur les références que tout environnement n'a pas — une
+#    session distante peut pousser du code et se voir refuser un tag. Sans elle, il
+#    faudrait un poste de développement sous la main pour publier quoi que ce soit.
 
-# Actions pinned by commit identifier, never by tag (`@v4`).
+# Actions épinglées par identifiant de commit, jamais par étiquette (`@v4`).
 #
-# A tag moves: its author — or whoever steals their account — can make it point
-# tomorrow at other code, which would run here with nothing changing in this file.
-# That is what happened in 2025 to tj-actions/changed-files. The stake is the
-# signing key: setup-gradle injects its own code into Gradle, the very Gradle that
-# signs the APK with the keystore password. Whoever holds the key can publish an
-# update that the app would install as legitimate.
+# Une étiquette se déplace : son auteur — ou quiconque dérobe son compte — peut la
+# faire pointer demain sur un autre code, qui s'exécuterait ici sans que rien ne
+# change dans ce fichier. C'est ce qui est arrivé en 2025 à tj-actions/changed-files.
+# L'enjeu est la clé de signature : setup-gradle injecte son propre code dans Gradle,
+# celui-là même qui signe l'APK avec le mot de passe du trousseau. Qui tient la clé
+# peut publier une mise à jour que l'application installerait comme légitime.
 #
-# The readable version is in a comment to the right of each identifier. To bump a
-# version, look up the commit of the new tag
-# (`git ls-remote https://github.com/<action>.git 'refs/tags/<version>^{}'`, or without
-# `^{}` for a lightweight tag) and replace identifier and comment together.
+# La version lisible est en commentaire à droite de chaque identifiant. Pour monter
+# de version, relever le commit de la nouvelle étiquette
+# (`git ls-remote https://github.com/<action>.git 'refs/tags/<version>^{}'`, ou sans
+# `^{}` pour une étiquette légère) et remplacer identifiant et commentaire ensemble.
 
 on:
   push:
@@ -43,87 +39,83 @@ on:
   workflow_dispatch:
     inputs:
       notes:
-        description: "Release notes in English, one change per line"
+        description: "Notes de version, une nouveauté par ligne"
         required: true
         type: string
-      notes_i18n:
-        description: 'Optional translations as JSON, e.g. {"fr":["Première nouveauté"],"es":["Primera novedad"]}'
-        required: false
-        default: '{}'
-        type: string
 
-# Needed to create the release and attach the files to it.
+# Nécessaire pour créer la publication et y joindre les fichiers.
 permissions:
   contents: write
 
 jobs:
-  publish:
+  publier:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out the code
+      - name: Récupérer le code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # The tag message serves as release notes: the history is needed.
+          # Le message du tag sert de notes de version : il faut l'historique.
           fetch-depth: 0
 
-      - name: Install the JDK
+      - name: Installer le JDK
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Prepare the Android SDK
-        # The runner already carries a complete Android SDK, cmdline-tools and
-        # sdkmanager included; only the license acceptance was missing.
-        # android-actions/setup-android@v3 used to handle it, until it failed
-        # overnight: it first tries to install the legacy « tools » package, which
-        # Google removed from its repository — so no version installs any more,
-        # whatever the project. We accept the licenses ourselves, without depending
-        # on the action for so simple a gesture.
+      - name: Préparer le SDK Android
+        # Le runner porte déjà un SDK Android complet, cmdline-tools et sdkmanager
+        # compris ; il ne manquait que l'acceptation des licences.
+        # android-actions/setup-android@v3 s'en chargeait, jusqu'à ce qu'elle échoue
+        # du jour au lendemain : elle tente d'abord d'installer le paquet historique
+        # « tools », que Google a retiré de son dépôt — plus aucune version ne
+        # l'installe donc plus, quel que soit le projet. On accepte les licences
+        # nous-mêmes, sans dépendre de l'action pour un geste aussi simple.
         #
-        # `|| true` is not there out of mere caution: `yes | sdkmanager` closes its
-        # input before `yes` has finished writing, which makes it exit with an error
-        # (SIGPIPE) although sdkmanager did accept the licenses. GitHub Actions'
-        # step shell enables `pipefail`, which would fail the step on a success. A
-        # real acceptance failure would show up anyway at the compilation that follows.
+        # `|| true` n'est pas là par prudence de principe : `yes | sdkmanager`
+        # ferme son entrée avant que `yes` ait fini d'écrire, ce qui la fait
+        # sortir en erreur (SIGPIPE) alors que sdkmanager, lui, a bien accepté les
+        # licences. Le shell des étapes GitHub Actions active `pipefail`, qui
+        # ferait donc échouer l'étape sur un succès. Un vrai échec d'acceptation
+        # se verrait de toute façon à la compilation qui suit.
         run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
-      - name: Install the target platform
+      - name: Installer la plateforme visée
         run: |
           sdkmanager --install "platforms;android-36" || true
           sdkmanager --install "platforms;android-36.1" || true
 
-      - name: Set up Gradle
+      - name: Préparer Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
-      - name: Run the tests
-        # A release must never be published if the test suite fails.
+      - name: Lancer les tests
+        # Une version ne doit jamais être publiée si la suite de tests échoue.
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      - name: Attach the test reports
-        # A release blocked by the tests must say why: Gradle's log only names the
-        # test, never the exception that made it fail.
+      - name: Joindre les rapports de test
+        # Une version bloquée par les tests doit dire pourquoi : le journal de Gradle
+        # ne nomme que le test, jamais l'exception qui l'a fait tomber.
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-reports
+          name: rapports-de-test
           path: app/build/reports/tests/
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Restore the signing keystore
+      - name: Restituer le trousseau de signature
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
           if [ -z "${KEYSTORE_BASE64}" ]; then
-            echo "::error::The KEYSTORE_BASE64 secret is missing. See CLAUDE.md, section \"Publishing a release\"."
+            echo "::error::Le secret KEYSTORE_BASE64 est absent. Voir CLAUDE.md, section « Publier une version »."
             exit 1
           fi
           printf '%s' "${KEYSTORE_BASE64}" | base64 -d > "${RUNNER_TEMP}/upload.jks"
 
-      - name: Build the signed release
+      - name: Compiler la version signée
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -131,12 +123,11 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: ./gradlew --no-daemon assembleRelease
 
-      - name: Prepare the APK, the notes and update.json
+      - name: Préparer l'APK, les notes et update.json
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
           DISPATCH_NOTES: ${{ inputs.notes }}
-          DISPATCH_NOTES_I18N: ${{ inputs.notes_i18n }}
         run: |
           set -euo pipefail
 
@@ -145,30 +136,23 @@ jobs:
           TAG="v${VERSION_NAME}"
 
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            # Safeguard: publishing a tag without having bumped the version would
-            # produce a release that nobody could install over the previous one.
+            # Garde-fou : publier un tag sans avoir incrémenté la version produirait
+            # une publication que personne ne pourrait installer par-dessus.
             if [ "${TAG}" != "${GITHUB_REF_NAME}" ]; then
-              echo "::error::Tag ${GITHUB_REF_NAME} does not match versionName ${VERSION_NAME}. Expected: ${TAG}"
+              echo "::error::Le tag ${GITHUB_REF_NAME} ne correspond pas à versionName ${VERSION_NAME}. Attendu : ${TAG}"
               exit 1
             fi
-            # The notes come from the annotated tag body, one bullet per non-empty line.
+            # Les notes viennent du corps du tag annoté, une puce par ligne non vide.
             NOTES=$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}" || true)
           else
-            # Manual run: the tag being deduced from versionName, it cannot diverge
-            # from the compiled version — the safeguard above would have nothing to
-            # check. What remains is refusing to overwrite an already published version.
+            # Déclenchement manuel : le tag étant déduit du versionName, il ne peut
+            # pas diverger de la version compilée — le garde-fou ci-dessus n'aurait
+            # rien à vérifier. Reste à refuser d'écraser une version déjà publiée.
             if gh release view "${TAG}" >/dev/null 2>&1; then
-              echo "::error::Version ${TAG} is already published. Bump versionCode and versionName in app/build.gradle.kts before republishing."
+              echo "::error::La version ${TAG} est déjà publiée. Incrémentez versionCode et versionName dans app/build.gradle.kts avant de republier."
               exit 1
             fi
             NOTES="${DISPATCH_NOTES}"
-          fi
-
-          # Optional translations (manual runs only). Anything that is not a JSON object
-          # is ignored rather than failing a release over a typo in a translation.
-          NOTES_I18N='{}'
-          if [ "${GITHUB_EVENT_NAME}" != "push" ] && [ -n "${DISPATCH_NOTES_I18N:-}" ]; then
-            NOTES_I18N=$(printf '%s' "${DISPATCH_NOTES_I18N}" | jq -c 'if type == "object" then . else {} end' 2>/dev/null || echo '{}')
           fi
 
           printf '%s\n' "${NOTES}" | grep -v '^[[:space:]]*$' | sed 's/^/- /' > notes.md
@@ -177,9 +161,9 @@ jobs:
           APK_NAME="mes-parcours-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "${APK_NAME}"
 
-          # Fingerprint of the published APK. The app compares it with what it
-          # downloaded before presenting it to the installer: a file truncated along
-          # the way is thus discarded instead of failing later, obscurely.
+          # Empreinte de l'APK publié. L'application la compare à ce qu'elle a
+          # téléchargé avant de le présenter à l'installateur : un fichier tronqué
+          # en route est ainsi écarté au lieu d'échouer plus tard, de façon obscure.
           APK_SHA256=$(sha256sum "${APK_NAME}" | cut -d' ' -f1)
 
           jq -n \
@@ -188,37 +172,36 @@ jobs:
             --arg apkUrl "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APK_NAME}" \
             --arg sha256 "${APK_SHA256}" \
             --argjson notes "${NOTES_JSON}" \
-            --argjson notesI18n "${NOTES_I18N}" \
-            '{versionCode: $versionCode, versionName: $versionName, apkUrl: $apkUrl, sha256: $sha256, notes: $notes, notesI18n: $notesI18n}' \
+            '{versionCode: $versionCode, versionName: $versionName, apkUrl: $apkUrl, sha256: $sha256, notes: $notes}' \
             > update.json
 
           echo "apk=${APK_NAME}" >> "${GITHUB_OUTPUT}"
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "versionName=${VERSION_NAME}" >> "${GITHUB_OUTPUT}"
 
-          echo "update.json produced:"
+          echo "update.json produit :"
           cat update.json
-          echo "Release notes:"
+          echo "Notes de version :"
           cat notes.md
 
-      - name: Create the release
+      - name: Créer la publication
         env:
           GH_TOKEN: ${{ github.token }}
-          # Like the notes above, these three values go through the environment
-          # rather than being interpolated into the command: `${{ }}` is replaced
-          # before the shell sees the line, so a shell character in the versionName
-          # would execute instead of being a name.
+          # Comme les notes plus haut, ces trois valeurs passent par l'environnement
+          # plutôt que d'être interpolées dans la commande : `${{ }}` est remplacé
+          # avant que le shell ne voie la ligne, si bien qu'un caractère de shell
+          # dans le versionName s'exécuterait au lieu d'être un nom.
           TAG: ${{ steps.prepare.outputs.tag }}
           APK: ${{ steps.prepare.outputs.apk }}
           VERSION_NAME: ${{ steps.prepare.outputs.versionName }}
         run: |
           set -euo pipefail
-          # update.json must carry exactly this name: the app looks for it at the URL
-          # releases/latest/download/update.json.
+          # update.json doit porter exactement ce nom : l'application le cherche à
+          # l'URL releases/latest/download/update.json.
           #
-          # --target only has an effect if the tag does not exist yet: gh then creates
-          # it on this commit. On a tag-triggered run, the tag already exists and the
-          # option does nothing.
+          # --target n'a d'effet que si le tag n'existe pas encore : gh le crée alors
+          # sur ce commit. Sur un déclenchement par tag, le tag existe déjà et
+          # l'option est sans effet.
           gh release create "${TAG}" \
             "${APK}" \
             update.json \

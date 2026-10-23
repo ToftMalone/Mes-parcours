@@ -66,23 +66,23 @@ fun MainScreen(
     val context = LocalContext.current
     val isTracking by viewModel.isTracking.collectAsState()
 
-    // Welcome screen: only once, on the very first launch — see
-    // OnboardingPreferences. As long as it has not been passed, nothing that follows (GPS
-    // tracking, update search) must start: that is the role of the early
-    // return further down.
+    // Écran de bienvenue : une seule fois, au tout premier lancement — voir
+    // OnboardingPreferences. Tant qu'il n'est pas passé, rien de ce qui suit (suivi
+    // GPS, recherche de mise à jour) ne doit démarrer : c'est le rôle du retour
+    // anticipé plus bas.
     var onboardingCompleted by remember {
         mutableStateOf(com.example.util.OnboardingPreferences.isCompleted(context))
     }
 
-    // Distinguishes “already passed before this launch” from “just finished
-    // this instant”: without this snapshot taken once and for all, the automatic
-    // re-request below would fire again right after the welcome screen's own request,
-    // as soon as the user refused the permission there.
+    // Distingue « déjà passé avant ce lancement » de « vient de se terminer à
+    // l'instant » : sans cette photo prise une fois pour toutes, la redemande
+    // automatique ci-dessous se redéclencherait juste après la propre demande de
+    // l'écran de bienvenue, dès que l'utilisateur y refuserait la permission.
     val onboardingWasAlreadyCompletedAtStart = remember { onboardingCompleted }
 
-    // Update detected by UpdatePrompt: kept here to show a persistent badge
-    // in the settings once the banner has been dismissed, and to be able to reopen it
-    // from there without restarting the app.
+    // Mise à jour détectée par UpdatePrompt : conservée ici pour afficher un badge
+    // persistant dans les réglages une fois le bandeau ignoré, et pour pouvoir le
+    // rouvrir depuis là sans redémarrer l'application.
     var availableUpdate by remember { mutableStateOf<com.example.util.update.AvailableUpdate?>(null) }
     var updateReopenTrigger by remember { mutableStateOf(0) }
 
@@ -126,21 +126,21 @@ fun MainScreen(
             }
         }
 
-        // It is this answer — granted or not — that closes the welcome screen:
-        // the user's choice is made, they can see the app. They can
-        // still grant the permission later from the Record tab.
+        // C'est cette réponse — accordée ou non — qui referme l'écran de bienvenue :
+        // le choix de l'utilisateur est fait, il peut voir l'application. Il pourra
+        // toujours accorder la permission plus tard depuis l'onglet Enregistrer.
         if (!onboardingCompleted) {
             com.example.util.OnboardingPreferences.setCompleted(context)
             onboardingCompleted = true
         }
     }
 
-    // Automatically re-requests at launch as long as the permission is missing, as
-    // before the welcome screen was added — but only for a user who had
-    // already passed it on a previous launch. For a first launch, it is
-    // WelcomeScreen that triggers the request, on an explicit and explained tap:
-    // asking again here as soon as the welcome is closed would ask a second time,
-    // without explanation, for the permission the user has just refused.
+    // Redemande automatiquement au lancement tant que la permission manque, comme
+    // avant l'ajout de l'accueil — mais seulement pour un utilisateur qui l'avait
+    // déjà passé lors d'un lancement précédent. Pour un premier lancement, c'est
+    // WelcomeScreen qui déclenche la demande, sur un appui explicite et expliqué :
+    // redemander ici aussitôt l'accueil refermé redemanderait une seconde fois,
+    // sans explication, la permission que l'utilisateur vient tout juste de refuser.
     LaunchedEffect(Unit) {
         if (!onboardingWasAlreadyCompletedAtStart) return@LaunchedEffect
 
@@ -176,13 +176,13 @@ fun MainScreen(
         return
     }
 
-    // Altitude chain used outside a recording — during a recording,
-    // it is TrackingService that handles it.
+    // Chaîne d'altitude utilisée hors enregistrement — pendant un enregistrement,
+    // c'est TrackingService qui s'en charge.
     val altitudeResolver = remember(context) { com.example.util.AltitudeResolver(context) }
     val altitudeSmoother = remember { com.example.util.AltitudeSmoother() }
 
-    // Serialized on a single thread: the smoother carries an internal state that two readings
-    // processed in parallel would corrupt. Same reason as pointExecutor in
+    // Sérialisé sur un seul thread : le lisseur porte un état interne que deux relevés
+    // traités en parallèle corrompraient. Même raison que pointExecutor dans
     // TrackingService.
     val altitudeExecutor = remember { java.util.concurrent.Executors.newSingleThreadExecutor() }
     val altitudeScope = remember(altitudeExecutor) {
@@ -220,13 +220,13 @@ fun MainScreen(
                     val isNetworkEnabled = try { lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { false }
                     val hasNoProvider = !isGpsEnabled && !isNetworkEnabled
 
-                    // The simulation fabricates a blue dot circling in Paris. It is
-                    // a development tool, and it must be guarded by
-                    // BuildConfig.DEBUG like TrackingService's (invariant 8):
-                    // emulator detection is heuristic — it tests, for example,
-                    // whether Build.PRODUCT contains “sdk” — and therefore sometimes triggers
-                    // on a real device. In a published version, the user would see
-                    // their position replaced by an invented one.
+                    // La simulation fabrique un point bleu qui tourne dans Paris. C'est
+                    // un outil de développement, et elle doit être gardée par
+                    // BuildConfig.DEBUG comme celle de TrackingService (invariant 8) :
+                    // la détection d'émulateur est heuristique — elle teste par exemple
+                    // si Build.PRODUCT contient « sdk » — et se déclenche donc parfois
+                    // sur un vrai appareil. En version publiée, l'utilisateur y verrait
+                    // sa position remplacée par une position inventée.
                     if (BuildConfig.DEBUG && (EnvironmentUtils.isEmulatorOrCloud(context) || hasNoProvider)) {
                         viewModel.updateGpsStatus(GpsStatus.SIMULATION)
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
@@ -257,8 +257,8 @@ fun MainScreen(
                         return@LifecycleEventObserver
                     }
 
-                    // No provider active: we say so, rather than displaying
-                    // a position the device does not have.
+                    // Aucun fournisseur actif : on le signale, plutôt que d'afficher
+                    // une position que l'appareil n'a pas.
                     if (hasNoProvider) {
                         viewModel.updateGpsStatus(GpsStatus.DISABLED)
                         return@LifecycleEventObserver
@@ -289,9 +289,9 @@ fun MainScreen(
                                 )
                                 viewModel.updateUserLocation(locPoint)
 
-                                // This callback arrives on the main thread, and the
-                                // conversion to sea level reads geoid data:
-                                // it must be done in the background.
+                                // Ce rappel arrive sur le thread principal, et la
+                                // conversion vers le niveau de la mer lit les données
+                                // de géoïde : elle doit se faire en arrière-plan.
                                 altitudeScope.launch {
                                     val fix = altitudeResolver.resolve(location)
                                     if (fix != null) {
@@ -358,33 +358,33 @@ fun MainScreen(
         }
     }
 
-    var currentTab by remember { mutableStateOf("record") }
+    var currentTab by remember { mutableStateOf("enregistrer") }
     var viewingDetailedTrackId by remember { mutableStateOf<Long?>(null) }
 
-    // Redirect to home page (record tab) on system back press if currently on other tabs
-    if (viewingDetailedTrackId == null && currentTab != "record") {
+    // Le retour système ramène à l'onglet Enregistrer depuis les autres onglets
+    if (viewingDetailedTrackId == null && currentTab != "enregistrer") {
         BackHandler {
-            currentTab = "record"
+            currentTab = "enregistrer"
         }
     }
 
-    // The detail view covers the tabs, but without taking MainScreen out of
-    // the composition: an early `return` took UpdatePrompt with it, which
-    // then lost the state of the update already detected. Every round trip to
-    // a track therefore relaunched a network request and reopened the banner
-    // the user had just dismissed.
+    // La vue de détail recouvre les onglets, mais sans faire sortir MainScreen de la
+    // composition : un `return` anticipé emportait avec lui UpdatePrompt, qui perdait
+    // alors l'état de la mise à jour déjà détectée. Chaque aller-retour vers un
+    // parcours relançait donc une requête réseau et rouvrait le bandeau que
+    // l'utilisateur venait d'écarter.
     val detailId = viewingDetailedTrackId
     var toolOpen by remember { mutableStateOf(false) }
     var settingsSubPageOpen by remember { mutableStateOf(false) }
 
-    // Opaque background **mandatory** under the transition: without it, you see through.
+    // Fond opaque **obligatoire** sous la transition : sans lui, on voit à travers.
     //
-    // The theme inherits from `Theme.DeviceDefault`, whose window background is dark.
-    // During a fade, both screens are half transparent at the same time, and this
-    // background showed between them — hence the black veil reported when opening
-    // a track as well as on return.
-    // Brief messages at the bottom of the screen (import succeeded, export, errors…), shared by
-    // all screens: see AppMessageHost.
+    // Le thème hérite de `Theme.DeviceDefault`, dont le fond de fenêtre est sombre.
+    // Pendant un fondu, les deux écrans sont à demi transparents en même temps, et ce
+    // fond apparaissait entre les deux — d'où le voile noir signalé à l'ouverture d'un
+    // parcours comme au retour.
+    // Messages brefs en bas d'écran (import réussi, export, erreurs…), partagés par
+    // tous les écrans : voir AppMessageHost.
     val messenger = remember { AppMessenger() }
 
     CompositionLocalProvider(LocalAppMessenger provides messenger) {
@@ -393,18 +393,18 @@ fun MainScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Sliding between the tabs and the detail view, rather than a
-        // dry switch. The direction of the slide follows navigation — the detail view enters from
-        // the right like a screen being stacked, and leaves to the right as it is
-        // unstacked — to stay readable at a glance rather than decorative.
+        // Glissement entre les onglets et la vue de détail, plutôt qu'une bascule
+        // sèche. Le sens du glissement suit la navigation — la vue de détail entre par
+        // la droite comme un écran qu'on empile, en sort par la droite comme on le
+        // dépile — pour rester lisible en un coup d'œil plutôt que décoratif.
         //
-        // **No fade on these two branches, and that is deliberate.** Two opaque screens
-        // sliding over each other never let anything show between them:
-        // the arithmetic shows it, the outgoing screen recedes by a fifth of the width while
-        // the incoming one travels a whole one, so they overlap from one end of the
-        // movement to the other. Adding a fade on top did not make the
-        // transition softer: it made it transparent, hence translucent over the
-        // window background.
+        // **Aucun fondu sur ces deux branches, et c'est voulu.** Deux écrans opaques
+        // qui glissent l'un sur l'autre ne laissent jamais rien paraître entre eux :
+        // le calcul le montre, l'écran sortant recule d'un cinquième de largeur quand
+        // l'entrant en parcourt une entière, si bien qu'ils se recouvrent d'un bout à
+        // l'autre du mouvement. Ajouter un fondu par-dessus ne rendait pas la
+        // transition plus douce : il la rendait transparente, donc translucide sur le
+        // fond de la fenêtre.
         AnimatedContent(
             targetState = detailId,
             transitionSpec = {
@@ -415,9 +415,9 @@ fun MainScreen(
                     slideInHorizontally(tween(220)) { -it / 5 } togetherWith
                         slideOutHorizontally(tween(220)) { it }
                 } else {
-                    // Direct move from one track to another: without a slide, a
-                    // fade is needed. The opaque background laid down above serves as its
-                    // canvas, so it cannot let the window show.
+                    // Passage direct d'un parcours à un autre : sans glissement, il
+                    // faut bien un fondu. Le fond opaque posé ci-dessus lui sert de
+                    // toile, il ne peut donc pas laisser voir la fenêtre.
                     fadeIn(tween(150)) togetherWith fadeOut(tween(150))
                 }
             },
@@ -431,15 +431,15 @@ fun MainScreen(
                     onBackClick = { viewingDetailedTrackId = null },
                     onResumeTrack = {
                         viewingDetailedTrackId = null
-                        currentTab = "record"
+                        currentTab = "enregistrer"
                     },
                     modifier = modifier
                 )
             } else {
                 Scaffold(
                     bottomBar = {
-                        // An open tool or settings page takes the whole screen.
-                        if (!(currentTab == "tools" && toolOpen) && !(currentTab == "settings" && settingsSubPageOpen)) MainNavigationBar(
+                        // Un outil ou une page de réglages ouverts prennent tout l'écran.
+                        if (!(currentTab == "outils" && toolOpen) && !(currentTab == "parametres" && settingsSubPageOpen)) MainNavigationBar(
                             currentTab = currentTab,
                             onTabSelected = { currentTab = it },
                             showUpdateBadge = availableUpdate != null,
@@ -452,7 +452,7 @@ fun MainScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     when (currentTab) {
-                        "record" -> {
+                        "enregistrer" -> {
                             TrackingTab(
                                 viewModel = viewModel,
                                 hasLocationPermission = hasLocationPermission,
@@ -476,26 +476,26 @@ fun MainScreen(
                                 }
                             )
                         }
-                        "history" -> {
+                        "historique" -> {
                             HistoryTab(
                                 viewModel = viewModel,
                                 modifier = Modifier.fillMaxSize(),
-                                // The list scrolls under the floating bar: the screen
-                                // manages its own margins rather than stopping dead
-                                // above it.
+                                // La liste défile sous la barre flottante : l'écran
+                                // gère lui-même ses marges plutôt que de s'arrêter net
+                                // au-dessus d'elle.
                                 contentPadding = innerPadding,
-                                onOpenRecording = { currentTab = "record" },
-                                onOpenTools = { currentTab = "tools" },
+                                onOpenRecording = { currentTab = "enregistrer" },
+                                onOpenTools = { currentTab = "outils" },
                                 onNavigateToDetails = { id ->
                                     viewingDetailedTrackId = id
                                 },
                                 onResumeTrack = {
                                     viewingDetailedTrackId = null
-                                    currentTab = "record"
+                                    currentTab = "enregistrer"
                                 }
                             )
                         }
-                        "tools" -> {
+                        "outils" -> {
                             ToolsTab(
                                 viewModel = viewModel,
                                 onNavigateToDetails = { id ->
@@ -504,10 +504,10 @@ fun MainScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = innerPadding,
                                 onInToolChanged = { toolOpen = it },
-                                onOpenHistory = { currentTab = "history" }
+                                onOpenHistory = { currentTab = "historique" }
                             )
                         }
-                        "settings" -> {
+                        "parametres" -> {
                             SettingsTab(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = innerPadding,
@@ -522,12 +522,12 @@ fun MainScreen(
             }
         }
 
-        // Search for a new version at startup. Shows nothing as long as there is
-        // none, and stays inert as long as UpdateConfig is not filled in.
+        // Recherche d'une nouvelle version au démarrage. Ne montre rien tant qu'il
+        // n'y en a pas, et reste inerte tant qu'UpdateConfig n'est pas renseigné.
         //
-        // Composed permanently, including while a track is shown in
-        // detail: that is what lets it keep the update already found.
-        // Only its display is suspended, so as not to cover the detail view.
+        // Composé en permanence, y compris pendant l'affichage d'un parcours en
+        // détail : c'est ce qui lui permet de garder la mise à jour déjà trouvée.
+        // Seul son affichage est suspendu, pour ne pas recouvrir la vue de détail.
         UpdatePrompt(
             reopenTrigger = updateReopenTrigger,
             isVisible = detailId == null,
@@ -557,14 +557,14 @@ fun MainScreen(
             )
         }
 
-        // Above the navigation bar on the tabs; above the import button in
-        // the history, which it must not hide; near the bottom in the
-        // detail view, which has no bar.
+        // Au-dessus de la barre de navigation sur les onglets ; au-dessus du bouton
+        // d'import dans l'historique, qu'il ne doit pas masquer ; près du bas dans la
+        // vue de détail, qui n'a pas de barre.
         AppMessageHost(
             messenger = messenger,
             bottomPadding = when {
                 detailId != null -> 24.dp
-                currentTab == "history" -> 168.dp
+                currentTab == "historique" -> 168.dp
                 else -> 96.dp
             },
             modifier = Modifier.align(Alignment.BottomCenter)

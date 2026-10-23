@@ -16,9 +16,9 @@ class ExampleRobolectricTest {
   fun `read string from context`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
-    // This test guards the app's displayed name: it fails if `app_name` changes
-    // without the rest following. That is what flagged it during the successive
-    // renamings (“Sillage”, then “Mes parcours”).
+    // Ce test garde le nom affiché de l'application : il échoue si `app_name` change
+    // sans que le reste suive. C'est ce qui l'a signalé lors des renommages
+    // successifs (« Sillage », puis « Mes parcours »).
     assertEquals("Mes parcours", appName)
   }
 }

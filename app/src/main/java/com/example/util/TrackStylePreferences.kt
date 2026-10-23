@@ -4,82 +4,82 @@ import android.content.Context
 import android.preference.PreferenceManager
 
 /**
- * Appearance of tracks on the map: line thickness, and palette offered to
- * color a track.
+ * Apparence des tracés sur la carte : épaisseur du trait, et palette proposée pour
+ * colorer un parcours.
  *
- * **The color belongs to the track, no longer to the category.** It is stored
- * in `Track.displayColor` and chosen from the track's card in the
- * history. The three per-category colors that used to live here in preferences were
- * removed: they now only serve as a default value, in the form of
- * constants, for a track whose color nobody chose and whose file
- * carried none.
+ * **La couleur appartient au parcours, plus à la catégorie.** Elle est enregistrée
+ * dans `Track.displayColor` et se choisit depuis la carte du parcours, dans
+ * l'historique. Les trois couleurs par catégorie qui vivaient ici en préférences ont
+ * été retirées : elles ne servent plus que de valeur par défaut, sous forme de
+ * constantes, pour un parcours dont personne n'a choisi la couleur et dont le fichier
+ * n'en portait pas.
  */
 object TrackStylePreferences {
 
     private const val KEY_THICKNESS_DP = "pref_track_thickness_dp"
 
     /**
-     * Marks the color backfill as done, so it only runs once.
+     * Marque la reprise des couleurs déjà faite, pour ne la faire qu'une fois.
      *
-     * See `TrackRepository.backfillDisplayColors`: on moving to per-track
-     * colors, each existing track explicitly receives the one it displayed
-     * until then, so that the update changes nothing on screen.
+     * Voir `TrackRepository.backfillDisplayColors` : au passage aux couleurs par
+     * parcours, chaque parcours existant reçoit explicitement celle qu'il affichait
+     * jusque-là, pour que la mise à jour ne change rien à l'écran.
      */
     private const val KEY_COLORS_MIGRATED = "pref_track_colors_migrated_to_per_track"
 
-    // Old keys, read only once by the backfill above and never again.
-    // Do not reuse them for anything else: an old installation still carries
-    // them, with the colors the user had chosen by category.
+    // Anciennes clés, lues une seule fois par la reprise ci-dessus puis plus jamais.
+    // Ne pas les réutiliser pour autre chose : une installation ancienne les porte
+    // encore, avec les couleurs que l'utilisateur avait choisies par catégorie.
     private const val LEGACY_KEY_COLOR_RECORDED = "pref_track_color_recorded"
     private const val LEGACY_KEY_COLOR_IMPORTED = "pref_track_color_imported"
     private const val LEGACY_KEY_COLOR_MERGED = "pref_track_color_merged"
     private const val LEGACY_KEY_IMPORTED_FROM_FILE = "pref_track_color_imported_from_file"
 
-    /** Purple, historical color of recorded tracks. */
+    /** Violet, couleur historique des parcours enregistrés. */
     const val DEFAULT_COLOR_RECORDED = 0xFF8B5CF6.toInt()
 
-    /** Neon green, historical color of imported tracks. */
+    /** Vert fluo, couleur historique des parcours importés. */
     const val DEFAULT_COLOR_IMPORTED = 0xFF39FF14.toInt()
 
-    /** Orange, to tell merged tracks apart at a glance from the other two. */
+    /** Orange, pour distinguer d'emblée les parcours fusionnés des deux autres. */
     const val DEFAULT_COLOR_MERGED = 0xFFFF9800.toInt()
 
-    /** Default thickness, in dp — comparable to the old “Normal” level. */
+    /** Épaisseur par défaut, en dp — comparable à l'ancien niveau « Normal ». */
     const val DEFAULT_THICKNESS_DP = 4f
 
-    /** Bounds of the setting: below, the line becomes hard to see on the
-      *  map; beyond, it hides the map background more than it shows the track. */
+    /** Bornes du réglage : en dessous, le trait devient difficile à voir sur la
+     *  carte ; au-delà, il masque le fond de carte plus qu'il ne montre le tracé. */
     const val MIN_THICKNESS_DP = 0.5f
     const val MAX_THICKNESS_DP = 15f
 
     /**
-     * Palette offered to color a track: the redesign's, saturated enough
-     * to stay readable on the Standard and Satellite backgrounds, in light as in
-     * dark. Changing the colors offered touches no existing track: their
-     * color is stored in `Track.displayColor`, not designated by its place
-     * in this list. The old palette had a black, invisible on the dark
-     * map; the new one has none.
+     * Palette proposée pour colorer un parcours : celle de la refonte, assez saturée
+     * pour rester lisible sur les fonds Standard et Satellite, en clair comme en
+     * sombre. Changer les couleurs proposées ne touche aucun parcours existant : leur
+     * couleur est enregistrée dans `Track.displayColor`, pas désignée par sa place
+     * dans cette liste. L'ancienne palette comptait un noir, invisible sur la carte
+     * sombre ; la nouvelle n'en a pas.
      */
     val COLOR_PALETTE = listOf(
-        0xFFE8505B.toInt(), // Red
+        0xFFE8505B.toInt(), // Rouge
         0xFFFF7043.toInt(), // Orange
-        0xFFF2A516.toInt(), // Amber
-        0xFF7CB342.toInt(), // Green
-        0xFF13A38A.toInt(), // Emerald
-        0xFF2F7DE1.toInt(), // Blue
+        0xFFF2A516.toInt(), // Ambre
+        0xFF7CB342.toInt(), // Vert
+        0xFF13A38A.toInt(), // Émeraude
+        0xFF2F7DE1.toInt(), // Bleu
         0xFF5C6BC0.toInt(), // Indigo
         0xFF8E5BE8.toInt(), // Violet
-        0xFFE0569B.toInt(), // Pink
-        0xFF795548.toInt()  // Brown
+        0xFFE0569B.toInt(), // Rose
+        0xFF795548.toInt()  // Brun
     )
 
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
     /**
-     * General thickness, in dp — the one the single Settings option had
-     * before thickness became a per-track choice. No screen writes it any
-     * more: it is still read so that a track with no choice of its own keeps the look
-     * it had, and for the track being recorded.
+     * Épaisseur générale, en dp — celle qu'avait l'unique réglage des Paramètres
+     * avant que l'épaisseur ne devienne un choix par parcours. Plus aucun écran ne
+     * l'écrit : elle reste lue pour qu'un parcours sans choix propre garde l'aspect
+     * qu'il avait, et pour la trace en cours d'enregistrement.
      */
     fun getThicknessDp(context: Context): Float {
         val stored = prefs(context).getFloat(KEY_THICKNESS_DP, DEFAULT_THICKNESS_DP)
@@ -92,24 +92,24 @@ object TrackStylePreferences {
             .apply()
     }
 
-    /** Thickness to use for a track: its own if it has one, otherwise the general one. */
+    /** Épaisseur à employer pour un parcours : la sienne s'il en a une, sinon la générale. */
     fun resolveThicknessDp(context: Context, displayWidthDp: Float?): Float =
         displayWidthDp?.coerceIn(MIN_THICKNESS_DP, MAX_THICKNESS_DP) ?: getThicknessDp(context)
 
     /**
-     * Line width in pixels, the one `Paint.strokeWidth` expects — converted
-     * from dp via the screen density.
+     * Largeur du trait en pixels, celle qu'attend `Paint.strokeWidth` — convertie
+     * depuis les dp via la densité de l'écran.
      */
     fun getStrokeWidth(context: Context, displayWidthDp: Float? = null): Float =
         resolveThicknessDp(context, displayWidthDp) * context.resources.displayMetrics.density
 
     /**
-     * Color of a track whose color nobody chose and whose file
-     * carried none.
+     * Couleur d'un parcours dont personne n'a choisi la couleur et dont le fichier
+     * n'en portait pas.
      *
-     * This fallback is not a detail: a GPX never carries a color, and a KML may
-     * carry none. Without it, these tracks would be drawn in black — i.e.
-     * invisible on the dark map background.
+     * Ce repli n'est pas un détail : un GPX ne porte jamais de couleur, et un KML peut
+     * n'en porter aucune. Sans lui, ces parcours seraient dessinés en noir — soit
+     * invisibles sur le fond de carte sombre.
      */
     fun defaultColorFor(isImported: Boolean, isMerged: Boolean): Int = when {
         isMerged -> DEFAULT_COLOR_MERGED
@@ -118,15 +118,15 @@ object TrackStylePreferences {
     }
 
     /**
-     * Color to use to draw a track, in order of priority:
+     * Couleur à employer pour dessiner un parcours, dans l'ordre de priorité :
      *
-     * 1. the user's explicit choice for this track ([displayColor]);
-     * 2. failing that, the color its file carried ([sourceColor]);
-     * 3. failing that, the default color of its category.
+     * 1. le choix explicite de l'utilisateur pour ce parcours ([displayColor]) ;
+     * 2. à défaut, la couleur que portait son fichier ([sourceColor]) ;
+     * 3. à défaut, la couleur par défaut de sa catégorie.
      *
-     * The explicit choice comes **before** the file's color, and that is deliberate:
-     * asking for a bold color on an imported track must show, otherwise the
-     * chip would get selected without the line changing on screen.
+     * Le choix explicite passe **devant** la couleur du fichier, et c'est voulu :
+     * demander une couleur franche sur un parcours importé doit se voir, sinon la
+     * pastille se sélectionnerait sans que le tracé change à l'écran.
      */
     fun resolveTrackColor(
         displayColor: Int?,
@@ -135,7 +135,7 @@ object TrackStylePreferences {
         isMerged: Boolean
     ): Int = displayColor ?: sourceColor ?: defaultColorFor(isImported, isMerged)
 
-    /** Has the per-track color backfill already happened? */
+    /** La reprise des couleurs par parcours a-t-elle déjà eu lieu ? */
     fun hasMigratedColors(context: Context): Boolean =
         prefs(context).getBoolean(KEY_COLORS_MIGRATED, false)
 
@@ -144,8 +144,8 @@ object TrackStylePreferences {
     }
 
     /**
-     * The per-category colors of the old version, as the user had
-     * set them. Read only by the backfill, to freeze the existing appearance.
+     * Les couleurs par catégorie de l'ancienne version, telles que l'utilisateur les
+     * avait réglées. Lues uniquement par la reprise, pour figer l'apparence existante.
      */
     class LegacyCategoryColors(
         val recorded: Int,

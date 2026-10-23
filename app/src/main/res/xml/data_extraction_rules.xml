@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   The track history is location data: it must not go
-   into the Google cloud backup. Direct device-to-device transfer remains
-   allowed, it does not leave the user's hands.
+   L'historique des parcours est une donnée de localisation : il ne doit pas partir
+   dans la sauvegarde cloud Google. Le transfert direct d'appareil à appareil reste
+   autorisé, il ne quitte pas la main de l'utilisateur.
 
-   Preferences are excluded from the cloud for the same reason: `pref_last_lat` /
-   `pref_last_lng` keep there the last map position displayed, rewritten at
-   every move. Excluding the database without excluding preferences let
-   the most telling point of all leave.
+   Les préférences sont exclues du cloud pour la même raison : `pref_last_lat` /
+   `pref_last_lng` y conservent la dernière position de carte affichée, réécrite à
+   chaque déplacement. Exclure la base sans exclure les préférences laissait partir
+   le point le plus parlant de tous.
 
-   Update APKs (`files/updates`) are excluded from both routes, for a
-   reason that is not privacy — they are public and re-downloadable —
-   but weight: about twenty MiB, enough to exhaust the backup quota and
-   make it fail silently, for a file the app can fetch again
-   from GitHub.
+   Les APK de mise à jour (`files/updates`) sont exclus des deux voies, pour une
+   raison qui n'est pas la confidentialité — ils sont publics et retéléchargeables —
+   mais le poids : une vingtaine de Mio, de quoi épuiser le quota de sauvegarde et
+   la faire échouer en silence, pour un fichier que l'application sait reprendre
+   depuis GitHub.
 -->
 <data-extraction-rules>
     <cloud-backup>

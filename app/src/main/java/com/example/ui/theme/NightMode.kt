@@ -27,12 +27,12 @@ import com.example.util.SolarTimes
 import com.example.util.TunnelDetector
 import kotlinx.coroutines.delay
 
-/** What decides the app's switch to dark theme. */
+/** Ce qui décide du passage de l'application en thème sombre. */
 enum class NightModeSource(val key: String) {
-    /** Android's “dark theme” setting. */
+    /** Le réglage « thème sombre » d'Android. */
     SYSTEM("system"),
 
-    /** Sunrise and sunset where you are. */
+    /** Le lever et le coucher du soleil à l'endroit où l'on se trouve. */
     SOLAR("solar");
 
     companion object {
@@ -46,11 +46,11 @@ object NightModePreferences {
     internal const val KEY_SOURCE = "pref_night_mode_source"
     internal const val KEY_TUNNEL = "pref_night_mode_tunnel"
 
-    /** Position of the last map center, written by the ViewModel at each move. */
+    /** Position du dernier centre de carte, écrite par le ViewModel à chaque déplacement. */
     private const val KEY_LAST_LAT = "pref_last_lat"
     private const val KEY_LAST_LNG = "pref_last_lng"
 
-    /** Center of France, like the map's default centering. */
+    /** Centre de la France, comme le centrage par défaut de la carte. */
     private const val FALLBACK_LAT = 46.603354
     private const val FALLBACK_LNG = 1.888334
 
@@ -75,10 +75,10 @@ object NightModePreferences {
     }
 
     /**
-     * Can the device measure ambient light?
+     * L'appareil sait-il mesurer la luminosité ambiante ?
      *
-     * Not every phone has a light sensor. Without it, tunnel detection
-     * can do nothing; only the solar computation remains.
+     * Tous les téléphones n'ont pas de capteur de lumière. Sans lui, la détection de
+     * tunnel ne peut rien faire ; seul le calcul solaire reste.
      */
     fun hasLightSensor(context: Context): Boolean {
         val manager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
@@ -86,12 +86,13 @@ object NightModePreferences {
     }
 
     /**
-     * Position to use for the solar computation.
+     * Position à utiliser pour le calcul solaire.
      *
-     * We use the last map center already stored rather than asking the GPS for a
-     * position: sunrise and sunset only need an accuracy of a few tens of
-     * kilometers — one degree of longitude shifts the times by only four minutes —
-     * and this avoids turning the GPS on to choose a background color.
+     * On se sert du dernier centre de carte déjà mémorisé plutôt que de demander une
+     * position au GPS : le lever et le coucher du soleil ne demandent qu'une
+     * précision de quelques dizaines de kilomètres — un degré de longitude ne décale
+     * les heures que de quatre minutes — et cela évite d'allumer le GPS pour choisir
+     * une couleur de fond.
      */
     fun lastKnownLocation(context: Context): Pair<Double, Double> {
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)
@@ -103,28 +104,28 @@ object NightModePreferences {
     }
 }
 
-/** Rate at which day and night are reevaluated. */
+/** Cadence de réévaluation du jour et de la nuit. */
 private const val SOLAR_REFRESH_MS = 60_000L
 
 /**
- * Is the dark theme active?
+ * Le thème sombre est-il actif ?
  *
- * Resolved only once by [MyApplicationTheme] then shared, so that the whole
- * display agrees — including what escapes Material, like the map's tile
- * filter. Calling `isSystemInDarkTheme()` directly elsewhere
- * would ignore solar mode.
+ * Résolu une seule fois par [MyApplicationTheme] puis partagé, afin que tout
+ * l'affichage s'accorde — y compris ce qui échappe à Material, comme le filtre de
+ * tuiles de la carte. Appeler `isSystemInDarkTheme()` directement ailleurs
+ * ignorerait le mode solaire.
  */
 val LocalIsDarkTheme = compositionLocalOf { false }
 
-/** The current night mode setting, reevaluated as soon as the user changes it. */
+/** Le réglage de mode nuit courant, réévalué dès que l'utilisateur le change. */
 @Composable
 private fun rememberNightModeSource(): NightModeSource {
     val context = LocalContext.current
     val prefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var source by remember(context) { mutableStateOf(NightModePreferences.getSource(context)) }
 
-    // Without this listening, changing the setting would only take effect at the next
-    // start of the app.
+    // Sans cette écoute, changer le réglage n'aurait d'effet qu'au prochain
+    // démarrage de l'application.
     DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == NightModePreferences.KEY_SOURCE) {
@@ -138,7 +139,7 @@ private fun rememberNightModeSource(): NightModeSource {
     return source
 }
 
-/** The tunnel detection setting, reevaluated as soon as the user changes it. */
+/** Le réglage de détection de tunnel, réévalué dès que l'utilisateur le change. */
 @Composable
 private fun rememberTunnelDetectionEnabled(): Boolean {
     val context = LocalContext.current
@@ -160,7 +161,7 @@ private fun rememberTunnelDetectionEnabled(): Boolean {
     return enabled
 }
 
-/** Is it daytime, here and now? Reevaluated every minute. */
+/** Fait-il jour, ici et maintenant ? Réévalué chaque minute. */
 @Composable
 private fun rememberIsDaylight(): Boolean {
     val context = LocalContext.current
@@ -171,8 +172,8 @@ private fun rememberIsDaylight(): Boolean {
 
     LaunchedEffect(context) {
         while (true) {
-            // The position is reread at each turn: it changes along the trip, and
-            // the setting does not have to be restarted to take it into account.
+            // La position est relue à chaque tour : elle change au fil du trajet, et
+            // le réglage n'a pas à être redémarré pour en tenir compte.
             val (lat, lng) = NightModePreferences.lastKnownLocation(context)
             isDaylight = SolarTimes.isDaylight(lat, lng, System.currentTimeMillis())
             delay(SOLAR_REFRESH_MS)
@@ -183,9 +184,9 @@ private fun rememberIsDaylight(): Boolean {
 }
 
 /**
- * Follows the light sensor and says whether we are in a covered and dark
- * space. Returns `false` if listening is disabled or if the device has no
- * light sensor.
+ * Suit le capteur de luminosité et indique si l'on se trouve dans un espace couvert
+ * et sombre. Renvoie `false` si l'écoute est désactivée ou si l'appareil n'a pas de
+ * capteur de lumière.
  */
 @Composable
 private fun rememberIsInDarkEnclosure(enabled: Boolean): Boolean {
@@ -205,16 +206,16 @@ private fun rememberIsInDarkEnclosure(enabled: Boolean): Boolean {
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 val lux = event.values.firstOrNull() ?: return
-                // Monotonic clock: the system time can jump, the confirmation
-                // delays would then become absurd.
+                // Horloge monotone : l'heure système peut sauter, les délais de
+                // confirmation deviendraient alors absurdes.
                 isInside = detector.onReading(lux, SystemClock.elapsedRealtime())
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
 
-        // Listening tied to the lifecycle: no need to ask the sensor when the
-        // app is not on screen.
+        // Écoute liée au cycle de vie : inutile de solliciter le capteur quand
+        // l'application n'est pas à l'écran.
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> sensorManager.registerListener(
@@ -225,8 +226,8 @@ private fun rememberIsInDarkEnclosure(enabled: Boolean): Boolean {
 
                 Lifecycle.Event.ON_STOP -> {
                     sensorManager.unregisterListener(listener)
-                    // Readings will resume after a cut of unknown duration:
-                    // the ambient reference from before no longer makes sense.
+                    // Les relevés reprendront après une coupure de durée inconnue :
+                    // la référence ambiante d'avant n'a plus de sens.
                     detector.reset()
                     isInside = false
                 }
@@ -245,21 +246,21 @@ private fun rememberIsInDarkEnclosure(enabled: Boolean): Boolean {
     return isInside
 }
 
-/** Should the dark theme be shown, given the chosen night mode setting? */
+/** Faut-il afficher le thème sombre, compte tenu du réglage de mode nuit choisi ? */
 @Composable
 fun rememberIsDarkTheme(): Boolean {
     val systemDark = isSystemInDarkTheme()
     return when (rememberNightModeSource()) {
         NightModeSource.SYSTEM -> systemDark
         NightModeSource.SOLAR -> {
-            // Both calls must be unconditional: a short-circuited && would
-            // make the next composable call conditional, which Compose's
-            // positional memoization does not tolerate as an argument.
+            // Les deux appels doivent être inconditionnels : un && court-circuité
+            // rendrait l'appel composable suivant conditionnel, ce que la
+            // mémorisation par position de Compose ne tolère pas en argument.
             val isDaylight = rememberIsDaylight()
             val tunnelEnabled = rememberTunnelDetectionEnabled()
 
-            // The sensor is only listened to by day: at night, the theme is already dark
-            // and no reading could change the result.
+            // Le capteur n'est écouté que de jour : la nuit, le thème est déjà sombre
+            // et aucun relevé ne pourrait changer le résultat.
             val inEnclosure = rememberIsInDarkEnclosure(enabled = isDaylight && tunnelEnabled)
 
             !isDaylight || inEnclosure

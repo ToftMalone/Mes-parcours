@@ -5,24 +5,24 @@ import com.example.data.model.LiveStats
 import com.example.data.model.TrackPoint
 
 /**
- * Accumulates the statistics of a track **point by point**, without ever holding the
- * complete list.
+ * Cumule les statistiques d'un parcours **point par point**, sans jamais tenir la
+ * liste complète.
  *
- * This is the only implementation of the computation: `TrackRepository.calculateStatsFromPoints`
- * is now just a call to this one on a list already in memory. Two
- * parallel implementations — one for lists, one for streams — would end up
- * diverging, and two identical tracks would then display different figures
- * depending on the path taken.
+ * C'est la seule implémentation du calcul : `TrackRepository.calculateStatsFromPoints`
+ * n'est plus qu'un appel à celle-ci sur une liste déjà en mémoire. Deux
+ * implémentations parallèles — une pour les listes, une pour les flux — finiraient
+ * par diverger, et deux parcours identiques afficheraient alors des chiffres
+ * différents selon le chemin emprunté.
  *
- * Feeding as a stream is what lets splitting compute the statistics of
- * each piece during its single read of the original track, with no size cap
- * and no second pass.
+ * Alimenter en flux est ce qui permet au découpage de calculer les statistiques de
+ * chaque morceau pendant sa seule lecture du parcours d'origine, sans plafond de
+ * taille ni seconde passe.
  */
 class TrackStatsAccumulator {
 
     private val elevation = ElevationAccumulator()
 
-    /** Reused at each measurement: `distanceBetween` writes its result into it. */
+    /** Réutilisé à chaque mesure : `distanceBetween` écrit son résultat dedans. */
     private val distanceResult = FloatArray(1)
 
     private var first: TrackPoint? = null
@@ -31,26 +31,26 @@ class TrackStatsAccumulator {
 
     private var distanceMeters = 0.0
     private var maxSpeedMps = 0.0
-    /** Sum of the speeds retained for the average: enough to extend it elsewhere. */
+    /** Somme des vitesses retenues pour la moyenne : de quoi la prolonger ailleurs. */
     var speedSumMps = 0.0
         private set
 
-    /** Number of readings counted in [speedSumMps]. */
+    /** Nombre de relevés comptés dans [speedSumMps]. */
     val speedSamples: Int get() = speedPoints
     private var speedPoints = 0
 
-    /** Adds a point. Points must arrive in track order. */
+    /** Ajoute un point. Les points doivent arriver dans l'ordre du parcours. */
     fun add(point: TrackPoint) {
         val prev = previous
         if (prev == null) {
-            // First point: it opens the reference altitude, but provides neither
-            // distance nor speed — it has no predecessor to measure against.
+            // Premier point : il ouvre l'altitude de référence, mais ne fournit ni
+            // distance ni vitesse — il n'a pas de précédent avec quoi les mesurer.
             first = point
             elevation.add(point.altitude)
         } else {
             if (point.isDiscontinuous) {
-                // Segment break: neither the straight-line distance from the
-                // previous segment nor the altitude jump must be counted.
+                // Rupture de tronçon : ni la distance à vol d'oiseau depuis le
+                // tronçon précédent, ni le saut d'altitude ne doivent être comptés.
                 elevation.breakSegment()
             } else {
                 Location.distanceBetween(
@@ -59,8 +59,8 @@ class TrackStatsAccumulator {
                     distanceResult
                 )
                 val meters = distanceResult[0].toDouble()
-                // Anti-drift filter: under a meter, it is GPS noise at
-                // rest, not a movement.
+                // Filtre anti-dérive : sous un mètre, c'est le bruit du GPS à
+                // l'arrêt, pas un déplacement.
                 if (meters > 1.0) distanceMeters += meters
             }
             elevation.add(point.altitude)
@@ -76,7 +76,7 @@ class TrackStatsAccumulator {
         count++
     }
 
-    /** Statistics of the points received so far. Can be called at any time. */
+    /** Statistiques des points reçus jusqu'ici. Peut être appelé à tout moment. */
     fun result(): LiveStats {
         val start = first ?: return LiveStats()
         val end = previous ?: return LiveStats()

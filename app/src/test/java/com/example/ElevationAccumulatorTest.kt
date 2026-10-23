@@ -6,23 +6,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The old accumulation compared each altitude with the previous one using a 0.80 m threshold.
- * It was wrong both ways: it missed steady climbs, whose
- * second-to-second gaps stay under the threshold, and it inflated elevation
- * when stopped, where GPS vertical noise crosses the threshold in one direction then
- * the other.
+ * L'ancien cumul comparait chaque altitude à la précédente avec un seuil de 0,80 m.
+ * Il se trompait dans les deux sens : il ratait les montées régulières, dont les
+ * écarts d'une seconde à l'autre restent sous le seuil, et il gonflait le dénivelé à
+ * l'arrêt, où le bruit vertical du GPS franchit le seuil dans un sens puis dans
+ * l'autre.
  *
- * These tests pin down the two expected behaviors of accumulation against a
- * reference altitude.
+ * Ces tests fixent les deux comportements attendus du cumul par altitude de
+ * référence.
  */
 class ElevationAccumulatorTest {
 
     private val accumulator = ElevationAccumulator()
 
     @Test
-    fun `a steady climb is counted despite small steps`() {
-        // 300 m of climb in steps of 0.15 m, which is what a 10% slope at
-        // 1.4 m/s sampled at 1 Hz gives. No step reaches the 3 m threshold.
+    fun `une montee reguliere est comptee malgre de petits pas`() {
+        // 300 m de montée par pas de 0,15 m, soit ce que donne une pente de 10 % à
+        // 1,4 m/s relevée à 1 Hz. Aucun pas n'atteint le seuil de 3 m.
         var altitude = 100.0
         accumulator.add(altitude)
         repeat(2_000) {
@@ -30,7 +30,7 @@ class ElevationAccumulatorTest {
             accumulator.add(altitude)
         }
 
-        // Tolerance of one threshold: the reference only follows in steps of 3 m.
+        // Tolérance d'un seuil : la référence ne suit que par paliers de 3 m.
         assertTrue(
             "D+ obtenu : ${accumulator.gainMeters}",
             accumulator.gainMeters >= 297.0 && accumulator.gainMeters <= 300.0
@@ -39,18 +39,18 @@ class ElevationAccumulatorTest {
     }
 
     @Test
-    fun `noise at rest creates no elevation`() {
-        // Oscillation of ±2 m around 200 m: this is ordinary GPS noise, and it
-        // must accumulate nothing since it never strays far enough from the reference.
+    fun `le bruit a l arret ne cree pas de denivele`() {
+        // Oscillation de ±2 m autour de 200 m : c'est du bruit GPS ordinaire, et il
+        // ne doit rien accumuler puisqu'il ne s'éloigne jamais assez de la référence.
         val noise = listOf(200.0, 202.0, 198.0, 201.5, 199.0, 200.5, 198.5, 201.0)
         repeat(50) { noise.forEach { accumulator.add(it) } }
 
-        assertEquals("D+ must stay zero", 0.0, accumulator.gainMeters, 0.001)
-        assertEquals("D- must stay zero", 0.0, accumulator.lossMeters, 0.001)
+        assertEquals("D+ doit rester nul", 0.0, accumulator.gainMeters, 0.001)
+        assertEquals("D- doit rester nul", 0.0, accumulator.lossMeters, 0.001)
     }
 
     @Test
-    fun `a descent is counted separately`() {
+    fun `une descente est comptee separement`() {
         accumulator.add(500.0)
         accumulator.add(450.0)
         accumulator.add(470.0)
@@ -60,27 +60,27 @@ class ElevationAccumulatorTest {
     }
 
     @Test
-    fun `a segment break does not count the altitude jump`() {
+    fun `une rupture de troncon ne compte pas le saut d altitude`() {
         accumulator.add(100.0)
         accumulator.add(120.0)
         assertEquals(20.0, accumulator.gainMeters, 0.001)
 
-        // Pause then resume 800 m higher: we did not climb those 800 m.
+        // Pause puis reprise 800 m plus haut : on n'a pas gravi ces 800 m.
         accumulator.breakSegment()
         accumulator.add(920.0)
         accumulator.add(930.0)
 
-        assertEquals("only the 10 m of the new segment count", 30.0, accumulator.gainMeters, 0.001)
+        assertEquals("seuls les 10 m du nouveau tronçon comptent", 30.0, accumulator.gainMeters, 0.001)
         assertEquals(0.0, accumulator.lossMeters, 0.001)
     }
 
     @Test
-    fun `restore takes over the totals without an altitude reference`() {
+    fun `restore reprend les totaux sans reference d altitude`() {
         accumulator.restore(gainMeters = 250.0, lossMeters = 80.0)
         assertEquals(250.0, accumulator.gainMeters, 0.001)
         assertEquals(80.0, accumulator.lossMeters, 0.001)
 
-        // The first point after a resume sets the reference, it accumulates nothing.
+        // Le premier point après une reprise fixe la référence, il ne cumule rien.
         accumulator.add(1_500.0)
         assertEquals(250.0, accumulator.gainMeters, 0.001)
 
@@ -89,7 +89,7 @@ class ElevationAccumulatorTest {
     }
 
     @Test
-    fun `reset erases everything`() {
+    fun `reset efface tout`() {
         accumulator.add(100.0)
         accumulator.add(200.0)
         assertTrue(accumulator.gainMeters > 0.0)

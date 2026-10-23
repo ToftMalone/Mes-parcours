@@ -1,46 +1,46 @@
 package com.example.util
 
 /**
- * Detects entering a covered, dark space — tunnel, car park, garage — and
- * the exit that follows, from the light sensor.
+ * Détecte l'entrée dans un espace couvert et sombre — tunnel, parking, garage — et
+ * la sortie qui s'ensuit, à partir du capteur de luminosité.
  *
- * The criterion is deliberately not an absolute threshold. An absolute threshold confuses “it
- * is dark here” with “I am indoors in broad daylight”: a lit living
- * room sits around 100 to 300 lux, well below outdoor light,
- * and the app switched to dark theme in broad daylight.
+ * Le critère n'est délibérément pas un seuil absolu. Un seuil absolu confond « il
+ * fait sombre ici » avec « je suis à l'intérieur en pleine journée » : un salon
+ * éclairé tourne autour de 100 à 300 lux, soit bien en dessous de la lumière du
+ * dehors, et l'application basculait en thème sombre alors qu'il faisait grand jour.
  *
- * What signs a tunnel is a **sudden and deep** drop relative to the
- * brightness of the preceding moments, then a clear return of light. Hence three
- * cumulative conditions on entry: darkness in absolute value, collapse relative
- * to the ambient reference, and persistence for a short delay.
+ * Ce qui signe un tunnel, c'est une chute **brutale et profonde** par rapport à la
+ * luminosité des instants précédents, puis un retour franc de la lumière. D'où trois
+ * conditions cumulées à l'entrée : obscurité en valeur absolue, effondrement relatif
+ * à la référence ambiante, et persistance pendant un court délai.
  *
- * No Android dependency: all the logic is directly testable.
+ * Sans dépendance Android : toute la logique est testable directement.
  */
 class TunnelDetector(
-    /** It must really be dark, in absolute value (lux). */
+    /** Il faut qu'il fasse vraiment noir, en valeur absolue (lux). */
     private val enterLux: Float = ENTER_LUX,
-    /** ...and be a tiny fraction of the previous ambient brightness. */
+    /** ...et que ce soit une fraction infime de la luminosité ambiante précédente. */
     private val enterRatio: Float = ENTER_RATIO,
-    /** Clear return of light, in absolute value (lux). */
+    /** Retour de la lumière franc, en valeur absolue (lux). */
     private val exitLux: Float = EXIT_LUX,
-    /** Time during which darkness must be confirmed before switching. */
+    /** Durée pendant laquelle l'obscurité doit se confirmer avant de basculer. */
     private val enterDelayMs: Long = ENTER_DELAY_MS,
-    /** Same for the return to light. */
+    /** Idem pour le retour à la lumière. */
     private val exitDelayMs: Long = EXIT_DELAY_MS,
-    /** Inertia of the ambient reference, per reading. */
+    /** Inertie de la référence ambiante, par relevé. */
     private val baselineSmoothing: Float = BASELINE_SMOOTHING
 ) {
 
-    /** Reference ambient brightness. Frozen as long as we are indoors. */
+    /** Luminosité ambiante de référence. Gelée tant que l'on est à l'intérieur. */
     private var baselineLux = Float.NaN
 
-    /** Instant of the first reading that contradicts the current state, or [NO_TIME]. */
+    /** Instant du premier relevé qui contredit l'état courant, ou [NO_TIME]. */
     private var pendingSince = NO_TIME
 
     var isInside: Boolean = false
         private set
 
-    /** Starts from zero: to be called when listening to the sensor stops then resumes. */
+    /** Repart de zéro : à appeler quand on cesse puis reprend l'écoute du capteur. */
     fun reset() {
         baselineLux = Float.NaN
         pendingSince = NO_TIME
@@ -48,9 +48,9 @@ class TunnelDetector(
     }
 
     /**
-     * Integrates a sensor reading and returns the current state.
+     * Intègre un relevé du capteur et renvoie l'état courant.
      *
-     * [elapsedMs] must come from a monotonic clock — the system time can jump.
+     * [elapsedMs] doit provenir d'une horloge monotone — l'heure système peut sauter.
      */
     fun onReading(lux: Float, elapsedMs: Long): Boolean {
         if (baselineLux.isNaN()) baselineLux = lux
@@ -58,16 +58,16 @@ class TunnelDetector(
         if (isInside) {
             updatePending(condition = lux >= exitLux, elapsedMs = elapsedMs, delayMs = exitDelayMs) {
                 isInside = false
-                // We start again from the light found, otherwise the reference would stay
-                // the one from before the entry and the next tunnel would be misjudged.
+                // On repart de la lumière retrouvée, sans quoi la référence resterait
+                // celle d'avant l'entrée et le prochain tunnel serait mal jugé.
                 baselineLux = lux
             }
             return isInside
         }
 
-        // The reference only follows outdoor light. Integrating the dark
-        // readings would pull it down, and the relative collapse that characterizes
-        // a tunnel entry would end up no longer detectable.
+        // La référence ne suit que la lumière du dehors. Y intégrer les relevés
+        // sombres la tirerait vers le bas, et l'effondrement relatif qui caractérise
+        // l'entrée d'un tunnel finirait par ne plus être détectable.
         if (lux > enterLux) {
             baselineLux += (lux - baselineLux) * baselineSmoothing
         }
@@ -80,9 +80,9 @@ class TunnelDetector(
     }
 
     /**
-     * Switches via [onConfirmed] if [condition] has held for at least [delayMs].
-     * Any contradiction resets the counter: a momentary darkness — a
-     * bridge, a truck's shadow — must not make the whole display flicker.
+     * Bascule via [onConfirmed] si [condition] tient depuis au moins [delayMs].
+     * Toute infirmation remet le compteur à zéro : une obscurité d'un instant — un
+     * pont, l'ombre d'un camion — ne doit pas faire clignoter tout l'affichage.
      */
     private inline fun updatePending(
         condition: Boolean,
@@ -105,21 +105,21 @@ class TunnelDetector(
         private const val NO_TIME = Long.MIN_VALUE
 
         /**
-         * A lit interior sits well above: that is what avoids
-         * switching to dark in a room in broad daylight.
+         * Un intérieur éclairé se situe bien au-dessus : c'est ce qui évite de
+         * basculer en sombre dans une pièce en pleine journée.
          */
         const val ENTER_LUX = 20f
 
-        /** Darkness must represent less than 8% of the ambient brightness. */
+        /** L'obscurité doit représenter moins de 8 % de la luminosité ambiante. */
         const val ENTER_RATIO = 0.08f
 
-        /** Beyond this, the light is really back. */
+        /** Au-delà, la lumière est revenue pour de bon. */
         const val EXIT_LUX = 80f
 
         const val ENTER_DELAY_MS = 1_000L
         const val EXIT_DELAY_MS = 1_500L
 
-        /** ≈ 4 s time constant at the sensor's normal rate. */
+        /** ≈ 4 s de constante de temps au rythme normal du capteur. */
         const val BASELINE_SMOOTHING = 0.05f
     }
 }

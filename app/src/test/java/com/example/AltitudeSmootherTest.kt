@@ -8,49 +8,49 @@ import org.junit.Test
 import kotlin.math.abs
 
 /**
- * Raw GPS altitude jitters by several meters from one reading to the next, even
- * with the device motionless. Smoothing makes the displayed number stable without
- * shifting it, and absorbs isolated outliers.
+ * L'altitude brute du GPS tremble de plusieurs mètres d'un relevé à l'autre, même
+ * appareil immobile. Le lissage sert à rendre le nombre affiché stable sans le
+ * décaler, et à absorber les valeurs aberrantes isolées.
  */
 class AltitudeSmootherTest {
 
     private val smoother = AltitudeSmoother()
 
     @Test
-    fun `without a measurement there is no value`() {
+    fun `sans mesure il n y a pas de valeur`() {
         assertNull(smoother.current)
     }
 
     @Test
-    fun `the first measurement is taken as is`() {
+    fun `la premiere mesure est reprise telle quelle`() {
         assertEquals(120.0, smoother.add(120.0), 0.001)
         assertEquals(120.0, smoother.current!!, 0.001)
     }
 
     @Test
-    fun `a stable altitude is returned without offset`() {
+    fun `une altitude stable est rendue sans decalage`() {
         repeat(30) { smoother.add(200.0) }
-        assertEquals("a constant value must not be moved", 200.0, smoother.current!!, 0.01)
+        assertEquals("une valeur constante ne doit pas être déplacée", 200.0, smoother.current!!, 0.01)
     }
 
     @Test
-    fun `an isolated outlier barely moves the result`() {
+    fun `une valeur aberrante isolee ne deplace presque pas le resultat`() {
         repeat(10) { smoother.add(200.0) }
         val before = smoother.current!!
 
-        // A single reading 60 m too high: the moving median discards it.
+        // Un seul relevé à 60 m au-dessus : la médiane glissante l'écarte.
         smoother.add(260.0)
         val after = smoother.current!!
 
         assertTrue(
-            "gap obtained: ${abs(after - before)} m",
+            "écart obtenu : ${abs(after - before)} m",
             abs(after - before) < 2.0
         )
     }
 
     @Test
-    fun `jitter is strongly reduced`() {
-        // ±6 m of noise around 300 m, like a motionless GPS in average conditions.
+    fun `le tremblement est fortement reduit`() {
+        // Bruit de ±6 m autour de 300 m, comme un GPS immobile en conditions moyennes.
         val noisy = listOf(306.0, 294.0, 303.0, 297.0, 305.0, 295.0, 301.0, 299.0)
         repeat(20) { noisy.forEach { smoother.add(it) } }
 
@@ -61,27 +61,27 @@ class AltitudeSmootherTest {
         val smoothedSpread = smoothed.max() - smoothed.min()
 
         assertTrue(
-            "raw amplitude $rawSpread m, smoothed $smoothedSpread m",
+            "amplitude brute $rawSpread m, lissée $smoothedSpread m",
             smoothedSpread < rawSpread / 3.0
         )
-        assertEquals("the average must not be shifted", 300.0, smoother.current!!, 3.0)
+        assertEquals("la moyenne ne doit pas être décalée", 300.0, smoother.current!!, 3.0)
     }
 
     @Test
-    fun `a real change is followed`() {
+    fun `un changement reel est suivi`() {
         repeat(20) { smoother.add(100.0) }
-        // Climb from 100 m to 300 m, sustained over time: it must be followed.
+        // Montée de 100 m à 300 m, tenue dans le temps : elle doit être suivie.
         repeat(40) { smoother.add(300.0) }
         assertEquals(300.0, smoother.current!!, 1.0)
     }
 
     @Test
-    fun `reset forgets the previous series`() {
+    fun `reset oublie la serie precedente`() {
         repeat(10) { smoother.add(100.0) }
         smoother.reset()
         assertNull(smoother.current)
 
-        // The first measurement after reset starts from zero, without dragging the old series.
+        // La première mesure après reset repart de zéro, sans traîner l'ancienne série.
         assertEquals(800.0, smoother.add(800.0), 0.001)
     }
 }
