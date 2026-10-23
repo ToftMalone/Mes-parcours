@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">أول إصدار مستقر</string>
     <string name="rel_2_1_0_a">يتبع التطبيق الآن لغة الهاتف، بـ 11 لغة</string>
     <string name="rel_2_1_0_b">تظهر ملاحظات الإصدار بلغتك</string>
+    <string name="tool_clean">تنظيف</string>
+    <string name="tool_clean_subtitle">يحذف النقاط المتراكمة في المكان نفسه عندما يستمر التسجيل.</string>
+    <string name="clean_threshold_title">حذف النقاط الأقرب من</string>
+    <string name="clean_threshold_value">%1$d م</string>
+    <string name="clean_threshold_note">تُقارن كل نقطة بآخر نقطة محفوظة: 1 أو 2 م تكفي لحذف النقاط المتراكمة أثناء التوقف دون المساس بالمسار.</string>
+    <string name="clean_name_format">%1$s (منظّف)</string>
+    <string name="clean_need_title">لا توجد مسارات للتنظيف</string>
+    <string name="clean_need_body">سجّل مسارًا أو استورده لتتمكن من تنظيفه هنا.</string>
+    <string name="clean_busy_title">جارٍ التنظيف…</string>
+    <string name="clean_busy_subtitle">إنشاء النسخة</string>
+    <string name="clean_action">إنشاء النسخة المنظّفة</string>
+    <string name="clean_done_title">تم إنشاء النسخة المنظّفة</string>
+    <string name="clean_done_body_kept">النقاط المحذوفة: %1$s. «%2$s» في السجل. تم الاحتفاظ بالأصل.</string>
+    <string name="clean_done_body_deleted">النقاط المحذوفة: %1$s. «%2$s» في السجل. تم حذف الأصل.</string>
+    <string name="clean_delete_original_hint">الناتج نسخة</string>
+    <string name="clean_info">تُحفظ فواصل المقاطع دائمًا: لا يُوصل مقطعان منفصلان أبدًا.</string>
+    <string name="err_clean_none">لا توجد نقطة بهذا القرب من سابقتها: لا شيء للحذف.</string>
+    <string name="err_clean_failed">خطأ في التنظيف</string>
 </resources>

@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">पहला स्थिर संस्करण</string>
     <string name="rel_2_1_0_a">ऐप अब फ़ोन की भाषा के अनुसार चलता है, 11 भाषाओं में</string>
     <string name="rel_2_1_0_b">संस्करण के नोट्स आपकी भाषा में दिखते हैं</string>
+    <string name="tool_clean">साफ़ करें</string>
+    <string name="tool_clean_subtitle">रिकॉर्डिंग चालू रह जाने पर एक ही जगह जमा हुए पॉइंट हटाएँ।</string>
+    <string name="clean_threshold_title">इससे कम दूरी वाले पॉइंट हटाएँ</string>
+    <string name="clean_threshold_value">%1$d मी</string>
+    <string name="clean_threshold_note">हर पॉइंट की तुलना पिछले रखे गए पॉइंट से होती है: 1 या 2 मी रुके रहने के दौरान जमा पॉइंट हटा देते हैं, चलने वाले हिस्से को छुए बिना।</string>
+    <string name="clean_name_format">%1$s (साफ़ किया गया)</string>
+    <string name="clean_need_title">साफ़ करने के लिए कोई रूट नहीं</string>
+    <string name="clean_need_body">यहाँ साफ़ करने के लिए कोई रूट रिकॉर्ड या इम्पोर्ट करें।</string>
+    <string name="clean_busy_title">साफ़ किया जा रहा है…</string>
+    <string name="clean_busy_subtitle">प्रति बनाई जा रही है</string>
+    <string name="clean_action">साफ़ की गई प्रति बनाएँ</string>
+    <string name="clean_done_title">साफ़ की गई प्रति बन गई</string>
+    <string name="clean_done_body_kept">हटाए गए पॉइंट: %1$s। «%2$s» इतिहास में है। मूल रूट रखा गया है।</string>
+    <string name="clean_done_body_deleted">हटाए गए पॉइंट: %1$s। «%2$s» इतिहास में है। मूल रूट हटा दिया गया है।</string>
+    <string name="clean_delete_original_hint">परिणाम एक प्रति है</string>
+    <string name="clean_info">सेगमेंट के बीच के अंतराल हमेशा रखे जाते हैं: दो अलग सेगमेंट कभी नहीं जोड़े जाते।</string>
+    <string name="err_clean_none">कोई भी पॉइंट पिछले पॉइंट के इतना पास नहीं है: हटाने के लिए कुछ नहीं।</string>
+    <string name="err_clean_failed">साफ़ करने में त्रुटि</string>
 </resources>

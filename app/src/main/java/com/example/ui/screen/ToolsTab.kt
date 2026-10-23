@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material.icons.rounded.TimerOff
+import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.Warning
@@ -116,7 +117,8 @@ import kotlin.math.sin
 private enum class Tool(@StringRes val titleRes: Int) {
     MERGE(R.string.tool_merge),
     SPLIT(R.string.tool_split),
-    TRIM(R.string.tool_trim)
+    TRIM(R.string.tool_trim),
+    CLEAN(R.string.tool_clean)
 }
 
 /** Where a tool stands: settings, work in progress, result, or nothing to process. */
@@ -150,6 +152,7 @@ fun ToolsTab(
         Tool.MERGE -> MergeTracksTool(viewModel, onNavigateToDetails, close, modifier)
         Tool.SPLIT -> SplitTrackTool(viewModel, onOpenHistory, close, modifier)
         Tool.TRIM -> TrimTrackTool(viewModel, onNavigateToDetails, close, modifier)
+        Tool.CLEAN -> CleanTrackTool(viewModel, onNavigateToDetails, close, modifier)
     }
 }
 
@@ -214,6 +217,16 @@ private fun ToolsMenu(
                 subtitle = stringResource(R.string.tool_trim_subtitle),
                 onClick = { onOpenTool(Tool.TRIM) },
                 testTag = "open_trim_tool_button"
+            )
+            ToolMenuEntry(
+                icon = Icons.Rounded.CleaningServices,
+                shape = CookieShape,
+                container = colors.tertiaryContainer,
+                content = colors.onTertiaryContainer,
+                title = stringResource(R.string.tool_clean),
+                subtitle = stringResource(R.string.tool_clean_subtitle),
+                onClick = { onOpenTool(Tool.CLEAN) },
+                testTag = "open_clean_tool_button"
             )
         }
     }
@@ -1427,6 +1440,177 @@ private fun KeptDurationBar(totalSeconds: Long, dropStartMinutes: Int, dropEndMi
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = colors.onPrimary
+        )
+    }
+}
+
+// --------------------------------------------------------------------- Clean up
+
+/**
+ * Distances offered, in meters. The first two are the useful ones — GPS noise at rest
+ * stays within a meter or two — the others are there for a phone with a poor fix.
+ */
+private val CLEAN_THRESHOLDS_METERS = listOf(1, 2, 3, 5, 10)
+private const val CLEAN_DEFAULT_INDEX = 1 // 2 m
+
+@Composable
+private fun CleanTrackTool(
+    viewModel: TrackViewModel,
+    onNavigateToDetails: (Long) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val messenger = LocalAppMessenger.current
+    val nameFormat = stringResource(R.string.clean_name_format)
+    val tracks by viewModel.allTracks.collectAsState()
+    val eligibleTracks = tracks.filter { !it.isRecording }.sortedByDescending { it.startTime }
+
+    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
+    val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
+
+    var thresholdIndex by remember { mutableIntStateOf(CLEAN_DEFAULT_INDEX) }
+    var newName by remember { mutableStateOf("") }
+    var deleteSource by remember { mutableStateOf(false) }
+    var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
+    var picking by remember { mutableStateOf(false) }
+
+    // Same reason as trimming: the result is a copy, and two rows of the same name
+    // in the history would be indistinguishable.
+    LaunchedEffect(selectedTrack?.id) {
+        selectedTrack?.let { newName = nameFormat.format(it.name) }
+    }
+
+    val thresholdMeters = CLEAN_THRESHOLDS_METERS[thresholdIndex]
+    val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
+        ToolPhase.Need(stringResource(R.string.clean_need_title), stringResource(R.string.clean_need_body))
+    } else phase
+
+    ToolScaffold(
+        tool = Tool.CLEAN,
+        phase = shownPhase,
+        onBack = onBack,
+        screenTag = "clean_tool",
+        backTag = "clean_tool_back_button",
+        modifier = modifier,
+        busyTitle = stringResource(R.string.clean_busy_title),
+        busySubtitle = stringResource(R.string.clean_busy_subtitle),
+        doneActions = {
+            val result = (phase as? ToolPhase.Done)?.resultTrackId
+            DoneButtons(
+                onFinish = onBack,
+                primaryLabel = if (result != null) stringResource(R.string.tool_view_track) else null,
+                onPrimary = {
+                    if (result != null) {
+                        viewModel.selectTrack(result)
+                        onNavigateToDetails(result)
+                    }
+                },
+                primaryTag = "clean_open_result"
+            )
+        },
+        action = {
+            ToolActionButton(
+                text = stringResource(R.string.clean_action),
+                icon = Icons.Rounded.CleaningServices,
+                enabled = selectedTrack != null && newName.isNotBlank(),
+                testTag = "confirm_clean_button",
+                onClick = {
+                    val track = selectedTrack ?: return@ToolActionButton
+                    val name = newName.trim()
+                    val deleting = deleteSource
+                    phase = ToolPhase.Busy
+                    viewModel.removeStationaryPoints(
+                        trackId = track.id,
+                        thresholdMeters = thresholdMeters.toDouble(),
+                        newName = name,
+                        deleteSource = deleting,
+                        onSuccess = { result ->
+                            phase = ToolPhase.Done(
+                                title = context.getString(R.string.clean_done_title),
+                                body = context.getString(
+                                    if (deleting) R.string.clean_done_body_deleted else R.string.clean_done_body_kept,
+                                    java.text.NumberFormat.getIntegerInstance().format(result.removedPoints),
+                                    name
+                                ),
+                                resultTrackId = result.newTrackId
+                            )
+                        },
+                        onError = { error ->
+                            phase = ToolPhase.Form
+                            messenger.show(error, Icons.Rounded.Error, isError = true)
+                        }
+                    )
+                }
+            )
+        }
+    ) {
+        val track = selectedTrack ?: return@ToolScaffold
+        val end = if (track.endTime > track.startTime) track.endTime else track.startTime + track.duration * 1000
+        SelectedTrackCard(
+            track = track,
+            subtitle = "${FormatUtils.formatClock(track.startTime)} → ${FormatUtils.formatClock(end)} · ${FormatUtils.formatDurationShort(track.duration)}",
+            onClick = { picking = true }
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.clean_threshold_title),
+                    style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    stringResource(R.string.clean_threshold_value, thresholdMeters),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp)
+                )
+            }
+            MpSlider(
+                value = thresholdIndex.toFloat(),
+                onValueChange = { thresholdIndex = it.roundToInt().coerceIn(0, CLEAN_THRESHOLDS_METERS.lastIndex) },
+                valueRange = 0f..CLEAN_THRESHOLDS_METERS.lastIndex.toFloat(),
+                steps = CLEAN_THRESHOLDS_METERS.size - 2,
+                testTag = "clean_threshold_slider"
+            )
+            Text(
+                stringResource(R.string.clean_threshold_note),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        FilledField(newName, { newName = it }, stringResource(R.string.tool_result_name_label), "clean_name_field")
+        Spacer(modifier = Modifier.height(10.dp))
+        SwitchCard(
+            title = stringResource(R.string.tool_delete_original),
+            subtitle = stringResource(R.string.clean_delete_original_hint),
+            checked = deleteSource,
+            onToggle = { deleteSource = !deleteSource },
+            testTag = "clean_delete_source_row"
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        InfoLine(Icons.Rounded.Verified, stringResource(R.string.clean_info))
+    }
+
+    if (picking) {
+        TrackPickerSheet(
+            tracks = eligibleTracks,
+            selectedId = selectedTrack?.id,
+            onPick = {
+                selectedTrackId = it.id
+                picking = false
+            },
+            onDismiss = { picking = false }
         )
     }
 }

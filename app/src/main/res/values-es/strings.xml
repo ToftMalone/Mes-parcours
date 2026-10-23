@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">Primera versión estable</string>
     <string name="rel_2_1_0_a">La aplicación sigue el idioma del teléfono, en 11 idiomas</string>
     <string name="rel_2_1_0_b">Las notas de versión se muestran en tu idioma</string>
+    <string name="tool_clean">Limpiar</string>
+    <string name="tool_clean_subtitle">Elimina los puntos acumulados en un mismo lugar cuando la grabación siguió activa.</string>
+    <string name="clean_threshold_title">Eliminar puntos a menos de</string>
+    <string name="clean_threshold_value">%1$d m</string>
+    <string name="clean_threshold_note">Cada punto se compara con el último conservado: 1 o 2 m eliminan los puntos acumulados en reposo sin tocar la caminata.</string>
+    <string name="clean_name_format">%1$s (limpio)</string>
+    <string name="clean_need_title">No hay recorridos que limpiar</string>
+    <string name="clean_need_body">Graba o importa un recorrido para poder limpiarlo aquí.</string>
+    <string name="clean_busy_title">Limpiando…</string>
+    <string name="clean_busy_subtitle">Creando la copia</string>
+    <string name="clean_action">Crear la copia limpia</string>
+    <string name="clean_done_title">Copia limpia creada</string>
+    <string name="clean_done_body_kept">Puntos eliminados: %1$s. «%2$s» está en el historial. El original se ha conservado.</string>
+    <string name="clean_done_body_deleted">Puntos eliminados: %1$s. «%2$s» está en el historial. El original se ha eliminado.</string>
+    <string name="clean_delete_original_hint">El resultado es una copia</string>
+    <string name="clean_info">Los cortes de tramo siempre se conservan: nunca se unen dos tramos distintos.</string>
+    <string name="err_clean_none">Ningún punto está tan cerca del anterior: no hay nada que eliminar.</string>
+    <string name="err_clean_failed">Error de limpieza</string>
 </resources>

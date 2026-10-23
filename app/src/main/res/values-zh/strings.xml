@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">首个稳定版本</string>
     <string name="rel_2_1_0_a">应用现在跟随手机语言，支持 11 种语言</string>
     <string name="rel_2_1_0_b">版本说明以你的语言显示</string>
+    <string name="tool_clean">清理</string>
+    <string name="tool_clean_subtitle">删除记录忘记停止时堆积在同一地点的点。</string>
+    <string name="clean_threshold_title">删除距离小于</string>
+    <string name="clean_threshold_value">%1$d 米</string>
+    <string name="clean_threshold_note">每个点都与上一个保留的点比较：1 或 2 米即可清除静止时堆积的点，不影响行走路线。</string>
+    <string name="clean_name_format">%1$s（已清理）</string>
+    <string name="clean_need_title">没有可清理的路线</string>
+    <string name="clean_need_body">录制或导入一条路线后，即可在此清理。</string>
+    <string name="clean_busy_title">正在清理…</string>
+    <string name="clean_busy_subtitle">正在创建副本</string>
+    <string name="clean_action">创建清理后的副本</string>
+    <string name="clean_done_title">已创建清理后的副本</string>
+    <string name="clean_done_body_kept">已删除的点：%1$s。“%2$s”位于历史中。原路线已保留。</string>
+    <string name="clean_done_body_deleted">已删除的点：%1$s。“%2$s”位于历史中。原路线已删除。</string>
+    <string name="clean_delete_original_hint">结果是一个副本</string>
+    <string name="clean_info">路段断点始终保留：不会把两个不同的路段连在一起。</string>
+    <string name="err_clean_none">没有点与前一个点如此接近：没有可删除的内容。</string>
+    <string name="err_clean_failed">清理出错</string>
 </resources>

@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">Primeira versão estável</string>
     <string name="rel_2_1_0_a">O aplicativo agora segue o idioma do celular, em 11 idiomas</string>
     <string name="rel_2_1_0_b">As notas de versão aparecem no seu idioma</string>
+    <string name="tool_clean">Limpar</string>
+    <string name="tool_clean_subtitle">Remove os pontos acumulados no mesmo lugar quando a gravação continuou ligada.</string>
+    <string name="clean_threshold_title">Remover pontos a menos de</string>
+    <string name="clean_threshold_value">%1$d m</string>
+    <string name="clean_threshold_note">Cada ponto é comparado com o último mantido: 1 ou 2 m removem os pontos acumulados parado sem mexer na caminhada.</string>
+    <string name="clean_name_format">%1$s (limpo)</string>
+    <string name="clean_need_title">Nenhum percurso para limpar</string>
+    <string name="clean_need_body">Grave ou importe um percurso para poder limpá-lo aqui.</string>
+    <string name="clean_busy_title">Limpando…</string>
+    <string name="clean_busy_subtitle">Criando a cópia</string>
+    <string name="clean_action">Criar a cópia limpa</string>
+    <string name="clean_done_title">Cópia limpa criada</string>
+    <string name="clean_done_body_kept">Pontos removidos: %1$s. «%2$s» está no histórico. O original foi mantido.</string>
+    <string name="clean_done_body_deleted">Pontos removidos: %1$s. «%2$s» está no histórico. O original foi excluído.</string>
+    <string name="clean_delete_original_hint">O resultado é uma cópia</string>
+    <string name="clean_info">As quebras de trecho são sempre mantidas: dois trechos distintos nunca são unidos.</string>
+    <string name="err_clean_none">Nenhum ponto está tão perto do anterior: não há nada a remover.</string>
+    <string name="err_clean_failed">Erro de limpeza</string>
 </resources>

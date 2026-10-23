@@ -339,4 +339,22 @@
     <string name="rel_1_0_a">First stable release</string>
     <string name="rel_2_1_0_a">The app now follows your phone\'s language, in 11 languages</string>
     <string name="rel_2_1_0_b">Release notes are shown in your language</string>
+    <string name="tool_clean">Clean up</string>
+    <string name="tool_clean_subtitle">Remove the points piled up in one spot when the recording was left running.</string>
+    <string name="clean_threshold_title">Remove points closer than</string>
+    <string name="clean_threshold_value">%1$d m</string>
+    <string name="clean_threshold_note">Each point is compared with the last one kept: 1 or 2 m clears the points piled up at rest without touching the walk.</string>
+    <string name="clean_name_format">%1$s (cleaned)</string>
+    <string name="clean_need_title">No tracks to clean up</string>
+    <string name="clean_need_body">Record or import a track to be able to clean it up here.</string>
+    <string name="clean_busy_title">Cleaning up…</string>
+    <string name="clean_busy_subtitle">Creating the copy</string>
+    <string name="clean_action">Create the cleaned copy</string>
+    <string name="clean_done_title">Cleaned copy created</string>
+    <string name="clean_done_body_kept">Points removed: %1$s. “%2$s” is in the history. The original has been kept.</string>
+    <string name="clean_done_body_deleted">Points removed: %1$s. “%2$s” is in the history. The original has been deleted.</string>
+    <string name="clean_delete_original_hint">The result is a copy</string>
+    <string name="clean_info">Segment breaks are always kept: two separate segments are never joined.</string>
+    <string name="err_clean_none">No point is that close to the previous one: there is nothing to remove.</string>
+    <string name="err_clean_failed">Clean-up error</string>
 </resources>

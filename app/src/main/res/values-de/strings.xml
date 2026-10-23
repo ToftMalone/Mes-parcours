@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">Erste stabile Version</string>
     <string name="rel_2_1_0_a">Die App folgt jetzt der Sprache des Handys, in 11 Sprachen</string>
     <string name="rel_2_1_0_b">Versionshinweise werden in deiner Sprache angezeigt</string>
+    <string name="tool_clean">Bereinigen</string>
+    <string name="tool_clean_subtitle">Entfernt die Punkte, die sich an einer Stelle häufen, wenn die Aufzeichnung weiterlief.</string>
+    <string name="clean_threshold_title">Punkte entfernen näher als</string>
+    <string name="clean_threshold_value">%1$d m</string>
+    <string name="clean_threshold_note">Jeder Punkt wird mit dem zuletzt behaltenen verglichen: 1 oder 2 m entfernen die im Stillstand angehäuften Punkte, ohne die Strecke anzutasten.</string>
+    <string name="clean_name_format">%1$s (bereinigt)</string>
+    <string name="clean_need_title">Keine Strecken zum Bereinigen</string>
+    <string name="clean_need_body">Zeichne eine Strecke auf oder importiere sie, um sie hier bereinigen zu können.</string>
+    <string name="clean_busy_title">Wird bereinigt…</string>
+    <string name="clean_busy_subtitle">Kopie wird erstellt</string>
+    <string name="clean_action">Bereinigte Kopie erstellen</string>
+    <string name="clean_done_title">Bereinigte Kopie erstellt</string>
+    <string name="clean_done_body_kept">Entfernte Punkte: %1$s. „%2$s“ befindet sich im Verlauf. Das Original wurde behalten.</string>
+    <string name="clean_done_body_deleted">Entfernte Punkte: %1$s. „%2$s“ befindet sich im Verlauf. Das Original wurde gelöscht.</string>
+    <string name="clean_delete_original_hint">Das Ergebnis ist eine Kopie</string>
+    <string name="clean_info">Abschnittsgrenzen bleiben immer erhalten: Zwei getrennte Abschnitte werden nie verbunden.</string>
+    <string name="err_clean_none">Kein Punkt liegt so nah am vorherigen: Es gibt nichts zu entfernen.</string>
+    <string name="err_clean_failed">Fehler beim Bereinigen</string>
 </resources>

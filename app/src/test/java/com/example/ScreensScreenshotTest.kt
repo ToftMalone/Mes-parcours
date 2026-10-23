@@ -288,6 +288,13 @@ class ScreensScreenshotTest {
         shoot("tools_trim", false)
     }
 
+    @Test fun tools_clean() {
+        seed(); tools(true); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_clean_tool_button").performScrollTo().performClick()
+        waitForTag("clean_threshold_slider")
+        shoot("tools_clean", true)
+    }
+
     // -------------------------------------------------------------- Settings
 
     private val sampleUpdate = AvailableUpdate(

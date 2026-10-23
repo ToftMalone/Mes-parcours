@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="tool_clean">Nettoyer</string>
+    <string name="tool_clean_subtitle">Supprimer les points entassés au même endroit quand l\'enregistrement a continué.</string>
+    <string name="clean_threshold_title">Supprimer les points à moins de</string>
+    <string name="clean_threshold_value">%1$d m</string>
+    <string name="clean_threshold_note">Chaque point est comparé au dernier point gardé : 1 ou 2 m retirent les points entassés à l\'arrêt sans toucher à la marche.</string>
+    <string name="clean_name_format">%1$s (nettoyé)</string>
+    <string name="clean_need_title">Aucun parcours à nettoyer</string>
+    <string name="clean_need_body">Enregistrez ou importez un parcours pour pouvoir le nettoyer ici.</string>
+    <string name="clean_busy_title">Nettoyage…</string>
+    <string name="clean_busy_subtitle">Création de la copie</string>
+    <string name="clean_action">Créer la copie nettoyée</string>
+    <string name="clean_done_title">Copie nettoyée créée</string>
+    <string name="clean_done_body_kept">Points supprimés : %1$s. « %2$s » est dans l\'historique. L\'original est conservé.</string>
+    <string name="clean_done_body_deleted">Points supprimés : %1$s. « %2$s » est dans l\'historique. L\'original a été supprimé.</string>
+    <string name="clean_delete_original_hint">Le résultat est une copie</string>
+    <string name="clean_info">Les ruptures de tronçon sont toujours gardées : deux tronçons distincts ne sont jamais recollés.</string>
+    <string name="err_clean_none">Aucun point n\'est aussi proche du précédent : il n\'y a rien à supprimer.</string>
+    <string name="err_clean_failed">Erreur de nettoyage</string>
 </resources>

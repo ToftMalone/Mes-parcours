@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">Первая стабильная версия</string>
     <string name="rel_2_1_0_a">Приложение следует языку телефона — доступно 11 языков</string>
     <string name="rel_2_1_0_b">Примечания к версии показываются на вашем языке</string>
+    <string name="tool_clean">Очистить</string>
+    <string name="tool_clean_subtitle">Удаляет точки, скопившиеся в одном месте, когда запись не остановили.</string>
+    <string name="clean_threshold_title">Удалить точки ближе</string>
+    <string name="clean_threshold_value">%1$d м</string>
+    <string name="clean_threshold_note">Каждая точка сравнивается с последней сохранённой: 1–2 м убирают точки, накопившиеся на стоянке, не затрагивая прогулку.</string>
+    <string name="clean_name_format">%1$s (очищено)</string>
+    <string name="clean_need_title">Нет маршрутов для очистки</string>
+    <string name="clean_need_body">Запишите или импортируйте маршрут, чтобы очистить его здесь.</string>
+    <string name="clean_busy_title">Очистка…</string>
+    <string name="clean_busy_subtitle">Создание копии</string>
+    <string name="clean_action">Создать очищенную копию</string>
+    <string name="clean_done_title">Очищенная копия создана</string>
+    <string name="clean_done_body_kept">Удалено точек: %1$s. «%2$s» в истории. Оригинал сохранён.</string>
+    <string name="clean_done_body_deleted">Удалено точек: %1$s. «%2$s» в истории. Оригинал удалён.</string>
+    <string name="clean_delete_original_hint">Результат — копия</string>
+    <string name="clean_info">Разрывы участков всегда сохраняются: два разных участка никогда не соединяются.</string>
+    <string name="err_clean_none">Нет точек так близко к предыдущей: удалять нечего.</string>
+    <string name="err_clean_failed">Ошибка очистки</string>
 </resources>

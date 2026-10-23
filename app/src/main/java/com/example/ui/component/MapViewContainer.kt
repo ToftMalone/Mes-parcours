@@ -1061,12 +1061,16 @@ private fun drawAllPointsAndMarkers(map: MapView, state: MapState) {
     var cachedOverlayPolylines = state.cachedOverlayTrackPolylines
     if (cachedOverlayPolylines == null) {
         val buildList = mutableListOf<Polyline>()
-        for (overlayTrack in state.overlayTracks) {
+        // Thickest first, hence underneath. Tracks walked again on the same path lie on
+        // top of each other: drawn last, a thick line would cover the thin ones entirely,
+        // and making one track thicker would look as if all of them had changed.
+        val byThickness = state.overlayTracks
+            .map { it to TrackStylePreferences.getStrokeWidth(map.context, it.displayWidthDp) }
+            .sortedByDescending { (_, width) -> width }
+        for ((overlayTrack, overlayStrokeWidth) in byThickness) {
             val trackPoints = overlayTrack.points
             if (trackPoints.isNotEmpty()) {
                 val segments = buildSegmentsFromPoints(trackPoints)
-                val overlayStrokeWidth =
-                    TrackStylePreferences.getStrokeWidth(map.context, overlayTrack.displayWidthDp)
 
                 for (segment in segments) {
                     if (segment.points.isNotEmpty()) {

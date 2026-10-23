@@ -338,4 +338,22 @@
     <string name="rel_1_0_a">最初の安定版</string>
     <string name="rel_2_1_0_a">アプリがスマートフォンの言語に合わせて表示されます（11 言語対応）</string>
     <string name="rel_2_1_0_b">リリースノートが使用中の言語で表示されます</string>
+    <string name="tool_clean">クリーンアップ</string>
+    <string name="tool_clean_subtitle">記録を止め忘れたときに同じ場所にたまったポイントを削除します。</string>
+    <string name="clean_threshold_title">次の距離より近いポイントを削除</string>
+    <string name="clean_threshold_value">%1$d m</string>
+    <string name="clean_threshold_note">各ポイントは最後に残したポイントと比較されます。1〜2 m なら、止まっている間にたまったポイントだけを削除し、歩いた部分には触れません。</string>
+    <string name="clean_name_format">%1$s（クリーンアップ済み）</string>
+    <string name="clean_need_title">クリーンアップできるルートがありません</string>
+    <string name="clean_need_body">ルートを記録またはインポートすると、ここでクリーンアップできます。</string>
+    <string name="clean_busy_title">クリーンアップ中…</string>
+    <string name="clean_busy_subtitle">コピーを作成しています</string>
+    <string name="clean_action">クリーンアップしたコピーを作成</string>
+    <string name="clean_done_title">クリーンアップしたコピーを作成しました</string>
+    <string name="clean_done_body_kept">削除したポイント：%1$s。「%2$s」が履歴に追加されました。元のルートは残しています。</string>
+    <string name="clean_done_body_deleted">削除したポイント：%1$s。「%2$s」が履歴に追加されました。元のルートは削除しました。</string>
+    <string name="clean_delete_original_hint">結果はコピーです</string>
+    <string name="clean_info">区間の切れ目は常に残します。別々の区間がつながることはありません。</string>
+    <string name="err_clean_none">前のポイントにそれほど近いポイントはありません。削除するものはありません。</string>
+    <string name="err_clean_failed">クリーンアップのエラー</string>
 </resources>

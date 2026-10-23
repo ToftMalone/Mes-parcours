@@ -894,6 +894,152 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Removing stationary points
+    // ------------------------------------------------------------------
+
+    /** Outcome of [removeStationaryPoints]: the track created and what was dropped. */
+    data class StationaryCleanup(val newTrackId: Long, val removedPoints: Int, val keptPoints: Int)
+
+    /**
+     * Creates a copy of [sourceTrackId] without its stationary points: any point closer
+     * than [thresholdMeters] to the last kept point is dropped.
+     *
+     * The everyday case: the recording forgotten on arrival, which piles up thousands of
+     * points at the same spot for hours. Comparing with the last **kept** point, and
+     * not with the previous one, is what catches a slow drift: GPS noise at rest moves
+     * by a few decimeters at a time, each step under the threshold, and would otherwise
+     * slip through a point at a time.
+     *
+     * Segment breaks ([TrackPoint.isDiscontinuous]) are always kept, so as never to
+     * glue two distinct segments together.
+     *
+     * Unlike trimming, the kept points do not form one slice, so SQLite cannot copy
+     * them in one `INSERT … SELECT`: they go through memory, one page at a time, and
+     * are written as they come. Each page is its own short write, like the import —
+     * a single transaction around the whole copy would lock the database for writing,
+     * and a recording in progress with it. Atomicity is restored the same way: the
+     * new row carries [Track.IMPORT_PLACEHOLDER_START_TIME] until the end, which hides
+     * it from the history, a failure deletes it, and [cleanupInterruptedImports]
+     * catches the one of a process killed midway.
+     *
+     * The original track is never modified, and is only deleted if [deleteSource] asks
+     * for it. Throws if the track is not found or is being recorded, if nothing is
+     * stationary, or if fewer than two points would remain.
+     */
+    suspend fun removeStationaryPoints(
+        sourceTrackId: Long,
+        thresholdMeters: Double,
+        newName: String,
+        deleteSource: Boolean
+    ): StationaryCleanup {
+        val source = trackDao.getTrackById(sourceTrackId)
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
+        if (isBeingRecorded(source)) {
+            throw UserFacingArgumentException(R.string.err_track_is_recording)
+        }
+
+        val newTrackId = trackDao.insertTrack(
+            Track(
+                name = newName,
+                activityType = source.activityType,
+                startTime = Track.IMPORT_PLACEHOLDER_START_TIME,
+                isRecording = false,
+                // Same inheritance as splitting and trimming: the origin and the
+                // appearance of the parent, but never its display on the map.
+                isImported = source.isImported,
+                isMerged = source.isMerged,
+                isSelectedForMap = false,
+                sourceColor = source.sourceColor,
+                displayColor = source.displayColor,
+                displayWidthDp = source.displayWidthDp
+            )
+        )
+
+        try {
+            val accumulator = TrackStatsAccumulator()
+            val distance = FloatArray(1)
+            var lastKept: TrackPoint? = null
+            var firstKeptTime = 0L
+            var keptCount = 0
+            var removedCount = 0
+            var afterId = 0L
+
+            while (true) {
+                val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
+                if (page.isEmpty()) break
+                afterId = page.last().id
+
+                val kept = ArrayList<TrackPoint>(page.size)
+                for (point in page) {
+                    val anchor = lastKept
+                    val keep = anchor == null || point.isDiscontinuous || run {
+                        android.location.Location.distanceBetween(
+                            anchor.latitude, anchor.longitude,
+                            point.latitude, point.longitude,
+                            distance
+                        )
+                        distance[0] >= thresholdMeters
+                    }
+                    if (!keep) {
+                        removedCount++
+                        continue
+                    }
+                    if (anchor == null) firstKeptTime = point.timestamp
+                    accumulator.add(point)
+                    kept += point.copy(id = 0, trackId = newTrackId)
+                    lastKept = point
+                    keptCount++
+                }
+                if (kept.isNotEmpty()) trackDao.insertTrackPoints(kept)
+            }
+
+            if (keptCount == 0) throw UserFacingStateException(R.string.err_track_empty)
+            if (removedCount == 0) throw UserFacingStateException(R.string.err_clean_none)
+            if (keptCount < 2) throw UserFacingStateException(R.string.err_trim_too_few)
+
+            val stats = accumulator.result()
+            database.withTransaction {
+                val placeholder = trackDao.getTrackById(newTrackId)
+                    ?: throw UserFacingStateException(R.string.err_track_not_found)
+                trackDao.updateTrack(
+                    placeholder.copy(
+                        startTime = firstKeptTime,
+                        endTime = lastKept?.timestamp ?: firstKeptTime,
+                        totalDistance = stats.distanceMeters,
+                        duration = stats.durationSec,
+                        maxSpeed = stats.maxSpeedMps,
+                        avgSpeed = stats.avgSpeedMps,
+                        elevationGain = stats.elevationGain,
+                        elevationLoss = stats.elevationLoss
+                    )
+                )
+                // The first kept point may have opened a segment in the original
+                // track; in the new track it only opens the line.
+                trackDao.clearFirstPointDiscontinuity(newTrackId)
+
+                if (deleteSource) {
+                    trackDao.deletePointsForTrack(sourceTrackId)
+                    trackDao.deleteTrack(sourceTrackId)
+                }
+            }
+            invalidatePointCaches(sourceTrackId)
+
+            return StationaryCleanup(newTrackId, removedCount, keptCount)
+        } catch (e: Throwable) {
+            // Even when cancelled: the reserved row must not stay behind, hidden.
+            withContext(kotlinx.coroutines.NonCancellable) {
+                runCatching {
+                    database.withTransaction {
+                        trackDao.deletePointsForTrack(newTrackId)
+                        trackDao.deleteTrack(newTrackId)
+                    }
+                }
+            }
+            throw e
+        }
+    }
+
     fun getSelectedImportedTracksFlow(): Flow<List<Track>> {
         return trackDao.getSelectedImportedTracksFlow()
     }

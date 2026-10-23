@@ -530,6 +530,38 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    /**
+     * Copies a track without its stationary points (see
+     * [TrackRepository.removeStationaryPoints]). On [kotlinx.coroutines.Dispatchers.IO]
+     * like trimming: it reads every point.
+     */
+    fun removeStationaryPoints(
+        trackId: Long,
+        thresholdMeters: Double,
+        newName: String,
+        deleteSource: Boolean,
+        onSuccess: (TrackRepository.StationaryCleanup) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val result = repository.removeStationaryPoints(
+                    sourceTrackId = trackId,
+                    thresholdMeters = thresholdMeters,
+                    newName = newName,
+                    deleteSource = deleteSource
+                )
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(result)
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.userMessage(appContext, R.string.err_clean_failed))
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Export
     //
