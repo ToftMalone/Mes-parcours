@@ -685,17 +685,18 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 195 tests unitaires en 23 suites : `ScreensScreenshotTest` (33, captures seules —
+- 207 tests unitaires en 24 suites : `ScreensScreenshotTest` (34, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `TrimTrackTest` (14), `SplitTrackTest` (13), `BearingTest` (10), `SolarTimesTest`
-  (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
-  `RecordingGuardsTest` (7),
-  `KmlStyleTableTest` (7), `TrackSegmentsTest` (7), `CoordinateTokenizerTest` (6),
-  `DarkTilesColorFilterTest` (6), `DesignSystemScreenshotTest` (6, captures seules),
-  `ElevationAccumulatorTest` (6), `TunnelDetectorTest` (6), `MergeTracksTest` (5),
-  `MigrationChainTest` (3), plus trois tests d'échafaudage hérités
-  (`ExampleUnitTest`, `ExampleRobolectricTest`, `GreetingScreenshotTest` avec
-  Roborazzi).
+  `TrimTrackTest` (14), `SplitTrackTest` (13), `CleanTrackTest` (11), `BearingTest` (10),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
+  `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
+  `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
+  `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),
+  `TunnelDetectorTest` (6), `MergeTracksTest` (5), `MigrationChainTest` (3), plus trois
+  tests d'échafaudage hérités (`ExampleUnitTest`, `ExampleRobolectricTest`,
+  `GreetingScreenshotTest` avec Roborazzi).
+  Lancer toutes les suites d'un coup échoue en local (conflit de bibliothèques natives de
+  Robolectric) : les lancer par groupes, `--tests 'com.example.<Suite>'` répété.
   Ce décompte s'était mis à mentir : il annonçait 72 tests pour 11 suites alors que le
   dépôt en portait 80 pour 15, `KmlExportTest` n'y ayant jamais été ajouté. À tenir à
   jour en même temps que les tests eux-mêmes.
