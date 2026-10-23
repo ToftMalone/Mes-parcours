@@ -1319,18 +1319,6 @@ cache de polylignes par trace serait la marche suivante.
 
 ### En attente d'arbitrage
 
-- **« Quand il change l'épaisseur d'un parcours, la valeur a changé quand il ouvre
-  la feuille d'un autre »**, rapporté par le père de l'auteur après la 2.1.0, sur des
-  parcours sans rapport entre eux. Première lecture fausse (des tracés superposés sur
-  la carte) : la 2.2 dessine bien les traits épais en dessous, mais ce n'était pas le
-  défaut — il est dans la feuille « Apparence du tracé ». Relecture faite : l'épaisseur
-  est écrite sur le seul parcours choisi (`setTrackStyle`), la feuille repart de la
-  valeur du parcours ouvert, et sa logique n'a pas bougé depuis la 2.0.2.
-  `ScreensScreenshotTest.epaisseur_propre_a_chaque_parcours` rejoue le geste (A épaissi,
-  B affiné, A rouvert, C ouvert) et **passe** : non reproduit. Un parcours sans
-  épaisseur propre affiche l'épaisseur générale (4 dp, ou l'ancien réglage) : tous ces
-  parcours montrent donc la même valeur, ce qui peut se confondre avec le défaut.
-  **Demander un enregistrement d'écran du geste exact** avant tout correctif.
 - `VIEWPORT_MARGIN` est passé de 0,35 à 0,60 à la demande de l'auteur. À évaluer.
   Surveiller l'effet indirect documenté au-dessus de la constante : la zone élargie
   sert aussi à `coversMostOfTrack`, donc l'affichage se rabat plus tôt sur la seule
@@ -1406,6 +1394,20 @@ inadvertance :
 
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.
+
+### Classé sans suite : l'épaisseur qui « changeait sur les autres parcours »
+
+Rapporté par le père de l'auteur après la 2.1.0 : en changeant l'épaisseur d'un
+parcours, la valeur aurait changé dans la feuille « Apparence du tracé » d'autres
+parcours, sans rapport entre eux. Jamais reproduit :
+`ScreensScreenshotTest.epaisseur_propre_a_chaque_parcours` rejoue le geste (A épaissi,
+B affiné, A rouvert, C ouvert) et passe, et la logique de la feuille n'avait pas bougé
+depuis la 2.0.2. Après la 2.2, il a confirmé que **ça ne le fait plus**. Cause jamais
+établie ; la 2.2 n'a touché que l'ordre de dessin sur la carte (traits épais dessous),
+qui ne concerne pas la feuille. Piste la plus probable : les parcours sans épaisseur
+propre affichent tous l'épaisseur générale, donc la même valeur. Le test reste, pour
+qu'une vraie régression se voie. Si le défaut revient : demander un enregistrement
+d'écran du geste exact avant de toucher au code.
 
 ### Arbitré, avant la 1.0
 
