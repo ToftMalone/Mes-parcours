@@ -21,10 +21,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Le nettoyage crée une copie sans les points entassés au même endroit. Ces tests
- * verrouillent ce sur quoi il repose : la comparaison au dernier point **gardé**, des
- * ruptures de tronçon jamais écartées, des statistiques tirées des seuls points gardés,
- * et aucune ligne cachée laissée derrière un refus.
+ * Le nettoyage réduit chaque arrêt à un seul point, sans rupture de tracé. Ces tests
+ * verrouillent ce sur quoi il repose : un gribouillis de bruit GPS qui disparaît en
+ * entier, une marche laissée intacte, des ruptures de tronçon jamais écartées, des
+ * statistiques tirées des seuls points gardés, et aucune ligne cachée laissée derrière
+ * un refus.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -57,7 +58,8 @@ class CleanTrackTest {
     private suspend fun createTrack(
         northMeters: List<Double>,
         breaks: Set<Int> = emptySet(),
-        track: Track = Track(name = "Sortie", startTime = start)
+        track: Track = Track(name = "Sortie", startTime = start),
+        secondsPerPoint: Long = 1
     ): Long {
         val trackId = db.trackDao.insertTrack(track)
         db.trackDao.insertTrackPoints(
@@ -68,7 +70,7 @@ class CleanTrackTest {
                     longitude = 5.0,
                     altitude = 100.0,
                     speed = 1f,
-                    timestamp = start + i * second,
+                    timestamp = start + i * secondsPerPoint * second,
                     isDiscontinuous = i in breaks
                 )
             }
@@ -79,6 +81,8 @@ class CleanTrackTest {
     private suspend fun pointsOf(trackId: Long): List<TrackPoint> =
         db.trackDao.getPointsForTrack(trackId)
 
+    private fun TrackPoint.north(): Double = (latitude - 45.0) / meter
+
     /** Toutes les lignes de la table, cachées comprises. */
     private fun trackRowCount(): Int =
         db.openHelper.readableDatabase.query("SELECT COUNT(*) FROM tracks").use { cursor ->
@@ -86,54 +90,93 @@ class CleanTrackTest {
             cursor.getInt(0)
         }
 
-    /** Une marche de 100 m, puis mille points qui tremblent à moins d'un demi-mètre de l'arrivée. */
-    private fun walkThenForgotten(): List<Double> =
-        (0..20).map { it * 5.0 } + (1..1000).map { 100.0 + (it % 5) * 0.1 }
+    /** Une marche, 5 m par seconde, de [from] à [to] mètres. */
+    private fun walk(from: Int, to: Int): List<Double> =
+        (from..to step 5).map { it.toDouble() }
+
+    /** [seconds] secondes de bruit GPS sous un toit : des sauts jusqu'à 8 m autour de [at]. */
+    private fun noise(at: Double, seconds: Int): List<Double> =
+        (1..seconds).map { at + ((it * 7) % 17 - 8) }
 
     // ------------------------------------------------------------------
-    // Ce qui est retiré, ce qui reste
+    // Ce qui est réduit, ce qui reste
     // ------------------------------------------------------------------
 
     @Test
-    fun `les points entassés après l'arrivée sont retirés`() = runBlocking {
-        val sourceId = createTrack(walkThenForgotten())
+    fun `l'enregistrement oublié à l'arrivée devient un seul point`() = runBlocking {
+        val sourceId = createTrack(walk(0, 100) + noise(100.0, 3600))
 
-        val result = repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
-        assertEquals("la marche est gardée, tous les 5 m", 21, pointsOf(result.newTrackId).size)
-        assertEquals(1000, result.removedPoints)
-        assertEquals(21, result.keptPoints)
+        val kept = pointsOf(result.newTrackId)
+        assertEquals(1, result.stops)
+        assertTrue("la marche reste, plus un point : ${kept.size}", kept.size in 12..22)
+        assertEquals("le point d'arrêt est au centre du bruit", 100.0, kept.last().north(), 2.0)
+        assertTrue("aucune rupture de tracé", kept.none { it.isDiscontinuous })
     }
 
     @Test
-    fun `une lente dérive se compare au dernier point gardé`() = runBlocking {
-        // Un demi-mètre à la fois : chaque pas reste sous le seuil, mais pas la dérive
-        // entière. Comparer au point précédent écarterait tout.
-        val sourceId = createTrack((0..20).map { it * 0.5 })
+    fun `la marche autour d'un arrêt est gardée point pour point`() = runBlocking {
+        val before = walk(0, 300)
+        val after = walk(305, 600)
+        val sourceId = createTrack(before + noise(300.0, 900) + after)
 
-        val result = repository.removeStationaryPoints(sourceId, 1.9, "Nettoyé", false)
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
-        val kept = pointsOf(result.newTrackId).map { (it.latitude - 45.0) / meter }
-        assertEquals("0, 2, 4, 6, 8 et 10 m", 6, kept.size)
-        assertEquals(10.0, kept.last(), 0.01)
+        val kept = pointsOf(result.newTrackId).map { it.north() }
+        // Seuls les derniers et premiers mètres, à moins du rayon de l'arrêt, s'y fondent.
+        val farFromStop = (before + after).filter { kotlin.math.abs(it - 300.0) > 35 }
+        farFromStop.forEach { north ->
+            assertTrue("$north m est gardé", kept.any { kotlin.math.abs(it - north) < 0.01 })
+        }
+        assertEquals(1, result.stops)
+        assertEquals(0.0, kept.first(), 0.01)
+        assertEquals(600.0, kept.last(), 0.01)
+        assertTrue(pointsOf(result.newTrackId).none { it.isDiscontinuous })
+    }
+
+    @Test
+    fun `un saut aberrant du GPS ne coupe pas l'arrêt`() = runBlocking {
+        // Toutes les cent secondes, une position à 80 m : l'arrêt doit rester d'un tenant.
+        val noisy = noise(100.0, 1200).mapIndexed { i, north -> if (i % 100 == 50) north + 80 else north }
+        val sourceId = createTrack(walk(0, 100) + noisy)
+
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
+
+        assertEquals(1, result.stops)
+        assertTrue(pointsOf(result.newTrackId).none { it.north() > 150 })
+    }
+
+    @Test
+    fun `un arrêt plus court que la durée choisie reste tel quel`() = runBlocking {
+        val sourceId = createTrack(walk(0, 100) + noise(100.0, 60) + walk(105, 200))
+
+        val failure = runCatching {
+            repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertEquals("seul l'original reste", 1, trackRowCount())
     }
 
     @Test
     fun `les ruptures de tronçon sont toujours gardées`() = runBlocking {
-        // Le dixième point ouvre un nouveau tronçon au même endroit : il reste, sans
-        // quoi deux tronçons seraient recollés.
-        val sourceId = createTrack(List(20) { 0.0 }, breaks = setOf(10))
+        // Le même arrêt, coupé par une rupture : deux arrêts, jamais recollés.
+        val sourceId = createTrack(noise(0.0, 1200), breaks = setOf(600))
 
-        val result = repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
-        assertEquals(2, pointsOf(result.newTrackId).size)
+        val kept = pointsOf(result.newTrackId)
+        assertEquals(2, result.stops)
+        assertEquals(2, kept.size)
+        assertTrue(kept[1].isDiscontinuous)
     }
 
     @Test
     fun `le premier point gardé n'est pas une rupture`() = runBlocking {
-        val sourceId = createTrack(walkThenForgotten(), breaks = setOf(0))
+        val sourceId = createTrack(walk(0, 100) + noise(100.0, 600), breaks = setOf(0))
 
-        val result = repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
         assertFalse(pointsOf(result.newTrackId).first().isDiscontinuous)
     }
@@ -144,18 +187,18 @@ class CleanTrackTest {
 
     @Test
     fun `le parcours d'origine reste intact par défaut`() = runBlocking {
-        val sourceId = createTrack(walkThenForgotten())
+        val sourceId = createTrack(walk(0, 100) + noise(100.0, 1000))
 
-        repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+        repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
         assertEquals(1021, pointsOf(sourceId).size)
     }
 
     @Test
     fun `le parcours d'origine est supprimé sur demande`() = runBlocking {
-        val sourceId = createTrack(walkThenForgotten())
+        val sourceId = createTrack(walk(0, 100) + noise(100.0, 1000))
 
-        repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", true)
+        repository.removeStationaryPoints(sourceId, 5, "Nettoyé", true)
 
         assertNull(db.trackDao.getTrackById(sourceId))
         assertTrue(pointsOf(sourceId).isEmpty())
@@ -167,10 +210,10 @@ class CleanTrackTest {
 
     @Test
     fun `rien d'immobile est refusé sans laisser de ligne`() = runBlocking {
-        val sourceId = createTrack((0..10).map { it * 5.0 })
+        val sourceId = createTrack(walk(0, 50))
 
         val failure = runCatching {
-            repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+            repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
@@ -180,10 +223,10 @@ class CleanTrackTest {
 
     @Test
     fun `un nettoyage qui ne laisserait qu'un point est refusé`() = runBlocking {
-        val sourceId = createTrack(List(50) { 0.0 })
+        val sourceId = createTrack(noise(0.0, 600))
 
         val failure = runCatching {
-            repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", true)
+            repository.removeStationaryPoints(sourceId, 5, "Nettoyé", true)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
@@ -194,15 +237,28 @@ class CleanTrackTest {
     @Test
     fun `un parcours en cours d'enregistrement ne se nettoie pas`() = runBlocking {
         val sourceId = createTrack(
-            walkThenForgotten(),
+            walk(0, 100) + noise(100.0, 1000),
             track = Track(name = "En cours", startTime = start, isRecording = true)
         )
 
         val failure = runCatching {
-            repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+            repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
+        assertEquals(1, trackRowCount())
+    }
+
+    @Test
+    fun `un fichier sans horodatage n'a pas d'arrêt et ne bloque pas`() = runBlocking {
+        // Un GPX sans <time> : tous les points à la même heure, la durée n'est jamais atteinte.
+        val sourceId = createTrack(noise(0.0, 30_000), secondsPerPoint = 0)
+
+        val failure = runCatching {
+            repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
         assertEquals(1, trackRowCount())
     }
 
@@ -212,23 +268,23 @@ class CleanTrackTest {
 
     @Test
     fun `les statistiques sont celles des points gardés et le parcours est visible`() = runBlocking {
-        val sourceId = createTrack(walkThenForgotten())
+        val sourceId = createTrack(walk(0, 100) + noise(100.0, 1000))
 
-        val result = repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
         val track = db.trackDao.getTrackById(result.newTrackId)!!
         val expected = repository.calculateStatsFromPoints(pointsOf(result.newTrackId))
         assertEquals(expected.distanceMeters, track.totalDistance, 0.001)
-        assertEquals(100.0, track.totalDistance, 0.5)
-        assertEquals("finit à l'arrivée, pas des heures après", 20L, track.duration)
+        assertEquals(100.0, track.totalDistance, 5.0)
+        assertTrue("finit à l'arrivée, pas une heure après : ${track.duration}", track.duration <= 20L)
         assertEquals("n'est plus cachée comme ligne réservée", start, track.startTime)
-        assertEquals(start + 20 * second, track.endTime)
+        assertEquals(pointsOf(result.newTrackId).last().timestamp, track.endTime)
     }
 
     @Test
     fun `le résultat hérite de l'apparence et de la provenance mais pas de la carte`() = runBlocking {
         val sourceId = createTrack(
-            walkThenForgotten(),
+            walk(0, 100) + noise(100.0, 1000),
             track = Track(
                 name = "Importé",
                 startTime = start,
@@ -240,7 +296,7 @@ class CleanTrackTest {
             )
         )
 
-        val result = repository.removeStationaryPoints(sourceId, 2.0, "Nettoyé", false)
+        val result = repository.removeStationaryPoints(sourceId, 5, "Nettoyé", false)
 
         val track = db.trackDao.getTrackById(result.newTrackId)!!
         assertEquals("Nettoyé", track.name)

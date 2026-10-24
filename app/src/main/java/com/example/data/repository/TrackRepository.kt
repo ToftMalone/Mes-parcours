@@ -15,6 +15,7 @@ import com.example.util.UserFacingArgumentException
 import com.example.util.UserFacingStateException
 import com.example.util.Exporter
 import com.example.util.MediaStoreExporter
+import com.example.util.StopCollapser
 import com.example.util.TrackStatsAccumulator
 import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.Dispatchers
@@ -574,6 +575,13 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     private val splitScanPageSize = 2_000
 
     /**
+     * Rayon d'un arrêt pour le nettoyage. Sous un toit, le GPS s'écarte couramment de
+     * 10 à 20 m de la position réelle ; 30 m couvre ce bruit sans avaler une marche,
+     * qui en sort en moins d'une minute.
+     */
+    private val stopRadiusMeters = 30.0
+
+    /**
      * Une tranche repérée pendant la lecture, avant d'être écrite en base.
      *
      * Les bornes sont des identifiants de points, jamais des positions : c'est ce qui
@@ -895,24 +903,28 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
-    // Suppression des points immobiles
+    // Nettoyage : chaque arrêt réduit à un point
     // ------------------------------------------------------------------
 
     /** Résultat de [removeStationaryPoints] : le parcours créé et ce qui a été écarté. */
-    data class StationaryCleanup(val newTrackId: Long, val removedPoints: Int, val keptPoints: Int)
+    data class StationaryCleanup(
+        val newTrackId: Long,
+        val removedPoints: Int,
+        val keptPoints: Int,
+        val stops: Int
+    )
 
     /**
-     * Crée une copie de [sourceTrackId] sans ses points immobiles : tout point à moins
-     * de [thresholdMeters] du dernier point gardé est écarté.
+     * Crée une copie de [sourceTrackId] où chaque arrêt d'au moins [minStopMinutes]
+     * minutes — des points restés dans un cercle de [stopRadiusMeters] — est réduit à
+     * un seul point, sans rupture de tracé. Hors des arrêts, tous les points restent :
+     * le tracé garde la fluidité de l'original. La détection est celle de
+     * [StopCollapser].
      *
      * Le cas de tous les jours : l'enregistrement oublié à l'arrivée, qui entasse des
-     * milliers de points au même endroit pendant des heures. Comparer au dernier point
-     * **gardé**, et non au précédent, est ce qui rattrape une lente dérive : à l'arrêt,
-     * le bruit du GPS avance de quelques décimètres à la fois, chaque pas sous le
-     * seuil, et passerait sinon un point après l'autre.
-     *
-     * Les ruptures de tronçon ([TrackPoint.isDiscontinuous]) sont toujours gardées,
-     * pour ne jamais recoller deux tronçons distincts.
+     * milliers de points au même endroit pendant des heures. La première version de
+     * l'outil écartait les points à moins de 1 à 10 m du dernier point gardé ; sous un
+     * toit, le GPS saute plus loin que ça, et le gribouillis restait, en zigzags.
      *
      * Contrairement au rognage, les points gardés ne forment pas une tranche : SQLite
      * ne peut donc pas les recopier d'un seul `INSERT … SELECT`. Ils passent par la
@@ -926,12 +938,12 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      *
      * Le parcours d'origine n'est jamais modifié, et n'est supprimé que si
      * [deleteSource] le demande. Lève une exception si le parcours est introuvable ou
-     * en cours d'enregistrement, si rien n'est immobile, ou s'il resterait moins de
+     * en cours d'enregistrement, s'il n'a aucun arrêt, ou s'il resterait moins de
      * deux points.
      */
     suspend fun removeStationaryPoints(
         sourceTrackId: Long,
-        thresholdMeters: Double,
+        minStopMinutes: Int,
         newName: String,
         deleteSource: Boolean
     ): StationaryCleanup {
@@ -960,45 +972,42 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
         try {
             val accumulator = TrackStatsAccumulator()
-            val distance = FloatArray(1)
+            var firstKept: TrackPoint? = null
             var lastKept: TrackPoint? = null
-            var firstKeptTime = 0L
             var keptCount = 0
-            var removedCount = 0
-            var afterId = 0L
+            var readCount = 0
+            val batch = ArrayList<TrackPoint>(splitScanPageSize)
 
+            val collapser = StopCollapser(
+                radiusMeters = stopRadiusMeters,
+                minDurationMs = minStopMinutes * 60_000L
+            ) { point ->
+                if (firstKept == null) firstKept = point
+                accumulator.add(point)
+                batch += point.copy(id = 0, trackId = newTrackId)
+                lastKept = point
+                keptCount++
+            }
+
+            var afterId = 0L
             while (true) {
                 val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
                 if (page.isEmpty()) break
                 afterId = page.last().id
-
-                val kept = ArrayList<TrackPoint>(page.size)
-                for (point in page) {
-                    val anchor = lastKept
-                    val keep = anchor == null || point.isDiscontinuous || run {
-                        android.location.Location.distanceBetween(
-                            anchor.latitude, anchor.longitude,
-                            point.latitude, point.longitude,
-                            distance
-                        )
-                        distance[0] >= thresholdMeters
-                    }
-                    if (!keep) {
-                        removedCount++
-                        continue
-                    }
-                    if (anchor == null) firstKeptTime = point.timestamp
-                    accumulator.add(point)
-                    kept += point.copy(id = 0, trackId = newTrackId)
-                    lastKept = point
-                    keptCount++
+                readCount += page.size
+                page.forEach(collapser::add)
+                if (batch.size >= splitScanPageSize) {
+                    trackDao.insertTrackPoints(batch)
+                    batch.clear()
                 }
-                if (kept.isNotEmpty()) trackDao.insertTrackPoints(kept)
             }
+            collapser.finish()
+            if (batch.isNotEmpty()) trackDao.insertTrackPoints(batch)
 
-            if (keptCount == 0) throw UserFacingStateException(R.string.err_track_empty)
-            if (removedCount == 0) throw UserFacingStateException(R.string.err_clean_none)
+            if (readCount == 0) throw UserFacingStateException(R.string.err_track_empty)
+            if (collapser.stopCount == 0) throw UserFacingStateException(R.string.err_clean_none)
             if (keptCount < 2) throw UserFacingStateException(R.string.err_trim_too_few)
+            val firstKeptTime = firstKept!!.timestamp
 
             val stats = accumulator.result()
             database.withTransaction {
@@ -1027,7 +1036,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             }
             invalidatePointCaches(sourceTrackId)
 
-            return StationaryCleanup(newTrackId, removedCount, keptCount)
+            return StationaryCleanup(newTrackId, readCount - keptCount, keptCount, collapser.stopCount)
         } catch (e: Throwable) {
             // Même en cas d'annulation : la ligne réservée ne doit pas rester, cachée.
             withContext(kotlinx.coroutines.NonCancellable) {

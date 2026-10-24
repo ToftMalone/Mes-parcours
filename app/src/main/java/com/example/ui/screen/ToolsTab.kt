@@ -1447,12 +1447,12 @@ private fun KeptDurationBar(totalSeconds: Long, dropStartMinutes: Int, dropEndMi
 // -------------------------------------------------------------------- Nettoyer
 
 /**
- * Distances proposées, en mètres. Les deux premières sont les utiles — à l'arrêt, le
- * bruit du GPS reste dans un ou deux mètres — les autres servent à un téléphone qui
- * capte mal.
+ * Durées minimales d'un arrêt, en minutes. Cinq minutes par défaut : assez pour qu'un
+ * feu rouge ou une pause photo restent, assez peu pour qu'un enregistrement oublié
+ * disparaisse dès l'arrivée.
  */
-private val CLEAN_THRESHOLDS_METERS = listOf(1, 2, 3, 5, 10)
-private const val CLEAN_DEFAULT_INDEX = 1 // 2 m
+private val CLEAN_STOP_MINUTES = listOf(2, 5, 10, 20, 30)
+private const val CLEAN_DEFAULT_INDEX = 1 // 5 min
 
 @Composable
 private fun CleanTrackTool(
@@ -1482,7 +1482,7 @@ private fun CleanTrackTool(
         selectedTrack?.let { newName = nameFormat.format(it.name) }
     }
 
-    val thresholdMeters = CLEAN_THRESHOLDS_METERS[thresholdIndex]
+    val stopMinutes = CLEAN_STOP_MINUTES[thresholdIndex]
     val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
         ToolPhase.Need(stringResource(R.string.clean_need_title), stringResource(R.string.clean_need_body))
     } else phase
@@ -1523,7 +1523,7 @@ private fun CleanTrackTool(
                     phase = ToolPhase.Busy
                     viewModel.removeStationaryPoints(
                         trackId = track.id,
-                        thresholdMeters = thresholdMeters.toDouble(),
+                        minStopMinutes = stopMinutes,
                         newName = name,
                         deleteSource = deleting,
                         onSuccess = { result ->
@@ -1531,6 +1531,7 @@ private fun CleanTrackTool(
                                 title = context.getString(R.string.clean_done_title),
                                 body = context.getString(
                                     if (deleting) R.string.clean_done_body_deleted else R.string.clean_done_body_kept,
+                                    result.stops,
                                     java.text.NumberFormat.getIntegerInstance(Locale.FRANCE).format(result.removedPoints),
                                     name
                                 ),
@@ -1569,15 +1570,15 @@ private fun CleanTrackTool(
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    stringResource(R.string.clean_threshold_value, thresholdMeters),
+                    stringResource(R.string.clean_threshold_value, stopMinutes),
                     style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp)
                 )
             }
             MpSlider(
                 value = thresholdIndex.toFloat(),
-                onValueChange = { thresholdIndex = it.roundToInt().coerceIn(0, CLEAN_THRESHOLDS_METERS.lastIndex) },
-                valueRange = 0f..CLEAN_THRESHOLDS_METERS.lastIndex.toFloat(),
-                steps = CLEAN_THRESHOLDS_METERS.size - 2,
+                onValueChange = { thresholdIndex = it.roundToInt().coerceIn(0, CLEAN_STOP_MINUTES.lastIndex) },
+                valueRange = 0f..CLEAN_STOP_MINUTES.lastIndex.toFloat(),
+                steps = CLEAN_STOP_MINUTES.size - 2,
                 testTag = "clean_threshold_slider"
             )
             Text(

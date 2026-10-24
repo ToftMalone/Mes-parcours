@@ -537,7 +537,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      */
     fun removeStationaryPoints(
         trackId: Long,
-        thresholdMeters: Double,
+        minStopMinutes: Int,
         newName: String,
         deleteSource: Boolean,
         onSuccess: (TrackRepository.StationaryCleanup) -> Unit,
@@ -547,7 +547,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             try {
                 val result = repository.removeStationaryPoints(
                     sourceTrackId = trackId,
-                    thresholdMeters = thresholdMeters,
+                    minStopMinutes = minStopMinutes,
                     newName = newName,
                     deleteSource = deleteSource
                 )
