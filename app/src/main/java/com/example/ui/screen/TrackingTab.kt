@@ -65,6 +65,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -204,6 +213,20 @@ fun TrackingTab(
     // Hauteur de la carte de statistiques, pour poser le bandeau des tracés masqués
     // juste en dessous : elle grandit quand un enregistrement démarre.
     var statsCardHeightPx by remember { mutableIntStateOf(0) }
+
+    // Déploiement de l'alerte de signal depuis le point du GPS (voir plus bas).
+    var alertBoxOrigin by remember { mutableStateOf(Offset.Zero) }
+    var gpsDotCenter by remember { mutableStateOf<Offset?>(null) }
+    var shownAlert by remember { mutableStateOf<AlertState?>(null) }
+    LaunchedEffect(activeAlertState) {
+        activeAlertState?.let { shownAlert = it }
+    }
+    val alertReveal by animateFloatAsState(
+        targetValue = if (activeAlertState != null) 1f else 0f,
+        animationSpec = tween(450, easing = FastOutSlowInEasing),
+        label = "gps_alert_reveal",
+        finishedListener = { if (it == 0f) shownAlert = null }
+    )
     val density = LocalDensity.current
     val zoomBannerTop = with(density) { statsCardHeightPx.toDp() } + 36.dp
 
@@ -253,35 +276,40 @@ fun TrackingTab(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onSizeChanged { statsCardHeightPx = it.height }
+                        .onGloballyPositioned { alertBoxOrigin = it.positionInRoot() }
                 ) {
                     StatsCard(
                         mode = mode,
                         stats = liveStats,
                         currentSpeedMps = currentSpeed,
                         currentAltitude = currentAlt,
-                        gpsIndicator = { GpsDot(found = signalFound) }
+                        gpsIndicator = {
+                            Box(
+                                modifier = Modifier.onGloballyPositioned { c ->
+                                    gpsDotCenter = c.positionInRoot() + Offset(c.size.width / 2f, c.size.height / 2f)
+                                }
+                            ) { GpsDot(found = signalFound) }
+                        }
                     )
-                    // En fondu, à l'arrivée comme au départ, comme avant la refonte : sans
-                    // lui, l'alerte recouvrait la carte d'un coup. L'alerte ne porte pas
-                    // d'ombre, le fondu n'a donc rien à trancher (voir « L'ombre tranchée »).
-                    Crossfade(
-                        targetState = activeAlertState,
-                        animationSpec = tween(350),
-                        label = "gps_alert",
-                        modifier = Modifier.matchParentSize()
-                    ) { alert ->
-                        when (alert) {
+                    // Le point du GPS se déploie en alerte, puis s'y replie, à la demande
+                    // de l'auteur. Pendant le repli, l'alerte qui vient de finir reste
+                    // affichée ([shownAlert]) : sans elle, il n'y aurait plus rien à replier.
+                    val shown = activeAlertState ?: shownAlert
+                    if (shown != null && alertReveal > 0f) {
+                        val revealModifier = Modifier
+                            .matchParentSize()
+                            .circularReveal(alertReveal, gpsDotCenter?.let { it - alertBoxOrigin })
+                        when (shown) {
                             AlertState.LOST -> GpsAlert(
                                 lost = true,
                                 subtitle = stringResource(if (isTracking) R.string.gps_alert_lost_resume else R.string.gps_alert_lost_waiting),
-                                modifier = Modifier.fillMaxSize()
+                                modifier = revealModifier
                             )
                             AlertState.FOUND -> GpsAlert(
                                 lost = false,
                                 subtitle = gpsAccuracy?.let { stringResource(R.string.gps_alert_accuracy, it.toInt()) } ?: stringResource(R.string.gps_alert_found_position),
-                                modifier = Modifier.fillMaxSize()
+                                modifier = revealModifier
                             )
-                            null -> Unit
                         }
                     }
                 }
@@ -379,6 +407,27 @@ private fun GpsChip(icon: ImageVector, text: String, modifier: Modifier = Modifi
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
         Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * Ne dessine le contenu que dans un cercle centré sur [center], qui grandit avec
+ * [progress] : à 0, un point de la taille de celui du GPS ; à 1, de quoi couvrir tout
+ * le bloc. Un découpage au dessin, pas une forme de `clip` : rien n'est remis en page à
+ * chaque image. Sans [center] connu, le cercle part du bord droit, où est le point.
+ */
+private fun Modifier.circularReveal(progress: Float, center: Offset?): Modifier = drawWithContent {
+    val c = center ?: Offset(size.width, size.height / 2f)
+    val maxRadius = maxOf(
+        c.getDistance(),
+        (c - Offset(size.width, 0f)).getDistance(),
+        (c - Offset(0f, size.height)).getDistance(),
+        (c - Offset(size.width, size.height)).getDistance()
+    )
+    val start = 5.dp.toPx()
+    val radius = start + (maxRadius - start) * progress
+    clipPath(Path().apply { addOval(Rect(c, radius)) }) {
+        this@drawWithContent.drawContent()
     }
 }
 

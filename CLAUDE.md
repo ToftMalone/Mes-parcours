@@ -669,6 +669,11 @@ fait pas :
   pendant le choix, Arrêter pendant l'enregistrement) ; pendant le choix, Annuler
   (48 dp) et Reprendre une trace (56 dp) au-dessus. **Ne pas revenir à la carte
   géante ni au bouton centré de la maquette.**
+- **Alertes de signal GPS : déployées depuis le point du GPS.** À la demande de
+  l'auteur, l'alerte « Signal GPS trouvé / perdu » naît du petit point d'état de la
+  carte de statistiques, grandit en cercle jusqu'à couvrir le bloc, puis s'y replie
+  (`circularReveal` dans `TrackingTab`, un découpage au dessin). L'alerte ne porte pas
+  d'ombre : rien à trancher (voir « L'ombre tranchée »).
 - **Point de position : bleu**, pas la couleur du thème (`POSITION_DOT_BLUE` dans
   `MapViewContainer`, #1A73E8 — le bleu de Google Maps d'avant la refonte). Demandé
   par l'auteur : c'est ce que l'œil cherche d'abord sur la carte. Les repères de
