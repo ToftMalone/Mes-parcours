@@ -261,18 +261,28 @@ fun TrackingTab(
                         currentAltitude = currentAlt,
                         gpsIndicator = { GpsDot(found = signalFound) }
                     )
-                    when (activeAlertState) {
-                        AlertState.LOST -> GpsAlert(
-                            lost = true,
-                            subtitle = stringResource(if (isTracking) R.string.gps_alert_lost_resume else R.string.gps_alert_lost_waiting),
-                            modifier = Modifier.matchParentSize()
-                        )
-                        AlertState.FOUND -> GpsAlert(
-                            lost = false,
-                            subtitle = gpsAccuracy?.let { stringResource(R.string.gps_alert_accuracy, it.toInt()) } ?: stringResource(R.string.gps_alert_found_position),
-                            modifier = Modifier.matchParentSize()
-                        )
-                        null -> Unit
+                    // En fondu, à l'arrivée comme au départ, comme avant la refonte : sans
+                    // lui, l'alerte recouvrait la carte d'un coup. L'alerte ne porte pas
+                    // d'ombre, le fondu n'a donc rien à trancher (voir « L'ombre tranchée »).
+                    Crossfade(
+                        targetState = activeAlertState,
+                        animationSpec = tween(350),
+                        label = "gps_alert",
+                        modifier = Modifier.matchParentSize()
+                    ) { alert ->
+                        when (alert) {
+                            AlertState.LOST -> GpsAlert(
+                                lost = true,
+                                subtitle = stringResource(if (isTracking) R.string.gps_alert_lost_resume else R.string.gps_alert_lost_waiting),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            AlertState.FOUND -> GpsAlert(
+                                lost = false,
+                                subtitle = gpsAccuracy?.let { stringResource(R.string.gps_alert_accuracy, it.toInt()) } ?: stringResource(R.string.gps_alert_found_position),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            null -> Unit
+                        }
                     }
                 }
             }
