@@ -575,6 +575,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     private val splitScanPageSize = 2_000
     private val previewGapMs = 15_000L
 
+    /** Au-delà, la zone du sélecteur de portion est trop chargée pour être lue d'un coup. */
+    private val maxPickerScan = 40_000
+
 
     /**
      * Une tranche repérée pendant la lecture, avant d'être écrite en base.
@@ -941,6 +944,77 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }
         last?.let { if (preview.lastOrNull()?.id != it.id) preview += it }
         return preview
+    }
+
+    /**
+     * Le détail de [trackId] dans la zone donnée, pour la carte du choix d'une portion :
+     * zoomée sur un virage, elle doit montrer ses points, pas la silhouette de tout le
+     * parcours — c'est ce qui faisait « couper » les virages en lignes droites.
+     *
+     * Au plus [maxPoints] points, à pas régulier ; les points qui suivent une sortie de
+     * zone, un trou de temps ou une rupture ouvrent un tronçon, et ceux qui les précèdent
+     * sont gardés, pour qu'aucun trait ne relie deux points que rien ne relie. Tant que la
+     * zone contient trop de points pour être lue d'un coup ([maxPickerScan]), on retombe
+     * sur l'aperçu du parcours entier.
+     */
+    suspend fun getPickerPoints(
+        trackId: Long,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        maxPoints: Int = 4_000
+    ): List<TrackPoint> {
+        val inside = trackDao.countPointsInBounds(trackId, minLat, maxLat, minLon, maxLon)
+        if (inside == 0) return emptyList()
+        if (inside > maxPickerScan) return getPreviewPoints(trackId)
+        val raw = trackDao.getDetailPointsInBounds(trackId, 0L, 1L, minLat, maxLat, minLon, maxLon)
+        val marked = ArrayList<TrackPoint>(raw.size)
+        for ((i, point) in raw.withIndex()) {
+            val previous = raw.getOrNull(i - 1)
+            val broken = previous != null && !point.isDiscontinuous && (
+                point.id != previous.id + 1 ||
+                    (previous.timestamp > 0L && point.timestamp > 0L &&
+                        point.timestamp - previous.timestamp > previewGapMs)
+                )
+            marked += if (broken) point.copy(isDiscontinuous = true) else point
+        }
+        if (marked.size <= maxPoints) return marked
+        val stride = (marked.size + maxPoints - 1) / maxPoints
+        val sampled = ArrayList<TrackPoint>(maxPoints + 16)
+        for ((i, point) in marked.withIndex()) {
+            val startsRun = point.isDiscontinuous
+            val endsRun = marked.getOrNull(i + 1)?.isDiscontinuous == true
+            if (i % stride == 0 || startsRun || endsRun || i == marked.lastIndex) sampled += point
+        }
+        return sampled
+    }
+
+    /** Distance parcourue entre deux points d'un parcours, ruptures de tronçon exclues. */
+    suspend fun measurePortion(trackId: Long, fromPointId: Long, toPointId: Long): Double {
+        val low = minOf(fromPointId, toPointId)
+        val high = maxOf(fromPointId, toPointId)
+        var total = 0.0
+        var previous: TrackPoint? = null
+        var afterId = low - 1
+        val result = FloatArray(1)
+        while (true) {
+            val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            for (point in page) {
+                if (point.id > high) return total
+                val last = previous
+                if (last != null && !point.isDiscontinuous) {
+                    android.location.Location.distanceBetween(
+                        last.latitude, last.longitude, point.latitude, point.longitude, result
+                    )
+                    total += result[0]
+                }
+                previous = point
+            }
+        }
+        return total
     }
 
     /**

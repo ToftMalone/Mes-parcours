@@ -333,7 +333,7 @@ class ScreensScreenshotTest {
         compose.onNodeWithTag("open_split_tool_button").performClick()
         waitForTag("split_mode_map")
         compose.onNodeWithTag("split_mode_map").performClick()
-        waitForTag("cut_range_slider")
+        waitForTag("cut_place_start")
         shoot("outils_decoupe_carte", true)
     }
 

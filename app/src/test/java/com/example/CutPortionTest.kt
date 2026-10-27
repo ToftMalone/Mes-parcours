@@ -153,4 +153,48 @@ class CutPortionTest {
             preview[preview.indexOf(after) - 1].id
         )
     }
+
+    @Test
+    fun `zoomé, le sélecteur rend tous les points de la zone`() = runBlocking {
+        val (trackId, points) = createTrack(10_000)
+        // Une zone de cent points, au milieu : le détail doit en rendre cent, pas une silhouette.
+        val zone = points.subList(5_000, 5_100)
+
+        val detail = repository.getPickerPoints(
+            trackId, zone.first().latitude, zone.last().latitude, 4.99, 5.01
+        )
+
+        assertEquals(100, detail.size)
+        assertEquals(zone.first().id, detail.first().id)
+        assertFalse(detail.drop(1).any { it.isDiscontinuous })
+    }
+
+    @Test
+    fun `le sélecteur coupe le trait là où le tracé sort de la zone`() = runBlocking {
+        val trackId = db.trackDao.insertTrack(Track(name = "Aller-retour", startTime = start))
+        // Le tracé monte vers le nord, sort de la zone, puis y revient plus loin : les deux
+        // morceaux visibles ne doivent pas être reliés.
+        val lats = (0 until 30).map { 45.0 + it * 5 / 111_132.0 } +
+            (0 until 30).map { 45.5 + it * 5 / 111_132.0 } +
+            (0 until 30).map { 45.0 + (30 + it) * 5 / 111_132.0 }
+        db.trackDao.insertTrackPoints(
+            lats.mapIndexed { i, lat ->
+                TrackPoint(trackId = trackId, latitude = lat, longitude = 5.0, timestamp = start + i * 1_000L)
+            }
+        )
+
+        val detail = repository.getPickerPoints(trackId, 44.99, 45.01, 4.99, 5.01)
+
+        assertEquals(60, detail.size)
+        assertEquals("le premier point de la reprise ouvre un tronçon", 1, detail.count { it.isDiscontinuous })
+    }
+
+    @Test
+    fun `la distance d'une portion s'additionne point à point`() = runBlocking {
+        val (trackId, points) = createTrack()
+
+        val meters = repository.measurePortion(trackId, points[40].id, points[59].id)
+
+        assertEquals(19 * 5.0, meters, 1.0)
+    }
 }

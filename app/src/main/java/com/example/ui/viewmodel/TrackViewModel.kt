@@ -494,6 +494,24 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             repository.getPreviewPoints(trackId)
         }
 
+    /** Le détail d'un parcours dans la zone visible du sélecteur de portion. */
+    suspend fun loadPickerPoints(
+        trackId: Long,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<com.example.data.model.TrackPoint> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.getPickerPoints(trackId, minLat, maxLat, minLon, maxLon)
+        }
+
+    /** Distance de la portion comprise entre deux points d'un parcours. */
+    suspend fun measurePortion(trackId: Long, fromPointId: Long, toPointId: Long): Double =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.measurePortion(trackId, fromPointId, toPointId)
+        }
+
     /** Retire une portion choisie sur la carte (voir [TrackRepository.cutPortion]). */
     fun cutPortion(
         trackId: Long,

@@ -280,7 +280,10 @@
     <string name="split_gap_title">Couper après une pause d\'au moins</string>
     <string name="split_gap_note">Sans effet sur un KML, ou sur un GPX sans horodatage : leurs points sont régulièrement espacés, il n\'y a aucune pause à trouver.</string>
     <string name="split_mode_map">Sur la carte</string>
-    <string name="cut_hint">Touchez la carte pour placer le début et la fin de la portion à retirer, en rouge, ou ajustez-les avec le curseur.</string>
+    <string name="cut_hint">Zoomez sur la carte, puis touchez le début de la portion à retirer, et enfin sa fin : ce qui est entre les deux apparaît en rouge. Les boutons permettent de reprendre l\'une des deux bornes.</string>
+    <string name="cut_unset">—</string>
+    <string name="cut_start_label">Début %1$s</string>
+    <string name="cut_end_label">Fin %1$s</string>
     <string name="cut_summary">À retirer : %1$s → %2$s · %3$s</string>
     <string name="cut_action">Retirer la portion</string>
     <string name="cut_busy">Retrait de la portion</string>

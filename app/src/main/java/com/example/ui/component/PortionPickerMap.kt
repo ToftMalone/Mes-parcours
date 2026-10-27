@@ -23,12 +23,18 @@ import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
 /**
- * Carte où l'on désigne une portion de parcours : le tracé entier, et en rouge la
- * portion comprise entre [startIndex] et [endIndex] (indices dans [points]). Un appui
- * sur la carte renvoie, par [onTapPoint], l'indice du point du tracé le plus proche.
+ * Carte où l'on désigne une portion de parcours : le tracé, et en rouge la portion comprise
+ * entre [start] et [end]. Un appui sur la carte renvoie, par [onTapPoint], le point du
+ * tracé le plus proche ; la carte pose elle-même un repère sur le début et sur la fin.
+ *
+ * [points] est le détail de la zone visible, que l'appelant recharge à chaque
+ * déplacement signalé par [onViewportChange] : une carte zoomée sur un virage doit en
+ * montrer les points, pas la silhouette de tout le parcours. [fitPoints] ne sert qu'à
+ * cadrer la carte une fois, à l'ouverture.
  *
  * Une carte à part, et non `MapViewContainer` : celle-là sert le suivi en direct et
  * l'affichage par fenêtre de vue (invariant 3), et reconstruit ses calques d'elle-même
@@ -42,9 +48,11 @@ import org.osmdroid.views.overlay.Polyline
 @Composable
 fun PortionPickerMap(
     points: List<TrackPoint>,
-    startIndex: Int,
-    endIndex: Int,
-    onTapPoint: (Int) -> Unit,
+    fitPoints: List<TrackPoint>,
+    start: TrackPoint?,
+    end: TrackPoint?,
+    onTapPoint: (TrackPoint) -> Unit,
+    onViewportChange: (BoundingBox) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -52,6 +60,8 @@ fun PortionPickerMap(
     val trackColor = MaterialTheme.colorScheme.primary.toArgb()
     val cutColor = MaterialTheme.colorScheme.error.toArgb()
     val currentOnTap = rememberUpdatedState(onTapPoint)
+    val currentOnViewport = rememberUpdatedState(onViewportChange)
+    val currentPoints = rememberUpdatedState(points)
     val density = context.resources.displayMetrics.density
 
     val mapView = remember {
@@ -63,6 +73,8 @@ fun PortionPickerMap(
                 else TileSourceFactory.MAPNIK
             )
             setMultiTouchControls(true)
+            // Assez de zoom pour poser une borne au mètre près.
+            maxZoomLevel = 21.0
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setOnTouchListener { view, event ->
                 if (event.action == android.view.MotionEvent.ACTION_DOWN) {
@@ -73,56 +85,74 @@ fun PortionPickerMap(
         }
     }
 
-    // Un tracé par tronçon : une rupture ne doit jamais être reliée par un trait.
-    val wholeLines = remember(mapView) { mutableListOf<Polyline>() }
-    val cutLines = remember(mapView) { mutableListOf<Polyline>() }
+    // La zone visible est signalée une fois le geste fini, pas à chaque image.
+    DisposableEffect(mapView) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val report = Runnable {
+            if (mapView.width > 0) currentOnViewport.value(mapView.boundingBox)
+        }
+        val schedule = {
+            handler.removeCallbacks(report)
+            handler.postDelayed(report, 250)
+        }
+        val listener = object : org.osmdroid.events.MapListener {
+            override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+                schedule()
+                return false
+            }
 
-    // Le tracé entier, et le cadrage, ne changent qu'avec le parcours.
-    LaunchedEffect(mapView, points) {
+            override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+                schedule()
+                return false
+            }
+        }
+        mapView.addMapListener(listener)
+        onDispose {
+            handler.removeCallbacks(report)
+            mapView.removeMapListener(listener)
+        }
+    }
+
+    // Cadrage unique, sur le parcours entier.
+    LaunchedEffect(mapView, fitPoints) {
+        if (fitPoints.isEmpty()) return@LaunchedEffect
+        val box = BoundingBox.fromGeoPointsSafe(fitPoints.map { GeoPoint(it.latitude, it.longitude) })
+        val frame = {
+            val margin = (32 * density).toInt()
+            mapView.zoomToBoundingBox(box.increaseByScale(1.15f), false, margin)
+            currentOnViewport.value(mapView.boundingBox)
+        }
+        if (mapView.width > 0) frame() else mapView.addOnFirstLayoutListener { _, _, _, _, _ -> frame() }
+    }
+
+    // Le tracé, la portion en rouge et les deux repères suivent le détail et les bornes.
+    LaunchedEffect(mapView, points, start, end, trackColor, cutColor) {
         mapView.overlays.clear()
-        if (points.isEmpty()) return@LaunchedEffect
-        wholeLines.clear()
-        cutLines.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                currentOnTap.value(nearestIndex(points, p))
+                nearestPoint(currentPoints.value, p)?.let { currentOnTap.value(it) }
                 return true
             }
 
             override fun longPressHelper(p: GeoPoint): Boolean = false
         }))
-        val all = mutableListOf<GeoPoint>()
+        val low = listOfNotNull(start?.id, end?.id).minOrNull()
+        val high = listOfNotNull(start?.id, end?.id).maxOrNull()
         for (range in segmentRanges(points)) {
             val line = styledLine(mapView, trackColor, 4f * density)
             line.setPoints(points.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
-            all += line.actualPoints
-            wholeLines += line
             mapView.overlays.add(line)
         }
-
-        val box = BoundingBox.fromGeoPointsSafe(all)
-        val frame = {
-            val margin = (32 * density).toInt()
-            mapView.zoomToBoundingBox(box.increaseByScale(1.15f), false, margin)
+        if (low != null && high != null && low != high) {
+            val inPortion = points.filter { it.id in low..high }
+            for (range in segmentRanges(inPortion)) {
+                val line = styledLine(mapView, cutColor, 7f * density)
+                line.setPoints(inPortion.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
+                mapView.overlays.add(line)
+            }
         }
-        if (mapView.width > 0) frame() else mapView.addOnFirstLayoutListener { _, _, _, _, _ -> frame() }
-    }
-
-    LaunchedEffect(mapView, points, startIndex, endIndex) {
-        if (points.isEmpty()) return@LaunchedEffect
-        val lo = startIndex.coerceIn(0, points.lastIndex)
-        val hi = endIndex.coerceIn(lo, points.lastIndex)
-        mapView.overlays.removeAll(cutLines.toSet())
-        cutLines.clear()
-        for (range in segmentRanges(points)) {
-            val from = maxOf(range.first, lo)
-            val to = minOf(range.last, hi)
-            if (from > to) continue
-            val line = styledLine(mapView, cutColor, 7f * density)
-            line.setPoints(points.subList(from, to + 1).map { GeoPoint(it.latitude, it.longitude) })
-            cutLines += line
-            mapView.overlays.add(line)
-        }
+        start?.let { mapView.overlays.add(boundaryMarker(mapView, it, trackColor, density)) }
+        end?.let { mapView.overlays.add(boundaryMarker(mapView, it, cutColor, density)) }
         mapView.invalidate()
     }
 
@@ -146,6 +176,21 @@ fun PortionPickerMap(
 
     AndroidView(factory = { mapView }, modifier = modifier.testTag("portion_picker_map"))
 }
+
+/** Un rond plein, cerclé de blanc, posé sur la borne [point]. */
+private fun boundaryMarker(mapView: MapView, point: TrackPoint, fill: Int, density: Float): Marker =
+    Marker(mapView).apply {
+        position = GeoPoint(point.latitude, point.longitude)
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        val size = (22 * density).toInt()
+        icon = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(fill)
+            setStroke((3 * density).toInt(), Color.WHITE)
+            setSize(size, size)
+        }
+        setOnMarkerClickListener { _, _ -> false }
+    }
 
 /** Une polyligne sans réaction au toucher, du trait et de l'épaisseur donnés. */
 private fun styledLine(mapView: MapView, strokeColor: Int, widthPx: Float): Polyline =
@@ -176,18 +221,18 @@ private fun segmentRanges(points: List<TrackPoint>): List<IntRange> {
     return ranges
 }
 
-/** Indice du point de [points] le plus proche de [target], à l'échelle d'un écran. */
-private fun nearestIndex(points: List<TrackPoint>, target: GeoPoint): Int {
+/** Le point de [points] le plus proche de [target], ou null si la liste est vide. */
+private fun nearestPoint(points: List<TrackPoint>, target: GeoPoint): TrackPoint? {
     val cosLat = kotlin.math.cos(Math.toRadians(target.latitude))
-    var best = 0
+    var best: TrackPoint? = null
     var bestDistance = Double.MAX_VALUE
-    points.forEachIndexed { i, p ->
+    for (p in points) {
         val dy = p.latitude - target.latitude
         val dx = (p.longitude - target.longitude) * cosLat
         val d = dx * dx + dy * dy
         if (d < bestDistance) {
             bestDistance = d
-            best = i
+            best = p
         }
     }
     return best

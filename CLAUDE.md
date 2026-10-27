@@ -346,18 +346,32 @@ enregistrement oublié) et l'absence de trou visible.
 
 Troisième mode de « Découper », demandé par le père de l'auteur : « Sur la carte ».
 Le parcours s'affiche sur une carte dédiée (`ui/component/PortionPickerMap`, et non
-`MapViewContainer`, qui reconstruit ses calques d'elle-même), la portion à retirer en
-rouge ; un appui sur la carte y pose la borne la plus proche, un double curseur
-l'ajuste. La carte vit dans un écran qui défile : elle se réserve chaque geste
-commencé sur elle (`requestDisallowInterceptTouchEvent`).
+`MapViewContainer`, qui reconstruit ses calques d'elle-même), zoomable jusqu'au niveau
+21. On touche le début, puis la fin : deux boutons « Début hh:mm » / « Fin hh:mm » disent
+quelle borne le prochain appui pose (il passe tout seul de l'une à l'autre) et permettent
+d'en reprendre une ; un repère rond marque chaque borne, la portion est en rouge. **Plus
+de double curseur** : le père de l'auteur le trouvait impossible à manier au doigt sur
+300 m de tracé, et il se cachait derrière le bouton d'action. La carte vit dans un écran
+qui défile : elle se réserve chaque geste commencé sur elle
+(`requestDisallowInterceptTouchEvent`).
 
-La carte montre un aperçu (`TrackRepository.getPreviewPoints` : 3 000 points au plus,
-à pas régulier, plus le dernier et les ruptures), dont les identifiants sont ceux de
-la base. `TrackRepository.cutPortion` retire les points entre les deux identifiants,
-inclus, et crée le morceau d'avant et celui d'après, chacun s'il a au moins deux
-points — même lecture unique, mêmes statistiques au passage, même transaction finale
-que le découpage. Un seul morceau garde le nom de base, sans numéro. Retirer tout est
-refusé. `CutPortionTest` verrouille.
+**Le détail suit le zoom.** Un aperçu fixe (3 000 points au plus) coupait les virages en
+lignes droites dès qu'on zoomait. `TrackRepository.getPickerPoints` relit donc les points
+de la zone visible (signalée par la carte 250 ms après chaque geste) : tous les points
+tant qu'il y en a moins de 4 000, sinon à pas régulier ; l'aperçu entier
+(`getPreviewPoints`) ne sert qu'à cadrer la carte à l'ouverture, et de repli quand la zone
+contient plus de 40 000 points. **Aucun trait ne relie deux points que rien ne relie** :
+le point qui suit une sortie de zone (identifiants non contigus), un trou de plus de
+15 s ou une rupture ouvre un tronçon, et la carte dessine un tracé par tronçon.
+Les bornes sont des **points** (donc des identifiants de la base), jamais des indices :
+elles survivent au rechargement du détail. `measurePortion` additionne la distance entre
+elles, page par page.
+
+`TrackRepository.cutPortion` retire les points entre les deux identifiants, inclus, et
+crée le morceau d'avant et celui d'après, chacun s'il a au moins deux points — même
+lecture unique, mêmes statistiques au passage, même transaction finale que le découpage.
+Un seul morceau garde le nom de base, sans numéro. Retirer tout est refusé.
+`CutPortionTest` verrouille.
 
 ### `TrackStatsAccumulator`
 
@@ -741,9 +755,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 219 tests unitaires en 25 suites : `ScreensScreenshotTest` (37, captures seules —
+- 222 tests unitaires en 25 suites : `ScreensScreenshotTest` (37, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (5), `BearingTest` (10),
+  `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (8), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
