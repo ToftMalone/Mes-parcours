@@ -378,6 +378,10 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_2_2_a">« Nettoyer » garde la forme exacte du tracé : seul le gribouillis du GPS resté sur place devient un point, sans couper le trait</string>
+    <string name="rel_2_2_2_b">Historique : un mode sélection (« Sélectionner », ou appui long) pour tout sélectionner, afficher, masquer, fusionner ou supprimer plusieurs parcours d\'un coup</string>
+    <string name="rel_2_2_2_c">« Découper » : nouveau mode « Sur la carte » pour retirer la portion de son choix</string>
+    <string name="rel_2_2_2_d">Le signal GPS trouvé ou perdu se déploie depuis le petit point d\'état</string>
     <string name="rel_2_2_1_a">« Nettoyer » réduit chaque arrêt à un seul point, sans couper le tracé, et garde tout le reste intact</string>
     <string name="rel_2_2_a">Nouvel outil « Nettoyer » : supprime les points entassés au même endroit quand l\'enregistrement a continué</string>
     <string name="rel_2_2_b">Les tracés les plus épais sont dessinés sous les plus fins</string>
