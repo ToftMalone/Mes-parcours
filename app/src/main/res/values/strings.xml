@@ -256,8 +256,8 @@
     <string name="split_done_body_kept">De « %1$s (1) » à « %1$s (%2$d) », dans l\'historique. L\'original est conservé.</string>
     <string name="split_done_body_deleted">De « %1$s (1) » à « %1$s (%2$d) », dans l\'historique. L\'original a été supprimé.</string>
     <string name="split_mode_label">Mode de découpe</string>
-    <string name="split_mode_segments">À chaque tronçon</string>
-    <string name="split_mode_gap">À chaque pause</string>
+    <string name="split_mode_segments">Par tronçon</string>
+    <string name="split_mode_gap">Par pause</string>
     <string name="split_hint_segments">Pour un fichier importé qui réunit plusieurs trajets : chaque tronçon devient un parcours.</string>
     <string name="split_gap_title">Couper après une pause d\'au moins</string>
     <string name="split_gap_note">Sans effet sur un KML, ou sur un GPX sans horodatage : leurs points sont régulièrement espacés, il n\'y a aucune pause à trouver.</string>
