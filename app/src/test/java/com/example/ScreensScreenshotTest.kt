@@ -184,6 +184,14 @@ class ScreensScreenshotTest {
         }
     }
 
+    @Test fun historique_selection() {
+        seed(); history(false); waitForTag("history_list")
+        compose.onNodeWithTag("history_start_selection").performClick()
+        waitForTag("selection_action_bar")
+        compose.onNodeWithTag("history_select_all").performClick()
+        shoot("historique_selection", false)
+    }
+
     @Test fun historique_clair() { seed(); history(false); waitForTag("history_list"); shoot("historique", false) }
     @Test fun historique_sombre() { seed(); history(true); waitForTag("history_list"); shoot("historique", true) }
 

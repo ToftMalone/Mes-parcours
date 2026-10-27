@@ -13,6 +13,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -136,6 +141,19 @@ fun HistoryTab(
     var deleteTrackId by remember { mutableStateOf<Long?>(null) }
     var refusedTrackId by remember { mutableStateOf<Long?>(null) }
 
+    // Mode sélection, demandé par le père de l'auteur : cocher plusieurs parcours, ou
+    // tous, et agir sur la sélection d'un coup. Les identifiants disparus (supprimés,
+    // fusionnés) sortent d'eux-mêmes de la sélection.
+    var selecting by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
+    var confirmBulkDelete by remember { mutableStateOf(false) }
+    var confirmBulkMerge by remember { mutableStateOf(false) }
+    val exitSelection = {
+        selecting = false
+        selectedIds = emptySet()
+    }
+    androidx.activity.compose.BackHandler(enabled = selecting) { exitSelection() }
+
     val filePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri ->
@@ -169,6 +187,10 @@ fun HistoryTab(
         HistoryCategory.MERGED to tracks.filter { it.isMerged }
     )
     val shown = byCategory.getValue(selectedCategory)
+    // La sélection ne vaut que pour la catégorie affichée : changer d'onglet la vide.
+    LaunchedEffect(selectedCategory) { selectedIds = emptySet() }
+    val selectedTracks = shown.filter { it.id in selectedIds }
+    val mergeable = selectedTracks.filter { !viewModel.isBeingRecorded(it) }
 
     // Reprise d'une trace : refusée, avec explication, tant qu'un enregistrement court.
     val resume: (Track) -> Unit = { track ->
@@ -216,30 +238,43 @@ fun HistoryTab(
                 }
             }
 
-            // « Tout sélectionner », demandé par le père de l'auteur : afficher ou masquer
-            // d'un geste tous les tracés de la catégorie sur la carte.
             if (shown.isNotEmpty()) {
-                val allShown = shown.all { it.isSelectedForMap }
                 Row(
-                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(end = 8.dp)
+                        .height(48.dp)
+                        .padding(start = 8.dp, end = 8.dp)
                 ) {
-                    TextButton(
-                        onClick = { viewModel.setTracksShownOnMap(shown, !allShown) },
-                        modifier = Modifier.testTag("history_toggle_all_on_map")
-                    ) {
-                        Icon(
-                            imageVector = if (allShown) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                    if (selecting) {
+                        IconButton(onClick = exitSelection, modifier = Modifier.testTag("selection_close")) {
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.selection_close_cd))
+                        }
                         Text(
-                            stringResource(if (allShown) R.string.history_hide_all else R.string.history_show_all),
-                            style = MaterialTheme.typography.labelLarge
+                            pluralStringResource(R.plurals.selection_count, selectedTracks.size, selectedTracks.size),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f)
                         )
+                        val allSelected = selectedTracks.size == shown.size
+                        TextButton(
+                            onClick = { selectedIds = if (allSelected) emptySet() else shown.map { it.id }.toSet() },
+                            modifier = Modifier.testTag("history_select_all")
+                        ) {
+                            Text(
+                                stringResource(if (allSelected) R.string.common_deselect_all else R.string.common_select_all),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = { selecting = true },
+                            modifier = Modifier.testTag("history_start_selection")
+                        ) {
+                            Icon(Icons.Rounded.Checklist, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.selection_start), style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }
@@ -271,10 +306,21 @@ fun HistoryTab(
                     ) {
                         itemsIndexed(shown, key = { _, it -> it.id }) { index, track ->
                             StaggeredHistoryCard(index) {
+                                val toggle = {
+                                    selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id
+                                }
                                 TrackHistoryCard(
                                     track = track,
                                     trackColor = Color(trackDisplayColor(track)),
-                                    onClick = { onNavigateToDetails(track.id) },
+                                    onClick = { if (selecting) toggle() else onNavigateToDetails(track.id) },
+                                    onLongClick = {
+                                        if (!selecting) {
+                                            selecting = true
+                                            selectedIds = setOf(track.id)
+                                        } else toggle()
+                                    },
+                                    selectionMode = selecting,
+                                    selected = track.id in selectedIds,
                                     isSelectedForMap = track.isSelectedForMap,
                                     onMapSelectionToggle = { viewModel.toggleTrackSelectionForMap(track) },
                                     onColorClick = { colorTrackId = track.id },
@@ -287,12 +333,26 @@ fun HistoryTab(
             }
         }
 
-        ImportFab(
-            onClick = importFile,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp)
-        )
+        if (selecting) {
+            SelectionActionBar(
+                count = selectedTracks.size,
+                canMerge = mergeable.size >= 2,
+                onShow = { viewModel.setTracksShownOnMap(selectedTracks, true) },
+                onHide = { viewModel.setTracksShownOnMap(selectedTracks, false) },
+                onMerge = { confirmBulkMerge = true },
+                onDelete = { confirmBulkDelete = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp)
+            )
+        } else {
+            ImportFab(
+                onClick = importFile,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp)
+            )
+        }
     }
 
     // ------------------------------------------------------------ Feuilles
@@ -345,6 +405,76 @@ fun HistoryTab(
                     else messenger.show(context.getString(R.string.delete_refused_recording), Icons.Rounded.Error, isError = true)
                 }
             }
+        )
+    }
+
+    if (confirmBulkDelete && selectedTracks.isNotEmpty()) {
+        val count = selectedTracks.size
+        MpDialog(
+            onDismissRequest = { confirmBulkDelete = false },
+            icon = {
+                ShapeBadge(
+                    icon = Icons.Rounded.DeleteForever,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(22.dp)
+                )
+            },
+            title = pluralStringResource(R.plurals.selection_delete_title, count, count),
+            body = stringResource(R.string.selection_delete_body),
+            dismissLabel = stringResource(R.string.common_cancel),
+            confirmLabel = stringResource(R.string.common_delete),
+            onConfirm = {
+                confirmBulkDelete = false
+                viewModel.deleteTracks(selectedTracks.map { it.id }) { deleted, refused ->
+                    if (refused > 0) {
+                        messenger.show(context.getString(R.string.delete_refused_recording), Icons.Rounded.Error, isError = true)
+                    } else {
+                        messenger.show(context.resources.getQuantityString(R.plurals.selection_deleted_toast, deleted, deleted), Icons.Rounded.Delete)
+                    }
+                    exitSelection()
+                }
+            },
+            confirmContainerColor = MaterialTheme.colorScheme.error,
+            confirmContentColor = MaterialTheme.colorScheme.onError,
+            confirmTestTag = "dialog_bulk_delete_confirm"
+        )
+    }
+
+    if (confirmBulkMerge && mergeable.size >= 2) {
+        // Même règle que l'outil Fusionner : le plus ancien accueille les autres et
+        // donne son nom au résultat.
+        val destination = mergeable.minBy { it.startTime }
+        MpDialog(
+            onDismissRequest = { confirmBulkMerge = false },
+            icon = {
+                ShapeBadge(
+                    icon = Icons.Rounded.Merge,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(22.dp)
+                )
+            },
+            title = stringResource(R.string.selection_merge_title, mergeable.size),
+            body = stringResource(R.string.selection_merge_body, destination.name),
+            dismissLabel = stringResource(R.string.common_cancel),
+            confirmLabel = stringResource(R.string.selection_merge),
+            onConfirm = {
+                confirmBulkMerge = false
+                val count = mergeable.size
+                viewModel.mergeTracks(
+                    context = context,
+                    trackIds = mergeable.sortedBy { it.startTime }.map { it.id },
+                    destinationTrackId = destination.id,
+                    mergedName = destination.name,
+                    onSuccess = {
+                        messenger.show(context.getString(R.string.merge_done_body, destination.name, count), Icons.Rounded.Merge)
+                        exitSelection()
+                    },
+                    onError = { error -> messenger.show(error, Icons.Rounded.Error, isError = true) }
+                )
+            },
+            confirmTestTag = "dialog_bulk_merge_confirm"
         )
     }
 
@@ -491,6 +621,8 @@ private fun CategoryChip(
  * La tuile colorée ouvre toujours la palette du parcours, comme la pastille qu'elle
  * remplace ; la feuille d'actions y mène aussi, pour qui ne devinerait pas le geste.
  */
+// combinedClickable : l'appui long ouvre le mode sélection.
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun TrackHistoryCard(
     track: Track,
@@ -504,23 +636,35 @@ fun TrackHistoryCard(
     /** Couleur d'affichage de ce parcours précis. */
     trackColor: Color = Color(
         TrackStylePreferences.defaultColorFor(track.isImported, track.isMerged)
-    )
+    ),
+    /** Appui long : entre dans le mode sélection ; null le désactive. */
+    onLongClick: (() -> Unit)? = null,
+    /**
+     * Mode sélection : la carte entière coche ou décoche le parcours, et une case
+     * remplace l'œil et le menu, qui n'auraient plus de sens.
+     */
+    selectionMode: Boolean = false,
+    selected: Boolean = false
 ) {
     val colors = MaterialTheme.colorScheme
+    val cardBg by animateColorAsState(
+        if (selectionMode && selected) colors.secondaryContainer else colors.surfaceContainerLow,
+        label = "card_bg"
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(colors.surfaceContainerLow)
-            .clickable(onClick = onClick)
+            .background(cardBg)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(start = 12.dp, end = 6.dp, top = 14.dp, bottom = 14.dp)
             .testTag("track_card_${track.id}")
     ) {
         TrackTile(
             color = trackColor,
-            modifier = if (onColorClick != null) {
+            modifier = if (onColorClick != null && !selectionMode) {
                 Modifier
                     .clip(RoundedCornerShape(14.dp))
                     .clickable(onClick = onColorClick)
@@ -562,6 +706,11 @@ fun TrackHistoryCard(
                 CardStat(Icons.Rounded.Schedule, FormatUtils.formatDurationShort(track.duration))
                 CardStat(Icons.Rounded.TrendingUp, FormatUtils.formatElevationShort(track.elevationGain))
             }
+        }
+
+        if (selectionMode) {
+            SelectionCheck(selected = selected, modifier = Modifier.padding(end = 10.dp).testTag("track_check_${track.id}"))
+            return@Row
         }
 
         val eyeBg by animateColorAsState(
@@ -642,6 +791,81 @@ private fun OutlinedTag(text: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
+    }
+}
+
+/** Case du mode sélection, dans le dessin des cases de l'outil Fusionner. */
+@Composable
+private fun SelectionCheck(selected: Boolean, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(26.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) colors.primary else Color.Transparent)
+            .border(2.dp, if (selected) colors.primary else colors.onSurfaceVariant, RoundedCornerShape(8.dp))
+    ) {
+        if (selected) Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.common_selected_cd), tint = colors.onPrimary, modifier = Modifier.size(20.dp))
+    }
+}
+
+/**
+ * Barre d'actions du mode sélection, à la place du bouton d'import. Les actions qui
+ * ne s'appliquent pas à la sélection courante restent visibles mais grisées : leur
+ * place ne bouge pas d'une sélection à l'autre.
+ */
+@Composable
+private fun SelectionActionBar(
+    count: Int,
+    canMerge: Boolean,
+    onShow: () -> Unit,
+    onHide: () -> Unit,
+    onMerge: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = colors.surfaceContainerHigh,
+        shadowElevation = 6.dp,
+        modifier = modifier.testTag("selection_action_bar")
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+        ) {
+            SelectionAction(Icons.Rounded.Visibility, stringResource(R.string.selection_show), count > 0, onShow, "selection_show")
+            SelectionAction(Icons.Rounded.VisibilityOff, stringResource(R.string.selection_hide), count > 0, onHide, "selection_hide")
+            SelectionAction(Icons.Rounded.Merge, stringResource(R.string.selection_merge), canMerge, onMerge, "selection_merge")
+            SelectionAction(Icons.Rounded.Delete, stringResource(R.string.common_delete), count > 0, onDelete, "selection_delete", tint = colors.error)
+        }
+    }
+}
+
+@Composable
+private fun SelectionAction(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    testTag: String,
+    tint: Color = MaterialTheme.colorScheme.onSurface
+) {
+    val color = if (enabled) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .testTag(testTag)
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1)
     }
 }
 

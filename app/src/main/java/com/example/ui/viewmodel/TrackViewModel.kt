@@ -412,6 +412,27 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    /**
+     * Supprime plusieurs parcours d'un coup (mode sélection de l'historique). Le parcours
+     * en cours d'enregistrement est refusé, comme à l'unité : [onResult] reçoit le nombre
+     * de suppressions faites et de refus.
+     */
+    fun deleteTracks(trackIds: List<Long>, onResult: (deleted: Int, refused: Int) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            var deleted = 0
+            var refused = 0
+            trackIds.forEach { id ->
+                if (repository.deleteTrack(id)) {
+                    deleted++
+                    if (_selectedTrackId.value == id) _selectedTrackId.value = null
+                } else {
+                    refused++
+                }
+            }
+            onResult(deleted, refused)
+        }
+    }
+
     /** Vrai pour le parcours qu'un enregistrement alimente : ni fusion ni suppression. */
     fun isBeingRecorded(track: Track): Boolean = repository.isBeingRecorded(track)
 

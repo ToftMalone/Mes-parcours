@@ -150,8 +150,26 @@
     <string name="track_deleted_toast">Parcours supprimé.</string>
     <string name="tag_google_earth">Google Earth</string>
     <string name="track_hide_from_map">Masquer de la carte</string>
-    <string name="history_show_all">Tout afficher sur la carte</string>
-    <string name="history_hide_all">Tout masquer</string>
+    <string name="selection_start">Sélectionner</string>
+    <string name="selection_close_cd">Quitter la sélection</string>
+    <string name="selection_show">Afficher</string>
+    <string name="selection_hide">Masquer</string>
+    <string name="selection_merge">Fusionner</string>
+    <string name="selection_delete_body">Ils seront effacés avec tous leurs points. Cette action est définitive.</string>
+    <string name="selection_merge_title">Fusionner %1$d parcours ?</string>
+    <string name="selection_merge_body">Ils seront réunis en un seul, « %1$s », le plus ancien de la sélection.</string>
+    <plurals name="selection_count">
+        <item quantity="one">%1$d sélectionné</item>
+        <item quantity="other">%1$d sélectionnés</item>
+    </plurals>
+    <plurals name="selection_delete_title">
+        <item quantity="one">Supprimer %1$d parcours ?</item>
+        <item quantity="other">Supprimer %1$d parcours ?</item>
+    </plurals>
+    <plurals name="selection_deleted_toast">
+        <item quantity="one">%1$d parcours supprimé</item>
+        <item quantity="other">%1$d parcours supprimés</item>
+    </plurals>
     <string name="common_select_all">Tout sélectionner</string>
     <string name="common_deselect_all">Tout désélectionner</string>
     <string name="track_show_on_map">Afficher sur la carte</string>

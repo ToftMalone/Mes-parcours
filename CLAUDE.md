@@ -132,10 +132,15 @@ se cochant sans effet visible. Symétriquement, « couleur d'origine » se dit e
 `displayColor` prime aussi sur `TrackPoint.segmentColor` au dessin : une couleur
 demandée à la main vaut pour le parcours entier, tronçons compris.
 
-**« Tout afficher sur la carte » / « Tout masquer »**, au-dessus de la liste de
-l'historique, bascule d'un geste tous les parcours de la catégorie affichée
-(`TrackDao.setShownOnMap`, une requête par paquet de 500 identifiants). Demandé par le
-père de l'auteur sous le nom « Tout sélectionner ».
+**Mode sélection de l'historique**, demandé par le père de l'auteur (« un bouton pour
+sélectionner toutes les traces et supprimer tout ce qui est sélectionné ») : bouton
+« Sélectionner » au-dessus de la liste, ou appui long sur un parcours. Les cartes
+portent alors une case, « Tout sélectionner » vise la catégorie affichée (changer
+d'onglet vide la sélection), et une barre remplace le bouton d'import : afficher ou
+masquer sur la carte (`TrackDao.setShownOnMap`, par paquets de 500 identifiants),
+fusionner (même règle que l'outil : le plus ancien accueille), supprimer (confirmé ;
+le parcours en cours d'enregistrement est refusé, comme à l'unité). Retour quitte le
+mode.
 
 **L'épaisseur du trait appartient elle aussi au parcours** (`Track.displayWidthDp`,
 migration 8→9), à la demande de l'auteur : elle se règle dans la même feuille que la
@@ -736,7 +741,7 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 218 tests unitaires en 25 suites : `ScreensScreenshotTest` (36, captures seules —
+- 219 tests unitaires en 25 suites : `ScreensScreenshotTest` (37, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (5), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
