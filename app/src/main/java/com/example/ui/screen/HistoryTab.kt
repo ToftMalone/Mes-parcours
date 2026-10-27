@@ -57,6 +57,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -212,6 +213,34 @@ fun HistoryTab(
                         onClick = { selectedCategory = category },
                         modifier = Modifier.weight(1f)
                     )
+                }
+            }
+
+            // « Tout sélectionner », demandé par le père de l'auteur : afficher ou masquer
+            // d'un geste tous les tracés de la catégorie sur la carte.
+            if (shown.isNotEmpty()) {
+                val allShown = shown.all { it.isSelectedForMap }
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 8.dp)
+                ) {
+                    TextButton(
+                        onClick = { viewModel.setTracksShownOnMap(shown, !allShown) },
+                        modifier = Modifier.testTag("history_toggle_all_on_map")
+                    ) {
+                        Icon(
+                            imageVector = if (allShown) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            stringResource(if (allShown) R.string.history_hide_all else R.string.history_show_all),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                 }
             }
 

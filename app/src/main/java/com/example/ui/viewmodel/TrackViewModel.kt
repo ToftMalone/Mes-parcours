@@ -287,6 +287,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    fun setTracksShownOnMap(tracks: List<Track>, shown: Boolean) {
+        viewModelScope.launch {
+            repository.setShownOnMap(tracks.map { it.id }, shown)
+        }
+    }
+
     // Fiche détail d'un parcours
     private val _selectedTrackId = MutableStateFlow<Long?>(null)
     val selectedTrackId: StateFlow<Long?> = _selectedTrackId.asStateFlow()
@@ -461,6 +467,34 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      * pour la fusion : elle relit tout le parcours et n'a rien à faire sur le thread
      * principal.
      */
+    /** Aperçu allégé d'un parcours, pour y choisir une portion sur la carte. */
+    suspend fun loadPreviewPoints(trackId: Long): List<com.example.data.model.TrackPoint> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.getPreviewPoints(trackId)
+        }
+
+    /** Retire une portion choisie sur la carte (voir [TrackRepository.cutPortion]). */
+    fun cutPortion(
+        trackId: Long,
+        fromPointId: Long,
+        toPointId: Long,
+        baseName: String,
+        deleteSource: Boolean,
+        onSuccess: (List<Long>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val newTrackIds = repository.cutPortion(trackId, fromPointId, toPointId, baseName, deleteSource)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(newTrackIds) }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.userMessage(appContext, R.string.err_split_failed))
+                }
+            }
+        }
+    }
+
     fun splitTrack(
         trackId: Long,
         mode: TrackRepository.SplitMode,
@@ -537,7 +571,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      */
     fun removeStationaryPoints(
         trackId: Long,
-        minStopMinutes: Int,
+        minStopSeconds: Int,
         newName: String,
         deleteSource: Boolean,
         onSuccess: (TrackRepository.StationaryCleanup) -> Unit,
@@ -547,7 +581,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             try {
                 val result = repository.removeStationaryPoints(
                     sourceTrackId = trackId,
-                    minStopMinutes = minStopMinutes,
+                    minStopSeconds = minStopSeconds,
                     newName = newName,
                     deleteSource = deleteSource
                 )

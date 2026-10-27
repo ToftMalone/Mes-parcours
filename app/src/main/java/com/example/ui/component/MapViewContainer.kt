@@ -367,7 +367,7 @@ private fun createDotIcon(context: Context, fill: Int, sizeDp: Float, ringDp: Fl
 
 // `lazy` : une seule source de tuiles (et une seule identité) pour toute la vie de
 // l'application, au lieu d'une nouvelle à chaque recomposition. Libellés en français.
-private val GOOGLE_SATELLITE_TILE_SOURCE: OnlineTileSourceBase by lazy {
+internal val GOOGLE_SATELLITE_TILE_SOURCE: OnlineTileSourceBase by lazy {
     val hl = "fr"
     object : OnlineTileSourceBase(
     "GoogleSatellite",

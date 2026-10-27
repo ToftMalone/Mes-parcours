@@ -37,6 +37,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import com.example.data.model.TrackPoint
+import com.example.ui.component.PortionPickerMap
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -94,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Track
 import com.example.data.repository.TrackRepository
+import com.example.ui.component.MpTextButton
 import com.example.ui.component.CookieShape
 import com.example.ui.component.LocalAppMessenger
 import com.example.ui.component.MpSheet
@@ -900,10 +906,21 @@ private fun MergeTracksTool(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp)
         )
+        // Le parcours en cours d'enregistrement n'est pas proposé : le fusionner
+        // supprimerait sa ligne sous le service (voir mergeAndSaveTracks).
+        val mergeable = tracks.filter { !viewModel.isBeingRecorded(it) }.sortedByDescending { it.startTime }
+        val allSelected = mergeable.isNotEmpty() && mergeable.all { it.id in selectedSourceIds }
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            MpTextButton(
+                text = stringResource(if (allSelected) R.string.common_deselect_all else R.string.common_select_all),
+                onClick = {
+                    selectedSourceIds = if (allSelected) emptySet() else mergeable.map { it.id }.toSet()
+                },
+                modifier = Modifier.testTag("merge_select_all")
+            )
+        }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Le parcours en cours d'enregistrement n'est pas proposé : le fusionner
-            // supprimerait sa ligne sous le service (voir mergeAndSaveTracks).
-            tracks.filter { !viewModel.isBeingRecorded(it) }.sortedByDescending { it.startTime }.forEach { track ->
+            mergeable.forEach { track ->
                 val isSelected = track.id in selectedSourceIds
                 MergeTrackRow(track, isSelected) {
                     selectedSourceIds = if (isSelected) selectedSourceIds - track.id else selectedSourceIds + track.id
@@ -1000,6 +1017,9 @@ private fun SplitTrackTool(
     val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
 
     var mode by remember { mutableStateOf(TrackRepository.SplitMode.SEGMENT_BREAKS) }
+    // Troisième mode, demandé par le père de l'auteur : désigner sur la carte la
+    // portion à retirer. Les deux autres coupent sans rien perdre ; celui-ci retire.
+    var onMap by remember { mutableStateOf(false) }
     var pauseIndex by remember { mutableIntStateOf(PAUSE_STEPS_MINUTES.indexOf(30)) }
     var baseName by remember { mutableStateOf("") }
     var deleteSource by remember { mutableStateOf(false) }
@@ -1010,6 +1030,21 @@ private fun SplitTrackTool(
     // « … (1) », « … (2) », etc.
     LaunchedEffect(selectedTrack?.id) {
         selectedTrack?.let { baseName = it.name }
+    }
+
+    // Aperçu du parcours pour le choix sur la carte, et la portion, en indices de
+    // l'aperçu. Rechargés à chaque changement de parcours.
+    var preview by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
+    var cutStart by remember(selectedTrack?.id) { mutableIntStateOf(0) }
+    var cutEnd by remember(selectedTrack?.id) { mutableIntStateOf(0) }
+    LaunchedEffect(selectedTrack?.id, onMap) {
+        val id = selectedTrack?.id ?: return@LaunchedEffect
+        if (onMap && preview == null) {
+            val loaded = viewModel.loadPreviewPoints(id)
+            preview = loaded
+            cutStart = loaded.size * 2 / 5
+            cutEnd = (loaded.size * 3 / 5).coerceAtMost(loaded.lastIndex.coerceAtLeast(0))
+        }
     }
 
     val pauseMinutes = PAUSE_STEPS_MINUTES[pauseIndex]
@@ -1025,20 +1060,53 @@ private fun SplitTrackTool(
         backTag = "split_tool_back_button",
         modifier = modifier,
         busyTitle = stringResource(R.string.split_busy_title),
-        busySubtitle = stringResource(if (mode == TrackRepository.SplitMode.TIME_GAP) R.string.split_busy_gap else R.string.split_busy_segments),
+        busySubtitle = stringResource(
+            when {
+                onMap -> R.string.cut_busy
+                mode == TrackRepository.SplitMode.TIME_GAP -> R.string.split_busy_gap
+                else -> R.string.split_busy_segments
+            }
+        ),
         doneActions = {
             DoneButtons(onFinish = onBack, primaryLabel = stringResource(R.string.split_view_history), onPrimary = onOpenHistory, primaryTag = "split_open_history")
         },
         action = {
+            val points = preview
             ToolActionButton(
-                text = stringResource(R.string.split_action),
+                text = stringResource(if (onMap) R.string.cut_action else R.string.split_action),
                 icon = Icons.Rounded.ContentCut,
-                enabled = selectedTrack != null && baseName.isNotBlank(),
+                enabled = selectedTrack != null && baseName.isNotBlank() && (!onMap || !points.isNullOrEmpty()),
                 testTag = "confirm_split_button",
                 onClick = {
                     val track = selectedTrack ?: return@ToolActionButton
                     val base = baseName.trim()
                     val deleting = deleteSource
+                    if (onMap) {
+                        val shown = points ?: return@ToolActionButton
+                        phase = ToolPhase.Busy
+                        viewModel.cutPortion(
+                            trackId = track.id,
+                            fromPointId = shown[cutStart].id,
+                            toPointId = shown[cutEnd].id,
+                            baseName = base,
+                            deleteSource = deleting,
+                            onSuccess = { newTrackIds ->
+                                phase = ToolPhase.Done(
+                                    title = context.getString(R.string.cut_done_title),
+                                    body = context.resources.getQuantityString(
+                                        if (deleting) R.plurals.cut_done_body_deleted else R.plurals.cut_done_body_kept,
+                                        newTrackIds.size, base, newTrackIds.size
+                                    ),
+                                    resultTrackId = newTrackIds.singleOrNull()
+                                )
+                            },
+                            onError = { error ->
+                                phase = ToolPhase.Form
+                                messenger.show(error, Icons.Rounded.Error, isError = true)
+                            }
+                        )
+                        return@ToolActionButton
+                    }
                     phase = ToolPhase.Busy
                     viewModel.splitTrack(
                         trackId = track.id,
@@ -1077,20 +1145,34 @@ private fun SplitTrackTool(
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             SegmentButton(
                 stringResource(R.string.split_mode_segments), Icons.Rounded.Splitscreen,
-                selected = mode == TrackRepository.SplitMode.SEGMENT_BREAKS,
-                onClick = { mode = TrackRepository.SplitMode.SEGMENT_BREAKS },
+                selected = !onMap && mode == TrackRepository.SplitMode.SEGMENT_BREAKS,
+                onClick = { onMap = false; mode = TrackRepository.SplitMode.SEGMENT_BREAKS },
                 testTag = "split_mode_segments",
                 modifier = Modifier.weight(1f)
             )
             SegmentButton(
                 stringResource(R.string.split_mode_gap), Icons.Rounded.Coffee,
-                selected = mode == TrackRepository.SplitMode.TIME_GAP,
-                onClick = { mode = TrackRepository.SplitMode.TIME_GAP },
+                selected = !onMap && mode == TrackRepository.SplitMode.TIME_GAP,
+                onClick = { onMap = false; mode = TrackRepository.SplitMode.TIME_GAP },
                 testTag = "split_mode_gap",
                 modifier = Modifier.weight(1f)
             )
+            SegmentButton(
+                stringResource(R.string.split_mode_map), Icons.Rounded.Map,
+                selected = onMap,
+                onClick = { onMap = true },
+                testTag = "split_mode_map",
+                modifier = Modifier.weight(1f)
+            )
         }
-        if (mode == TrackRepository.SplitMode.SEGMENT_BREAKS) {
+        if (onMap) {
+            CutOnMapSection(
+                points = preview,
+                start = cutStart,
+                end = cutEnd,
+                onRangeChange = { lo, hi -> cutStart = lo; cutEnd = hi }
+            )
+        } else if (mode == TrackRepository.SplitMode.SEGMENT_BREAKS) {
             Text(
                 stringResource(R.string.split_hint_segments),
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
@@ -1155,13 +1237,13 @@ private fun SplitTrackTool(
         Spacer(modifier = Modifier.height(10.dp))
         SwitchCard(
             title = stringResource(R.string.tool_delete_original),
-            subtitle = stringResource(R.string.split_delete_original_hint),
+            subtitle = stringResource(if (onMap) R.string.cut_delete_original_hint else R.string.split_delete_original_hint),
             checked = deleteSource,
             onToggle = { deleteSource = !deleteSource },
             testTag = "split_delete_source_row"
         )
         Spacer(modifier = Modifier.height(14.dp))
-        InfoLine(Icons.Rounded.Verified, stringResource(R.string.split_info))
+        InfoLine(Icons.Rounded.Verified, stringResource(if (onMap) R.string.cut_info else R.string.split_info))
     }
 
     if (picking) {
@@ -1174,6 +1256,95 @@ private fun SplitTrackTool(
             },
             onDismiss = { picking = false }
         )
+    }
+}
+
+/**
+ * Le choix de la portion à retirer : la carte, où un appui déplace la borne la plus
+ * proche, et un double curseur pour l'ajuster. Les deux bornes sont des indices dans
+ * [points], l'aperçu allégé du parcours.
+ */
+@Composable
+private fun CutOnMapSection(
+    points: List<TrackPoint>?,
+    start: Int,
+    end: Int,
+    onRangeChange: (Int, Int) -> Unit
+) {
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Text(
+            stringResource(R.string.cut_hint),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp)
+        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(340.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        ) {
+            if (points == null) {
+                CircularProgressIndicator()
+            } else if (points.size >= 2) {
+                PortionPickerMap(
+                    points = points,
+                    startIndex = start,
+                    endIndex = end,
+                    onTapPoint = { index ->
+                        // La borne la plus proche de l'appui vient s'y poser.
+                        if (kotlin.math.abs(index - start) <= kotlin.math.abs(index - end)) {
+                            onRangeChange(minOf(index, end), end)
+                        } else {
+                            onRangeChange(start, maxOf(index, start))
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        if (points != null && points.size >= 2) {
+            RangeSlider(
+                value = start.toFloat()..end.toFloat(),
+                onValueChange = { range ->
+                    onRangeChange(
+                        range.start.roundToInt().coerceIn(0, points.lastIndex),
+                        range.endInclusive.roundToInt().coerceIn(0, points.lastIndex)
+                    )
+                },
+                valueRange = 0f..points.lastIndex.toFloat(),
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .testTag("cut_range_slider")
+            )
+            val lo = start.coerceIn(0, points.lastIndex)
+            val hi = end.coerceIn(lo, points.lastIndex)
+            val meters = remember(points, lo, hi) {
+                val result = FloatArray(1)
+                var total = 0.0
+                for (i in lo + 1..hi) {
+                    val a = points[i - 1]
+                    val b = points[i]
+                    if (b.isDiscontinuous) continue
+                    android.location.Location.distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, result)
+                    total += result[0]
+                }
+                total
+            }
+            Text(
+                stringResource(
+                    R.string.cut_summary,
+                    FormatUtils.formatClock(points[lo].timestamp),
+                    FormatUtils.formatClock(points[hi].timestamp),
+                    FormatUtils.formatDistanceShort(meters)
+                ),
+                style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
     }
 }
 
@@ -1447,12 +1618,12 @@ private fun KeptDurationBar(totalSeconds: Long, dropStartMinutes: Int, dropEndMi
 // -------------------------------------------------------------------- Nettoyer
 
 /**
- * Durées minimales d'un arrêt, en minutes. Cinq minutes par défaut : assez pour qu'un
- * feu rouge ou une pause photo restent, assez peu pour qu'un enregistrement oublié
- * disparaisse dès l'arrivée.
+ * Durées minimales d'un arrêt, en secondes. Une minute par défaut : la détection ne
+ * retient que du bruit sur place (voir StopCollapser), si bien que réduire même un
+ * court arrêt ne change pas la forme du tracé.
  */
-private val CLEAN_STOP_MINUTES = listOf(2, 5, 10, 20, 30)
-private const val CLEAN_DEFAULT_INDEX = 1 // 5 min
+private val CLEAN_STOP_SECONDS = listOf(30, 60, 120, 300, 600)
+private const val CLEAN_DEFAULT_INDEX = 1 // 1 min
 
 @Composable
 private fun CleanTrackTool(
@@ -1482,7 +1653,7 @@ private fun CleanTrackTool(
         selectedTrack?.let { newName = nameFormat.format(it.name) }
     }
 
-    val stopMinutes = CLEAN_STOP_MINUTES[thresholdIndex]
+    val stopSeconds = CLEAN_STOP_SECONDS[thresholdIndex]
     val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
         ToolPhase.Need(stringResource(R.string.clean_need_title), stringResource(R.string.clean_need_body))
     } else phase
@@ -1523,7 +1694,7 @@ private fun CleanTrackTool(
                     phase = ToolPhase.Busy
                     viewModel.removeStationaryPoints(
                         trackId = track.id,
-                        minStopMinutes = stopMinutes,
+                        minStopSeconds = stopSeconds,
                         newName = name,
                         deleteSource = deleting,
                         onSuccess = { result ->
@@ -1570,15 +1741,16 @@ private fun CleanTrackTool(
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    stringResource(R.string.clean_threshold_value, stopMinutes),
+                    if (stopSeconds < 60) stringResource(R.string.clean_threshold_seconds, stopSeconds)
+                    else stringResource(R.string.clean_threshold_value, stopSeconds / 60),
                     style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp)
                 )
             }
             MpSlider(
                 value = thresholdIndex.toFloat(),
-                onValueChange = { thresholdIndex = it.roundToInt().coerceIn(0, CLEAN_STOP_MINUTES.lastIndex) },
-                valueRange = 0f..CLEAN_STOP_MINUTES.lastIndex.toFloat(),
-                steps = CLEAN_STOP_MINUTES.size - 2,
+                onValueChange = { thresholdIndex = it.roundToInt().coerceIn(0, CLEAN_STOP_SECONDS.lastIndex) },
+                valueRange = 0f..CLEAN_STOP_SECONDS.lastIndex.toFloat(),
+                steps = CLEAN_STOP_SECONDS.size - 2,
                 testTag = "clean_threshold_slider"
             )
             Text(

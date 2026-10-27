@@ -320,6 +320,15 @@ class ScreensScreenshotTest {
         shoot("outils_decoupe", true)
     }
 
+    @Test fun outils_decoupe_carte() {
+        seed(); tools(true); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_split_tool_button").performClick()
+        waitForTag("split_mode_map")
+        compose.onNodeWithTag("split_mode_map").performClick()
+        waitForTag("cut_range_slider")
+        shoot("outils_decoupe_carte", true)
+    }
+
     @Test fun outils_rognage() {
         seed(); tools(false); waitForTag("tools_tab")
         compose.onNodeWithTag("open_trim_tool_button").performClick()

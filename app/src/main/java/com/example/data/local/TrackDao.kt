@@ -249,6 +249,10 @@ interface TrackDao {
     @Update
     suspend fun updateTrack(track: Track)
 
+    /** « Tout afficher » / « Tout masquer » : une seule écriture pour toute une catégorie. */
+    @Query("UPDATE tracks SET isSelectedForMap = :shown WHERE id IN (:trackIds)")
+    suspend fun setShownOnMap(trackIds: List<Long>, shown: Boolean)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTrackPoint(point: TrackPoint): Long
 

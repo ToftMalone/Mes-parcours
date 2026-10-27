@@ -574,12 +574,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     /** Nombre de points relus par lot pendant le repérage des coupures. */
     private val splitScanPageSize = 2_000
 
-    /**
-     * Rayon d'un arrêt pour le nettoyage. Sous un toit, le GPS s'écarte couramment de
-     * 10 à 20 m de la position réelle ; 30 m couvre ce bruit sans avaler une marche,
-     * qui en sort en moins d'une minute.
-     */
-    private val stopRadiusMeters = 30.0
 
     /**
      * Une tranche repérée pendant la lecture, avant d'être écrite en base.
@@ -903,6 +897,144 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
+    // Retrait d'une portion choisie sur la carte
+    // ------------------------------------------------------------------
+
+    /**
+     * Un aperçu de [trackId] pour le choix d'une portion à la main : au plus
+     * [maxPoints] points, pris à pas régulier, plus le dernier et toutes les ruptures de
+     * tronçon. Lu page par page, comme le reste : un parcours de plusieurs millions de
+     * points passe. Ses identifiants sont ceux de la base, ce qui permet de désigner les
+     * bornes de la portion sans relire le parcours.
+     */
+    suspend fun getPreviewPoints(trackId: Long, maxPoints: Int = 3_000): List<TrackPoint> {
+        val total = trackDao.getTrackPointMeta(trackId)?.pointCount ?: 0
+        if (total == 0) return emptyList()
+        val stride = maxOf(1, (total + maxPoints - 1) / maxPoints)
+        val preview = ArrayList<TrackPoint>(minOf(total, maxPoints + 1))
+        var index = 0
+        var last: TrackPoint? = null
+        var afterId = 0L
+        while (true) {
+            val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            for (point in page) {
+                if (index % stride == 0 || point.isDiscontinuous) preview += point
+                last = point
+                index++
+            }
+        }
+        last?.let { if (preview.lastOrNull()?.id != it.id) preview += it }
+        return preview
+    }
+
+    /**
+     * Retire de [sourceTrackId] les points d'identifiant compris entre [fromPointId] et
+     * [toPointId] inclus, choisis sur la carte, et crée les morceaux qui restent : celui
+     * d'avant et celui d'après, chacun s'il compte au moins deux points.
+     *
+     * C'est un découpage : même lecture unique page par page, mêmes statistiques
+     * cumulées au passage, même transaction finale où SQLite recopie chaque tranche
+     * (`copyPointRangeInto`, invariant 5). Le parcours d'origine n'est jamais modifié,
+     * et n'est supprimé que si [deleteSource] le demande.
+     */
+    suspend fun cutPortion(
+        sourceTrackId: Long,
+        fromPointId: Long,
+        toPointId: Long,
+        baseName: String,
+        deleteSource: Boolean
+    ): List<Long> {
+        val source = trackDao.getTrackById(sourceTrackId)
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
+        if (isBeingRecorded(source)) {
+            throw UserFacingArgumentException(R.string.err_track_is_recording)
+        }
+        val low = minOf(fromPointId, toPointId)
+        val high = maxOf(fromPointId, toPointId)
+
+        class Piece(val fromId: Long) {
+            val stats = TrackStatsAccumulator()
+            var count = 0
+            var startTime = 0L
+            var endTime = 0L
+            fun add(point: TrackPoint) {
+                if (count == 0) startTime = point.timestamp
+                endTime = point.timestamp
+                stats.add(point)
+                count++
+            }
+        }
+
+        var before: Piece? = null
+        var after: Piece? = null
+        var afterId = 0L
+        while (true) {
+            val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            for (point in page) {
+                when {
+                    point.id < low -> (before ?: Piece(point.id).also { before = it }).add(point)
+                    point.id > high -> (after ?: Piece(point.id).also { after = it }).add(point)
+                }
+            }
+        }
+
+        // La tranche d'avant s'arrête juste avant la portion (borne haute exclusive),
+        // celle d'après va jusqu'au bout.
+        val planned = listOfNotNull(
+            before?.takeIf { it.count >= 2 }?.let { it to low },
+            after?.takeIf { it.count >= 2 }?.let { it to Long.MAX_VALUE }
+        )
+        if (planned.isEmpty()) throw UserFacingStateException(R.string.err_cut_everything)
+
+        return database.withTransaction {
+            val newTrackIds = planned.mapIndexed { index, (piece, untilId) ->
+                val stats = piece.stats.result()
+                val newTrackId = trackDao.insertTrack(
+                    Track(
+                        name = if (planned.size == 1) baseName else "$baseName (${index + 1})",
+                        activityType = source.activityType,
+                        startTime = piece.startTime,
+                        endTime = piece.endTime,
+                        totalDistance = stats.distanceMeters,
+                        duration = stats.durationSec,
+                        maxSpeed = stats.maxSpeedMps,
+                        avgSpeed = stats.avgSpeedMps,
+                        elevationGain = stats.elevationGain,
+                        elevationLoss = stats.elevationLoss,
+                        isRecording = false,
+                        // Même héritage que le découpage : provenance et apparence, mais
+                        // jamais l'affichage sur la carte.
+                        isImported = source.isImported,
+                        isMerged = source.isMerged,
+                        isSelectedForMap = false,
+                        sourceColor = source.sourceColor,
+                        displayColor = source.displayColor,
+                        displayWidthDp = source.displayWidthDp
+                    )
+                )
+                trackDao.copyPointRangeInto(
+                    destinationId = newTrackId,
+                    sourceId = sourceTrackId,
+                    fromId = piece.fromId,
+                    untilId = untilId
+                )
+                trackDao.clearFirstPointDiscontinuity(newTrackId)
+                newTrackId
+            }
+            if (deleteSource) {
+                trackDao.deletePointsForTrack(sourceTrackId)
+                trackDao.deleteTrack(sourceTrackId)
+            }
+            invalidatePointCaches(sourceTrackId)
+            newTrackIds
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Nettoyage : chaque arrêt réduit à un point
     // ------------------------------------------------------------------
 
@@ -915,16 +1047,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     )
 
     /**
-     * Crée une copie de [sourceTrackId] où chaque arrêt d'au moins [minStopMinutes]
-     * minutes — des points restés dans un cercle de [stopRadiusMeters] — est réduit à
-     * un seul point, sans rupture de tracé. Hors des arrêts, tous les points restent :
-     * le tracé garde la fluidité de l'original. La détection est celle de
-     * [StopCollapser].
-     *
-     * Le cas de tous les jours : l'enregistrement oublié à l'arrivée, qui entasse des
-     * milliers de points au même endroit pendant des heures. La première version de
-     * l'outil écartait les points à moins de 1 à 10 m du dernier point gardé ; sous un
-     * toit, le GPS saute plus loin que ça, et le gribouillis restait, en zigzags.
+     * Crée une copie de [sourceTrackId] où chaque arrêt d'au moins [minStopSeconds]
+     * secondes — un gribouillis de bruit GPS au même endroit — est réduit à un point,
+     * sans rupture de tracé. Hors des arrêts, tous les points restent : le tracé garde
+     * sa forme. La détection, et l'histoire de ses deux premières versions ratées, sont
+     * dans [StopCollapser].
      *
      * Contrairement au rognage, les points gardés ne forment pas une tranche : SQLite
      * ne peut donc pas les recopier d'un seul `INSERT … SELECT`. Ils passent par la
@@ -943,7 +1070,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      */
     suspend fun removeStationaryPoints(
         sourceTrackId: Long,
-        minStopMinutes: Int,
+        minStopSeconds: Int,
         newName: String,
         deleteSource: Boolean
     ): StationaryCleanup {
@@ -978,10 +1105,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             var readCount = 0
             val batch = ArrayList<TrackPoint>(splitScanPageSize)
 
-            val collapser = StopCollapser(
-                radiusMeters = stopRadiusMeters,
-                minDurationMs = minStopMinutes * 60_000L
-            ) { point ->
+            val collapser = StopCollapser(minDurationMs = minStopSeconds * 1_000L) { point ->
                 if (firstKept == null) firstKept = point
                 accumulator.add(point)
                 batch += point.copy(id = 0, trackId = newTrackId)
@@ -1057,6 +1181,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     suspend fun updateTrack(track: Track) {
         trackDao.updateTrack(track)
+    }
+
+    suspend fun setShownOnMap(trackIds: List<Long>, shown: Boolean) {
+        // SQLite borne le nombre de paramètres d'une requête : par paquets.
+        trackIds.chunked(500).forEach { trackDao.setShownOnMap(it, shown) }
     }
 
     /**

@@ -150,6 +150,10 @@
     <string name="track_deleted_toast">Parcours supprimé.</string>
     <string name="tag_google_earth">Google Earth</string>
     <string name="track_hide_from_map">Masquer de la carte</string>
+    <string name="history_show_all">Tout afficher sur la carte</string>
+    <string name="history_hide_all">Tout masquer</string>
+    <string name="common_select_all">Tout sélectionner</string>
+    <string name="common_deselect_all">Tout désélectionner</string>
     <string name="track_show_on_map">Afficher sur la carte</string>
     <string name="track_actions">Actions</string>
     <string name="track_subtitle_merged">Fusionné · %1$s</string>
@@ -217,7 +221,7 @@
     <string name="tools_title">Outils</string>
     <string name="tools_intro">Transformez vos parcours. Découper et rogner créent des copies : l\'original reste, sauf si vous choisissez de le supprimer.</string>
     <string name="tool_merge_subtitle">Réunir plusieurs parcours en un seul, dans l\'ordre chronologique.</string>
-    <string name="tool_split_subtitle">Séparer un parcours à chaque tronçon ou à chaque longue pause.</string>
+    <string name="tool_split_subtitle">Séparer un parcours à chaque tronçon ou longue pause, ou en retirer une portion choisie sur la carte.</string>
     <string name="tool_trim_subtitle">Retirer des minutes au début ou à la fin d\'un parcours.</string>
     <string name="tools_back">Retour aux outils</string>
     <string name="tool_done">Terminé</string>
@@ -257,6 +261,23 @@
     <string name="split_hint_segments">Pour un fichier importé qui réunit plusieurs trajets : chaque tronçon devient un parcours.</string>
     <string name="split_gap_title">Couper après une pause d\'au moins</string>
     <string name="split_gap_note">Sans effet sur un KML, ou sur un GPX sans horodatage : leurs points sont régulièrement espacés, il n\'y a aucune pause à trouver.</string>
+    <string name="split_mode_map">Sur la carte</string>
+    <string name="cut_hint">Touchez la carte pour placer le début et la fin de la portion à retirer, en rouge, ou ajustez-les avec le curseur.</string>
+    <string name="cut_summary">À retirer : %1$s → %2$s · %3$s</string>
+    <string name="cut_action">Retirer la portion</string>
+    <string name="cut_busy">Retrait de la portion</string>
+    <string name="cut_done_title">Portion retirée</string>
+    <string name="cut_delete_original_hint">La portion retirée sera perdue</string>
+    <string name="cut_info">La portion en rouge est retirée ; le reste du parcours est gardé tel quel, avant et après.</string>
+    <string name="err_cut_everything">Il ne resterait rien du parcours : réduisez la portion à retirer.</string>
+    <plurals name="cut_done_body_kept">
+        <item quantity="one">« %1$s » est dans l\'historique. L\'original est conservé.</item>
+        <item quantity="other">« %1$s (1) » et « %1$s (%2$d) », dans l\'historique. L\'original est conservé.</item>
+    </plurals>
+    <plurals name="cut_done_body_deleted">
+        <item quantity="one">« %1$s » est dans l\'historique. L\'original a été supprimé.</item>
+        <item quantity="other">« %1$s (1) » et « %1$s (%2$d) », dans l\'historique. L\'original a été supprimé.</item>
+    </plurals>
     <string name="split_base_name">Nom de base</string>
     <string name="tool_delete_original">Supprimer l\'original</string>
     <string name="split_delete_original_hint">Les morceaux en contiennent tous les points</string>
@@ -347,7 +368,8 @@
     <string name="tool_clean_subtitle">Réduire chaque arrêt à un seul point, quand l\'enregistrement a continué.</string>
     <string name="clean_threshold_title">Arrêts d\'au moins</string>
     <string name="clean_threshold_value">%1$d min</string>
-    <string name="clean_threshold_note">Les points restés plus longtemps dans un cercle de 30 m deviennent un seul point, et le tracé y passe sans coupure. En mouvement, tous les points sont gardés.</string>
+    <string name="clean_threshold_seconds">%1$d s</string>
+    <string name="clean_threshold_note">Seul le gribouillis du GPS resté sur place devient un point, et le tracé y passe sans coupure. Tout ce qui avance, même lentement, est gardé tel quel.</string>
     <string name="clean_name_format">%1$s (nettoyé)</string>
     <string name="clean_need_title">Aucun parcours à nettoyer</string>
     <string name="clean_need_body">Enregistrez ou importez un parcours pour pouvoir le nettoyer ici.</string>

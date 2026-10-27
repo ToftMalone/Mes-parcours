@@ -132,6 +132,11 @@ se cochant sans effet visible. Symétriquement, « couleur d'origine » se dit e
 `displayColor` prime aussi sur `TrackPoint.segmentColor` au dessin : une couleur
 demandée à la main vaut pour le parcours entier, tronçons compris.
 
+**« Tout afficher sur la carte » / « Tout masquer »**, au-dessus de la liste de
+l'historique, bascule d'un geste tous les parcours de la catégorie affichée
+(`TrackDao.setShownOnMap`, une requête par paquet de 500 identifiants). Demandé par le
+père de l'auteur sous le nom « Tout sélectionner ».
+
 **L'épaisseur du trait appartient elle aussi au parcours** (`Track.displayWidthDp`,
 migration 8→9), à la demande de l'auteur : elle se règle dans la même feuille que la
 couleur (« Apparence du tracé », pastille du parcours dans l'historique), et le réglage
@@ -196,8 +201,10 @@ de parcours (`SingleTrackRow` pour un seul, `MergeTrackRow` pour plusieurs), un 
 deux réglages, un bouton de confirmation.
 
 - **Fusionner des traces** — voir l'invariant 5 : la fusion se fait dans SQLite,
-  aucun point ne transite par la mémoire.
-- **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous.
+  aucun point ne transite par la mémoire. Un bouton « Tout sélectionner » coche
+  toute la liste.
+- **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous ; ou en
+  retirer une portion choisie sur la carte.
 - **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
   ci-dessous.
 - **Nettoyer un parcours** — retirer les points immobiles, décrit ci-dessous.
@@ -285,36 +292,38 @@ jamais de `isSelectedForMap`.
 
 ### Nettoyer un parcours
 
-`TrackRepository.removeStationaryPoints` crée une copie où **chaque arrêt devient un
-seul point, sans rupture de tracé** : le trait arrive au point et en repart. Un arrêt,
-ce sont des points restés dans un cercle de 30 m autour de leur centre pendant au
-moins la durée choisie (2, 5, 10, 20 ou 30 min ; 5 par défaut). Hors des arrêts,
-**tous les points sont gardés**, et le tracé garde la fluidité de l'original. Le point
-est placé au centre de l'arrêt, avec l'horodatage de l'arrivée : un enregistrement
-oublié ne compte plus dans la durée. La détection vit dans `util/StopCollapser`.
+`TrackRepository.removeStationaryPoints` crée une copie où **le gribouillis du GPS
+resté sur place devient un point, et où tout le reste garde sa forme exacte**. La
+détection vit dans `util/StopCollapser`, dont l'en-tête raconte le détail.
 
-**Pourquoi pas un seuil entre points.** La première version de l'outil (2.2) écartait
-les points à moins de 1 à 10 m du dernier point gardé. Sous un toit, le GPS saute de
-3 à 10 m par seconde et dessine un gribouillis de plusieurs dizaines de mètres : le
-seuil n'en retirait que les points intermédiaires, et le gribouillis restait, en
-zigzags. Le père de l'auteur l'a montré sur deux captures ; il a demandé « un seul
-point, mais sans rupture de trace ».
+**Deux versions ont échoué avant celle-ci, sur les captures du père de l'auteur :**
 
-Ce qui tient la détection, chaque règle pour un cas réel :
+- **2.2** — écarter les points à moins de 1 à 10 m du dernier point gardé. Sous un
+  toit, le GPS saute plus loin que ça : le gribouillis restait, en zigzags.
+- **2.2.1** — réduire à un point tout cercle de 30 m tenu cinq minutes. Une marche
+  lente, un aller-retour dans une impasse, tenaient dans le cercle et étaient avalés :
+  le tracé perdait sa forme. Et le point unique gardait l'heure d'arrivée, si bien que
+  le point suivant venait des minutes plus tard : `buildSegmentsFromPoints` coupe le
+  trait au-delà de quinze secondes entre voisins, d'où **un trou** dans le tracé.
 
-- **Échappées tolérées** (30 s au plus) : un saut aberrant hors du cercle ne coupe
-  pas l'arrêt, ni ne l'empêche d'être confirmé.
-- **Approche rendue** : en se formant, le centre suit les derniers mètres de la
-  marche ; à la confirmation, les premiers points à plus du rayon du centre définitif
-  sont rendus tels quels, sinon le tracé couperait au plus court.
-- **Tampons bornés en nombre**, pas seulement en durée : un GPX sans `<time>` porte la
-  même heure partout et n'atteint jamais aucune durée. Il n'a donc jamais d'arrêt.
-- Les ruptures de tronçon terminent un arrêt et sont toujours gardées.
+**Le critère actuel est local et prudent.** Chaque point est jugé sur ±30 s autour de
+lui : immobile si la fenêtre tient dans 6 m, ou si elle tient dans 30 m avec un
+chemin parcouru d'au moins quatre fois son diamètre (beaucoup de chemin pour peu
+d'étendue : la signature du bruit ; une marche, même avec un demi-tour, avance).
+Rayon au 80ᵉ centile autour de la médiane, contre les sauts aberrants. Quand le
+parcours porte des vitesses GPS (Doppler, fiables à l'arrêt), une vitesse au-dessus
+de 0,4 m/s interdit de juger immobile : c'est ce qui protège la marche lente. Une
+fenêtre immobile absorbe ses voisins proches, à 10 m au plus.
 
-Le résultat hérite de la provenance et de l'apparence du parent, jamais de
-`isSelectedForMap` ; l'original n'est supprimé que si la case est cochée. Les
-statistiques sont cumulées pendant la lecture par `TrackStatsAccumulator`, sur les
-seuls points gardés.
+**Un arrêt devient deux points confondus**, l'arrivée et le départ : la coupure de
+l'affichage tombe entre eux, invisible. Un arrêt qui termine le parcours ne garde que
+l'arrivée, pour que la durée s'y arrête. Durée minimale réglable (30 s à 10 min,
+1 min par défaut) ; réduire même un court arrêt ne change pas la forme.
+
+Les ruptures de tronçon ne sont jamais traversées. Le résultat hérite de la
+provenance et de l'apparence du parent, jamais de `isSelectedForMap` ; l'original
+n'est supprimé que si la case est cochée. Statistiques cumulées pendant la lecture
+par `TrackStatsAccumulator`, sur les seuls points gardés.
 
 **Pas de `copyPointRangeInto` ici** : les points gardés ne forment pas une tranche.
 Ils passent par la mémoire une page à la fois et sont écrits au fur et à mesure, une
@@ -324,8 +333,26 @@ l'import : la ligne neuve porte `Track.IMPORT_PLACEHOLDER_START_TIME` jusqu'à l
 (cachée de l'historique), un échec la supprime (`NonCancellable`), et
 `cleanupInterruptedImports` rattrape celle d'un processus tué.
 
-Deux refus : aucun arrêt assez long, et moins de deux points restants.
-`CleanTrackTest` verrouille le tout.
+Deux refus : aucun arrêt, et moins de deux points restants. `CleanTrackTest`
+verrouille le tout, dont le cas rapporté (marche lente avec demi-tour, puis
+enregistrement oublié) et l'absence de trou visible.
+
+### Retirer une portion choisie sur la carte
+
+Troisième mode de « Découper », demandé par le père de l'auteur : « Sur la carte ».
+Le parcours s'affiche sur une carte dédiée (`ui/component/PortionPickerMap`, et non
+`MapViewContainer`, qui reconstruit ses calques d'elle-même), la portion à retirer en
+rouge ; un appui sur la carte y pose la borne la plus proche, un double curseur
+l'ajuste. La carte vit dans un écran qui défile : elle se réserve chaque geste
+commencé sur elle (`requestDisallowInterceptTouchEvent`).
+
+La carte montre un aperçu (`TrackRepository.getPreviewPoints` : 3 000 points au plus,
+à pas régulier, plus le dernier et les ruptures), dont les identifiants sont ceux de
+la base. `TrackRepository.cutPortion` retire les points entre les deux identifiants,
+inclus, et crée le morceau d'avant et celui d'après, chacun s'il a au moins deux
+points — même lecture unique, mêmes statistiques au passage, même transaction finale
+que le découpage. Un seul morceau garde le nom de base, sans numéro. Retirer tout est
+refusé. `CutPortionTest` verrouille.
 
 ### `TrackStatsAccumulator`
 
@@ -709,9 +736,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 211 tests unitaires en 24 suites : `ScreensScreenshotTest` (35, captures seules —
+- 218 tests unitaires en 25 suites : `ScreensScreenshotTest` (36, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `TrimTrackTest` (14), `CleanTrackTest` (14), `SplitTrackTest` (13), `BearingTest` (10),
+  `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (5), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
