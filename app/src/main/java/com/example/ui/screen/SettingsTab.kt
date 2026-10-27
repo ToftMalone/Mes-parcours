@@ -811,6 +811,11 @@ private class Release(val version: String, val date: String?, val changes: List<
  */
 private val RELEASES = listOf(
     Release(
+        version = "2.2.4",
+        date = "2026-10-27",
+        changes = listOf(R.string.rel_2_2_4_a, R.string.rel_2_2_4_b)
+    ),
+    Release(
         version = "2.2.3",
         date = "2026-10-27",
         changes = listOf(R.string.rel_2_2_3_a)

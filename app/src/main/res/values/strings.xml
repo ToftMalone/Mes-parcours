@@ -381,6 +381,8 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_2_4_a">« Découper », mode « Sur la carte » : la carte montre le détail du tracé quand on zoome, sans plus couper les virages</string>
+    <string name="rel_2_2_4_b">On pose le début puis la fin de la portion d\'un appui sur la carte, au lieu des curseurs</string>
     <string name="rel_2_2_3_a">« Découper », mode « Sur la carte » : plus de trait entre des points que rien ne relie</string>
     <string name="rel_2_2_2_a">« Nettoyer » garde la forme exacte du tracé : seul le gribouillis du GPS resté sur place devient un point, sans couper le trait</string>
     <string name="rel_2_2_2_b">Historique : un mode sélection (« Sélectionner », ou appui long) pour tout sélectionner, afficher, masquer, fusionner ou supprimer plusieurs parcours d\'un coup</string>
