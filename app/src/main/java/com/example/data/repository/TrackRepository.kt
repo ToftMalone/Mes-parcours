@@ -573,6 +573,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     /** Nombre de points relus par lot pendant le repérage des coupures. */
     private val splitScanPageSize = 2_000
+    private val previewGapMs = 15_000L
 
 
     /**
@@ -920,7 +921,20 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             if (page.isEmpty()) break
             afterId = page.last().id
             for (point in page) {
-                if (index % stride == 0 || point.isDiscontinuous) preview += point
+                // Un trou de plus de quinze secondes coupe le trait à l'affichage
+                // (`buildSegmentsFromPoints`), mais l'échantillonnage en cache la preuve :
+                // on garde les deux bords du trou, le second marqué comme rupture, sans quoi
+                // l'aperçu tirerait un trait entre deux points que rien ne relie.
+                val previous = last
+                val gap = previous != null && !point.isDiscontinuous &&
+                    previous.timestamp > 0L && point.timestamp > 0L &&
+                    point.timestamp - previous.timestamp > previewGapMs
+                if (gap) {
+                    if (preview.lastOrNull()?.id != previous!!.id) preview += previous
+                    preview += point.copy(isDiscontinuous = true)
+                } else if (index % stride == 0 || point.isDiscontinuous) {
+                    preview += point
+                }
                 last = point
                 index++
             }

@@ -73,26 +73,16 @@ fun PortionPickerMap(
         }
     }
 
-    val whole = remember(mapView) { Polyline(mapView).apply { setOnClickListener { _, _, _ -> false } } }
-    val cut = remember(mapView) { Polyline(mapView).apply { setOnClickListener { _, _, _ -> false } } }
+    // Un tracé par tronçon : une rupture ne doit jamais être reliée par un trait.
+    val wholeLines = remember(mapView) { mutableListOf<Polyline>() }
+    val cutLines = remember(mapView) { mutableListOf<Polyline>() }
 
     // Le tracé entier, et le cadrage, ne changent qu'avec le parcours.
     LaunchedEffect(mapView, points) {
         mapView.overlays.clear()
         if (points.isEmpty()) return@LaunchedEffect
-        whole.setPoints(points.map { GeoPoint(it.latitude, it.longitude) })
-        whole.outlinePaint.apply {
-            color = trackColor
-            strokeWidth = 4f * density
-            strokeCap = android.graphics.Paint.Cap.ROUND
-            isAntiAlias = true
-        }
-        cut.outlinePaint.apply {
-            color = cutColor
-            strokeWidth = 7f * density
-            strokeCap = android.graphics.Paint.Cap.ROUND
-            isAntiAlias = true
-        }
+        wholeLines.clear()
+        cutLines.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                 currentOnTap.value(nearestIndex(points, p))
@@ -101,10 +91,16 @@ fun PortionPickerMap(
 
             override fun longPressHelper(p: GeoPoint): Boolean = false
         }))
-        mapView.overlays.add(whole)
-        mapView.overlays.add(cut)
+        val all = mutableListOf<GeoPoint>()
+        for (range in segmentRanges(points)) {
+            val line = styledLine(mapView, trackColor, 4f * density)
+            line.setPoints(points.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
+            all += line.actualPoints
+            wholeLines += line
+            mapView.overlays.add(line)
+        }
 
-        val box = BoundingBox.fromGeoPointsSafe(whole.actualPoints)
+        val box = BoundingBox.fromGeoPointsSafe(all)
         val frame = {
             val margin = (32 * density).toInt()
             mapView.zoomToBoundingBox(box.increaseByScale(1.15f), false, margin)
@@ -116,7 +112,17 @@ fun PortionPickerMap(
         if (points.isEmpty()) return@LaunchedEffect
         val lo = startIndex.coerceIn(0, points.lastIndex)
         val hi = endIndex.coerceIn(lo, points.lastIndex)
-        cut.setPoints(points.subList(lo, hi + 1).map { GeoPoint(it.latitude, it.longitude) })
+        mapView.overlays.removeAll(cutLines.toSet())
+        cutLines.clear()
+        for (range in segmentRanges(points)) {
+            val from = maxOf(range.first, lo)
+            val to = minOf(range.last, hi)
+            if (from > to) continue
+            val line = styledLine(mapView, cutColor, 7f * density)
+            line.setPoints(points.subList(from, to + 1).map { GeoPoint(it.latitude, it.longitude) })
+            cutLines += line
+            mapView.overlays.add(line)
+        }
         mapView.invalidate()
     }
 
@@ -139,6 +145,35 @@ fun PortionPickerMap(
     }
 
     AndroidView(factory = { mapView }, modifier = modifier.testTag("portion_picker_map"))
+}
+
+/** Une polyligne sans réaction au toucher, du trait et de l'épaisseur donnés. */
+private fun styledLine(mapView: MapView, strokeColor: Int, widthPx: Float): Polyline =
+    Polyline(mapView).apply {
+        setOnClickListener { _, _, _ -> false }
+        outlinePaint.apply {
+            color = strokeColor
+            strokeWidth = widthPx
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            isAntiAlias = true
+        }
+    }
+
+/**
+ * Les tronçons de [points], en plages d'indices : un point marqué `isDiscontinuous`
+ * ouvre le suivant. Les relier d'un trait dessinerait un chemin que personne n'a parcouru.
+ */
+private fun segmentRanges(points: List<TrackPoint>): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    var start = 0
+    for (i in 1 until points.size) {
+        if (points[i].isDiscontinuous) {
+            ranges += start until i
+            start = i
+        }
+    }
+    if (points.isNotEmpty()) ranges += start until points.size
+    return ranges
 }
 
 /** Indice du point de [points] le plus proche de [target], à l'échelle d'un écran. */

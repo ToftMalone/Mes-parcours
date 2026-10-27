@@ -125,4 +125,32 @@ class CutPortionTest {
         assertEquals(points.last().id, preview.last().id)
         assertEquals(points.first().id, preview.first().id)
     }
+
+    @Test
+    fun `l'aperçu marque un trou de temps comme une rupture`() = runBlocking {
+        val trackId = db.trackDao.insertTrack(Track(name = "Trou", startTime = start))
+        db.trackDao.insertTrackPoints(
+            (0 until 1_000).map { i ->
+                // Un trou de dix minutes au point 500, sans rupture déclarée.
+                val delay = if (i >= 500) 600_000L else 0L
+                TrackPoint(
+                    trackId = trackId,
+                    latitude = 45.0 + i * 5 / 111_132.0,
+                    longitude = 5.0,
+                    timestamp = start + i * 1_000L + delay
+                )
+            }
+        )
+        val points = db.trackDao.getPointsForTrack(trackId)
+
+        val preview = repository.getPreviewPoints(trackId, maxPoints = 100)
+
+        val after = preview.first { it.id == points[500].id }
+        assertTrue("le point après le trou ouvre un tronçon", after.isDiscontinuous)
+        assertEquals(
+            "le point d'avant le trou est gardé",
+            points[499].id,
+            preview[preview.indexOf(after) - 1].id
+        )
+    }
 }
