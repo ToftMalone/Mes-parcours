@@ -289,16 +289,10 @@
     <string name="cut_busy">Retrait de la portion</string>
     <string name="cut_done_title">Portion retirée</string>
     <string name="cut_delete_original_hint">La portion retirée sera perdue</string>
-    <string name="cut_info">La portion en rouge est retirée ; le reste du parcours est gardé tel quel, avant et après.</string>
-    <string name="err_cut_everything">Il ne resterait rien du parcours : réduisez la portion à retirer.</string>
-    <plurals name="cut_done_body_kept">
-        <item quantity="one">« %1$s » est dans l\'historique. L\'original est conservé.</item>
-        <item quantity="other">« %1$s (1) » et « %1$s (%2$d) », dans l\'historique. L\'original est conservé.</item>
-    </plurals>
-    <plurals name="cut_done_body_deleted">
-        <item quantity="one">« %1$s » est dans l\'historique. L\'original a été supprimé.</item>
-        <item quantity="other">« %1$s (1) » et « %1$s (%2$d) », dans l\'historique. L\'original a été supprimé.</item>
-    </plurals>
+    <string name="cut_info">La portion en rouge est retirée ; le reste reste en un seul parcours, sans trait à travers le trou.</string>
+    <string name="err_cut_everything">Il ne resterait pas de quoi faire un parcours : réduisez la portion à retirer.</string>
+    <string name="cut_done_body_kept">« %1$s » est dans l\'historique, en un seul parcours. L\'original est conservé.</string>
+    <string name="cut_done_body_deleted">« %1$s » est dans l\'historique, en un seul parcours. L\'original a été supprimé.</string>
     <string name="split_base_name">Nom de base</string>
     <string name="tool_delete_original">Supprimer l\'original</string>
     <string name="split_delete_original_hint">Les morceaux en contiennent tous les points</string>

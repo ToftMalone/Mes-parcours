@@ -368,9 +368,16 @@ elles survivent au rechargement du détail. `measurePortion` additionne la dista
 elles, page par page.
 
 `TrackRepository.cutPortion` retire les points entre les deux identifiants, inclus, et
-crée le morceau d'avant et celui d'après, chacun s'il a au moins deux points — même
-lecture unique, mêmes statistiques au passage, même transaction finale que le découpage.
-Un seul morceau garde le nom de base, sans numéro. Retirer tout est refusé.
+**crée un seul parcours** : ce qui précède la portion, puis ce qui la suit. Le père de
+l'auteur avait obtenu trois fichiers (l'original, l'avant, l'après) et veut « une seule
+trace ». Le premier point de la suite est marqué rupture de tronçon : aucun trait n'est
+dessiné à travers le trou, et la distance à vol d'oiseau n'est pas comptée (le
+`TrackStatsAccumulator` reçoit ce point marqué, la base aussi, via
+`markFirstPointAfterDiscontinuous`). Une portion au début ou à la fin ne laisse aucune
+rupture. Même lecture unique, mêmes statistiques au passage, même transaction finale que
+le découpage. **Dans ce mode, l'original est supprimé d'office** (le commutateur « Supprimer
+l'original » est coché à l'entrée du mode, et reste là pour le garder) : sinon l'historique
+garde deux parcours là où l'on en voulait un. Refusé s'il reste moins de deux points.
 `CutPortionTest` verrouille.
 
 ### `TrackStatsAccumulator`

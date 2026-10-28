@@ -1042,83 +1042,89 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         val low = minOf(fromPointId, toPointId)
         val high = maxOf(fromPointId, toPointId)
 
-        class Piece(val fromId: Long) {
-            val stats = TrackStatsAccumulator()
-            var count = 0
-            var startTime = 0L
-            var endTime = 0L
-            fun add(point: TrackPoint) {
-                if (count == 0) startTime = point.timestamp
-                endTime = point.timestamp
-                stats.add(point)
-                count++
-            }
-        }
-
-        var before: Piece? = null
-        var after: Piece? = null
+        // Un seul parcours en sortie : ce qui précède la portion, puis ce qui la suit. Le
+        // premier point de la suite ouvre un nouveau tronçon — rien n'est tracé ni compté
+        // à travers le trou, la distance à vol d'oiseau n'a jamais été parcourue.
+        val stats = TrackStatsAccumulator()
+        var keptCount = 0
+        var startTime = 0L
+        var endTime = 0L
+        var beforeFirstId: Long? = null
+        var afterFirstId: Long? = null
         var afterId = 0L
         while (true) {
             val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
             if (page.isEmpty()) break
             afterId = page.last().id
             for (point in page) {
-                when {
-                    point.id < low -> (before ?: Piece(point.id).also { before = it }).add(point)
-                    point.id > high -> (after ?: Piece(point.id).also { after = it }).add(point)
+                if (point.id in low..high) continue
+                var counted = point
+                if (point.id < low) {
+                    if (beforeFirstId == null) beforeFirstId = point.id
+                } else if (afterFirstId == null) {
+                    afterFirstId = point.id
+                    if (beforeFirstId != null) counted = point.copy(isDiscontinuous = true)
                 }
+                if (keptCount == 0) startTime = point.timestamp
+                endTime = point.timestamp
+                stats.add(counted)
+                keptCount++
             }
         }
-
-        // La tranche d'avant s'arrête juste avant la portion (borne haute exclusive),
-        // celle d'après va jusqu'au bout.
-        val planned = listOfNotNull(
-            before?.takeIf { it.count >= 2 }?.let { it to low },
-            after?.takeIf { it.count >= 2 }?.let { it to Long.MAX_VALUE }
-        )
-        if (planned.isEmpty()) throw UserFacingStateException(R.string.err_cut_everything)
+        if (keptCount < 2) throw UserFacingStateException(R.string.err_cut_everything)
 
         return database.withTransaction {
-            val newTrackIds = planned.mapIndexed { index, (piece, untilId) ->
-                val stats = piece.stats.result()
-                val newTrackId = trackDao.insertTrack(
-                    Track(
-                        name = if (planned.size == 1) baseName else "$baseName (${index + 1})",
-                        activityType = source.activityType,
-                        startTime = piece.startTime,
-                        endTime = piece.endTime,
-                        totalDistance = stats.distanceMeters,
-                        duration = stats.durationSec,
-                        maxSpeed = stats.maxSpeedMps,
-                        avgSpeed = stats.avgSpeedMps,
-                        elevationGain = stats.elevationGain,
-                        elevationLoss = stats.elevationLoss,
-                        isRecording = false,
-                        // Même héritage que le découpage : provenance et apparence, mais
-                        // jamais l'affichage sur la carte.
-                        isImported = source.isImported,
-                        isMerged = source.isMerged,
-                        isSelectedForMap = false,
-                        sourceColor = source.sourceColor,
-                        displayColor = source.displayColor,
-                        displayWidthDp = source.displayWidthDp
-                    )
+            val result = stats.result()
+            val newTrackId = trackDao.insertTrack(
+                Track(
+                    name = baseName,
+                    activityType = source.activityType,
+                    startTime = startTime,
+                    endTime = endTime,
+                    totalDistance = result.distanceMeters,
+                    duration = result.durationSec,
+                    maxSpeed = result.maxSpeedMps,
+                    avgSpeed = result.avgSpeedMps,
+                    elevationGain = result.elevationGain,
+                    elevationLoss = result.elevationLoss,
+                    isRecording = false,
+                    // Même héritage que le découpage : provenance et apparence, mais
+                    // jamais l'affichage sur la carte.
+                    isImported = source.isImported,
+                    isMerged = source.isMerged,
+                    isSelectedForMap = false,
+                    sourceColor = source.sourceColor,
+                    displayColor = source.displayColor,
+                    displayWidthDp = source.displayWidthDp
                 )
+            )
+            beforeFirstId?.let {
                 trackDao.copyPointRangeInto(
                     destinationId = newTrackId,
                     sourceId = sourceTrackId,
-                    fromId = piece.fromId,
-                    untilId = untilId
+                    fromId = it,
+                    untilId = low
                 )
-                trackDao.clearFirstPointDiscontinuity(newTrackId)
-                newTrackId
             }
+            val lastBeforeId = trackDao.getMaxPointId(newTrackId)
+            afterFirstId?.let {
+                trackDao.copyPointRangeInto(
+                    destinationId = newTrackId,
+                    sourceId = sourceTrackId,
+                    fromId = it,
+                    untilId = Long.MAX_VALUE
+                )
+            }
+            // Le premier point de la suite ouvre un tronçon ; celui du tout début du
+            // parcours, lui, n'a plus à en ouvrir un (voir le découpage).
+            if (lastBeforeId != null) trackDao.markFirstPointAfterDiscontinuous(newTrackId, lastBeforeId)
+            trackDao.clearFirstPointDiscontinuity(newTrackId)
             if (deleteSource) {
                 trackDao.deletePointsForTrack(sourceTrackId)
                 trackDao.deleteTrack(sourceTrackId)
             }
             invalidatePointCaches(sourceTrackId)
-            newTrackIds
+            listOf(newTrackId)
         }
     }
 

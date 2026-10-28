@@ -1101,9 +1101,9 @@ private fun SplitTrackTool(
                             onSuccess = { newTrackIds ->
                                 phase = ToolPhase.Done(
                                     title = context.getString(R.string.cut_done_title),
-                                    body = context.resources.getQuantityString(
-                                        if (deleting) R.plurals.cut_done_body_deleted else R.plurals.cut_done_body_kept,
-                                        newTrackIds.size, base, newTrackIds.size
+                                    body = context.getString(
+                                        if (deleting) R.string.cut_done_body_deleted else R.string.cut_done_body_kept,
+                                        base
                                     ),
                                     resultTrackId = newTrackIds.singleOrNull()
                                 )
@@ -1154,21 +1154,23 @@ private fun SplitTrackTool(
             SegmentButton(
                 stringResource(R.string.split_mode_segments), Icons.Rounded.Splitscreen,
                 selected = !onMap && mode == TrackRepository.SplitMode.SEGMENT_BREAKS,
-                onClick = { onMap = false; mode = TrackRepository.SplitMode.SEGMENT_BREAKS },
+                onClick = { if (onMap) deleteSource = false; onMap = false; mode = TrackRepository.SplitMode.SEGMENT_BREAKS },
                 testTag = "split_mode_segments",
                 modifier = Modifier.weight(1f)
             )
             SegmentButton(
                 stringResource(R.string.split_mode_gap), Icons.Rounded.Coffee,
                 selected = !onMap && mode == TrackRepository.SplitMode.TIME_GAP,
-                onClick = { onMap = false; mode = TrackRepository.SplitMode.TIME_GAP },
+                onClick = { if (onMap) deleteSource = false; onMap = false; mode = TrackRepository.SplitMode.TIME_GAP },
                 testTag = "split_mode_gap",
                 modifier = Modifier.weight(1f)
             )
             SegmentButton(
                 stringResource(R.string.split_mode_map), Icons.Rounded.Map,
                 selected = onMap,
-                onClick = { onMap = true },
+                // Retirer une portion remplace le parcours : l'original est supprimé d'office,
+                // la case reste là pour le garder.
+                onClick = { if (!onMap) deleteSource = true; onMap = true },
                 testTag = "split_mode_map",
                 modifier = Modifier.weight(1f)
             )

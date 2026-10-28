@@ -153,6 +153,13 @@ interface TrackDao {
     @Query("SELECT MAX(id) FROM track_points WHERE trackId = :trackId")
     suspend fun getMaxPointId(trackId: Long): Long?
 
+    /** Marque comme rupture de tronçon le premier point d'un parcours après [afterId]. */
+    @Query(
+        "UPDATE track_points SET isDiscontinuous = 1 WHERE id = " +
+                "(SELECT MIN(id) FROM track_points WHERE trackId = :trackId AND id > :afterId)"
+    )
+    suspend fun markFirstPointAfterDiscontinuous(trackId: Long, afterId: Long)
+
     @Query("SELECT MAX(id) FROM track_points")
     suspend fun getMaxPointIdGlobal(): Long?
 
