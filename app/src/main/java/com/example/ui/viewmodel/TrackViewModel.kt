@@ -494,6 +494,34 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             repository.getPreviewPoints(trackId)
         }
 
+    /** Le point par lequel un parcours se prolonge (voir [TrackRepository.extendTrack]). */
+    suspend fun loadEndPoint(trackId: Long, atEnd: Boolean): com.example.data.model.TrackPoint? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.getEndPoint(trackId, atEnd)
+        }
+
+    /** Prolonge un parcours d'un tracé dessiné sur la carte. */
+    fun extendTrack(
+        trackId: Long,
+        taps: List<Pair<Double, Double>>,
+        atEnd: Boolean,
+        newName: String,
+        deleteSource: Boolean,
+        onSuccess: (Long) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val id = repository.extendTrack(trackId, taps, atEnd, newName, deleteSource)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(id) }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.userMessage(appContext, R.string.err_extend_failed))
+                }
+            }
+        }
+    }
+
     /** Le détail d'un parcours dans la zone visible du sélecteur de portion. */
     suspend fun loadPickerPoints(
         trackId: Long,

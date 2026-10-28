@@ -328,6 +328,13 @@ class ScreensScreenshotTest {
         shoot("outils_decoupe", true)
     }
 
+    @Test fun outils_prolonger() {
+        seed(); tools(true); waitForTag("tools_tab")
+        compose.onNodeWithTag("open_extend_tool_button").performScrollTo().performClick()
+        waitForTag("extend_side_end")
+        shoot("outils_prolonger", true)
+    }
+
     @Test fun outils_decoupe_carte() {
         seed(); tools(true); waitForTag("tools_tab")
         compose.onNodeWithTag("open_split_tool_button").performClick()

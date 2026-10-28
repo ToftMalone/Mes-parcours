@@ -160,6 +160,19 @@ interface TrackDao {
     )
     suspend fun markFirstPointAfterDiscontinuous(trackId: Long, afterId: Long)
 
+    /** Retire la marque de rupture du premier point d'un parcours après [afterId]. */
+    @Query(
+        "UPDATE track_points SET isDiscontinuous = 0 WHERE id = " +
+                "(SELECT MIN(id) FROM track_points WHERE trackId = :trackId AND id > :afterId)"
+    )
+    suspend fun clearFirstPointAfterDiscontinuity(trackId: Long, afterId: Long)
+
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id ASC LIMIT 1")
+    suspend fun getFirstPoint(trackId: Long): TrackPoint?
+
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id DESC LIMIT 1")
+    suspend fun getLastPoint(trackId: Long): TrackPoint?
+
     @Query("SELECT MAX(id) FROM track_points")
     suspend fun getMaxPointIdGlobal(): Long?
 

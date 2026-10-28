@@ -213,6 +213,8 @@ deux réglages, un bouton de confirmation.
 - **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
   ci-dessous.
 - **Nettoyer un parcours** — retirer les points immobiles, décrit ci-dessous.
+- **Prolonger un parcours** — dessiner sur la carte la partie manquante, décrit
+  ci-dessous.
 
 **« Supprimer les points immobiles » avait été retiré** avant la 1.0, à la demande de
 l'auteur ; il est revenu après la 2.1.0 sous le nom « Nettoyer », à sa demande
@@ -379,6 +381,26 @@ le découpage. **Dans ce mode, l'original est supprimé d'office** (le commutate
 l'original » est coché à l'entrée du mode, et reste là pour le garder) : sinon l'historique
 garde deux parcours là où l'on en voulait un. Refusé s'il reste moins de deux points.
 `CutPortionTest` verrouille.
+
+### Prolonger un parcours
+
+Demandé par le père de l'auteur : « si j'ai arrêté ma trace trop tôt, créer des points
+manuellement sur la carte pour compléter la partie qui manque, comme dans Earth ».
+`ExtendTrackTool` reprend la carte de « Sur la carte » (`PortionPickerMap`, avec
+`onTapGeo` : l'appui renvoie l'endroit touché, et `sketch`, le tracé dessiné en
+pointillés). On choisit le bout (« À la fin » ou « Au début », repère rond), puis chaque
+appui ajoute un point relié au précédent ; « Annuler le point » et « Tout effacer ».
+
+`util/TrackExtender` fabrique les points : lignes droites d'un appui à l'autre, à
+l'allure moyenne du parcours (1,2 m/s à défaut), **redécoupées toutes les 5 s au plus**
+— sans quoi deux appuis éloignés seraient séparés de plusieurs minutes et
+`buildSegmentsFromPoints` couperait le trait au-delà de quinze secondes. Altitude et
+couleur de tronçon : celles du bout raccordé. `TrackRepository.extendTrack` écrit la
+copie comme le découpage (statistiques en une lecture, transaction unique,
+`copyPointRangeInto` à côté des points fabriqués) ; prolongé par le début, l'ancien
+premier point perd sa marque de rupture (`clearFirstPointAfterDiscontinuity`), sinon
+le raccord serait coupé. Comme pour le retrait d'une portion, l'original est supprimé
+d'office (case décochable) et le résultat garde son nom. `ExtendTrackTest` verrouille.
 
 ### `TrackStatsAccumulator`
 
@@ -762,9 +784,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 222 tests unitaires en 25 suites : `ScreensScreenshotTest` (37, captures seules —
+- 226 tests unitaires en 26 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (8), `BearingTest` (10),
+  `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

@@ -3,6 +3,7 @@ package com.example.ui.screen
 import androidx.annotation.StringRes
 import com.example.R
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -43,11 +44,14 @@ import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Coffee
 import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Merge
@@ -75,6 +79,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -125,7 +130,8 @@ private enum class Tool(@StringRes val titleRes: Int) {
     MERGE(R.string.tool_merge),
     SPLIT(R.string.tool_split),
     TRIM(R.string.tool_trim),
-    CLEAN(R.string.tool_clean)
+    CLEAN(R.string.tool_clean),
+    EXTEND(R.string.tool_extend)
 }
 
 /** Où en est un outil : réglages, travail en cours, résultat, ou rien à traiter. */
@@ -160,6 +166,7 @@ fun ToolsTab(
         Tool.SPLIT -> SplitTrackTool(viewModel, onOpenHistory, close, modifier)
         Tool.TRIM -> TrimTrackTool(viewModel, onNavigateToDetails, close, modifier)
         Tool.CLEAN -> CleanTrackTool(viewModel, onNavigateToDetails, close, modifier)
+        Tool.EXTEND -> ExtendTrackTool(viewModel, onNavigateToDetails, close, modifier)
     }
 }
 
@@ -234,6 +241,16 @@ private fun ToolsMenu(
                 subtitle = stringResource(R.string.tool_clean_subtitle),
                 onClick = { onOpenTool(Tool.CLEAN) },
                 testTag = "open_clean_tool_button"
+            )
+            ToolMenuEntry(
+                icon = Icons.Rounded.Route,
+                shape = SunShape,
+                container = colors.primaryContainer,
+                content = colors.onPrimaryContainer,
+                title = stringResource(R.string.tool_extend),
+                subtitle = stringResource(R.string.tool_extend_subtitle),
+                onClick = { onOpenTool(Tool.EXTEND) },
+                testTag = "open_extend_tool_button"
             )
         }
     }
@@ -1793,6 +1810,250 @@ private fun CleanTrackTool(
         )
         Spacer(modifier = Modifier.height(14.dp))
         InfoLine(Icons.Rounded.Verified, stringResource(R.string.clean_info))
+    }
+
+    if (picking) {
+        TrackPickerSheet(
+            tracks = eligibleTracks,
+            selectedId = selectedTrack?.id,
+            onPick = {
+                selectedTrackId = it.id
+                picking = false
+            },
+            onDismiss = { picking = false }
+        )
+    }
+}
+
+// ------------------------------------------------------------------- Prolonger
+
+/**
+ * Prolonger un parcours d'un tracé dessiné à la main, demandé par le père de l'auteur :
+ * « si j'ai arrêté ma trace trop tôt, créer des points manuellement sur la carte pour
+ * compléter la partie qui manque, comme dans Earth ». Chaque appui sur la carte ajoute
+ * un point, relié au précédent ; le premier part du bout du parcours.
+ */
+@Composable
+private fun ExtendTrackTool(
+    viewModel: TrackViewModel,
+    onNavigateToDetails: (Long) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val messenger = LocalAppMessenger.current
+    val tracks by viewModel.allTracks.collectAsState()
+    val eligibleTracks = tracks.filter { !it.isRecording }.sortedByDescending { it.startTime }
+
+    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
+    val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
+
+    var atEnd by remember(selectedTrack?.id) { mutableStateOf(true) }
+    var newName by remember { mutableStateOf("") }
+    // Comme le retrait d'une portion : on veut une seule trace à la fin.
+    var deleteSource by remember { mutableStateOf(true) }
+    var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
+    var picking by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedTrack?.id) {
+        selectedTrack?.let { newName = it.name }
+    }
+
+    var preview by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
+    var detail by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
+    var viewport by remember(selectedTrack?.id) { mutableStateOf<org.osmdroid.util.BoundingBox?>(null) }
+    var anchor by remember(selectedTrack?.id, atEnd) { mutableStateOf<TrackPoint?>(null) }
+    // Les appuis, du plus proche du bout au plus éloigné ; changer de bout les efface.
+    val taps = remember(selectedTrack?.id, atEnd) { mutableStateListOf<org.osmdroid.util.GeoPoint>() }
+    LaunchedEffect(selectedTrack?.id) {
+        val id = selectedTrack?.id ?: return@LaunchedEffect
+        val loaded = viewModel.loadPreviewPoints(id)
+        preview = loaded
+        if (detail == null) detail = loaded
+    }
+    LaunchedEffect(selectedTrack?.id, atEnd) {
+        val id = selectedTrack?.id ?: return@LaunchedEffect
+        anchor = viewModel.loadEndPoint(id, atEnd)
+    }
+    LaunchedEffect(selectedTrack?.id, viewport) {
+        val id = selectedTrack?.id ?: return@LaunchedEffect
+        val box = viewport ?: return@LaunchedEffect
+        detail = viewModel.loadPickerPoints(id, box.latSouth, box.latNorth, box.lonWest, box.lonEast)
+    }
+
+    val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
+        ToolPhase.Need(stringResource(R.string.extend_need_title), stringResource(R.string.extend_need_body))
+    } else phase
+
+    ToolScaffold(
+        tool = Tool.EXTEND,
+        phase = shownPhase,
+        onBack = onBack,
+        screenTag = "extend_tool",
+        backTag = "extend_tool_back_button",
+        modifier = modifier,
+        busyTitle = stringResource(R.string.extend_busy_title),
+        busySubtitle = stringResource(R.string.extend_busy_subtitle),
+        doneActions = {
+            val result = (phase as? ToolPhase.Done)?.resultTrackId
+            DoneButtons(
+                onFinish = onBack,
+                primaryLabel = if (result != null) stringResource(R.string.tool_view_track) else null,
+                onPrimary = {
+                    if (result != null) {
+                        viewModel.selectTrack(result)
+                        onNavigateToDetails(result)
+                    }
+                },
+                primaryTag = "extend_open_result"
+            )
+        },
+        action = {
+            ToolActionButton(
+                text = stringResource(R.string.extend_action),
+                icon = Icons.Rounded.Route,
+                enabled = selectedTrack != null && newName.isNotBlank() && taps.isNotEmpty() && anchor != null,
+                testTag = "confirm_extend_button",
+                onClick = {
+                    val track = selectedTrack ?: return@ToolActionButton
+                    val name = newName.trim()
+                    val deleting = deleteSource
+                    phase = ToolPhase.Busy
+                    viewModel.extendTrack(
+                        trackId = track.id,
+                        taps = taps.map { it.latitude to it.longitude },
+                        atEnd = atEnd,
+                        newName = name,
+                        deleteSource = deleting,
+                        onSuccess = { id ->
+                            phase = ToolPhase.Done(
+                                title = context.getString(R.string.extend_done_title),
+                                body = context.getString(
+                                    if (deleting) R.string.extend_done_body_deleted else R.string.extend_done_body_kept,
+                                    name
+                                ),
+                                resultTrackId = id
+                            )
+                        },
+                        onError = { error ->
+                            phase = ToolPhase.Form
+                            messenger.show(error, Icons.Rounded.Error, isError = true)
+                        }
+                    )
+                }
+            )
+        }
+    ) {
+        val track = selectedTrack ?: return@ToolScaffold
+        SelectedTrackCard(
+            track = track,
+            subtitle = stringResource(R.string.track_row_subtitle_date, categoryOf(track), FormatUtils.formatDistanceShort(track.totalDistance), FormatUtils.formatDurationShort(track.duration)),
+            onClick = { picking = true }
+        )
+
+        SectionLabel(stringResource(R.string.extend_side_label))
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            SegmentButton(
+                stringResource(R.string.extend_side_end), Icons.Rounded.Flag,
+                selected = atEnd,
+                onClick = { atEnd = true },
+                testTag = "extend_side_end",
+                modifier = Modifier.weight(1f)
+            )
+            SegmentButton(
+                stringResource(R.string.extend_side_start), Icons.Rounded.Flag,
+                selected = !atEnd,
+                onClick = { atEnd = false },
+                testTag = "extend_side_start",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            stringResource(R.string.extend_hint),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)
+        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(420.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        ) {
+            val shown = detail
+            val fit = preview
+            if (shown == null || fit == null) {
+                CircularProgressIndicator()
+            } else if (fit.isNotEmpty()) {
+                PortionPickerMap(
+                    points = shown,
+                    fitPoints = fit,
+                    start = anchor,
+                    end = null,
+                    onTapPoint = {},
+                    onViewportChange = { viewport = it },
+                    sketch = taps.toList(),
+                    onTapGeo = { taps.add(it) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(top = 10.dp)
+        ) {
+            SegmentButton(
+                stringResource(R.string.extend_undo), Icons.AutoMirrored.Rounded.Undo,
+                selected = false,
+                onClick = { if (taps.isNotEmpty()) taps.removeAt(taps.lastIndex) },
+                testTag = "extend_undo",
+                modifier = Modifier.weight(1f)
+            )
+            SegmentButton(
+                stringResource(R.string.extend_clear), Icons.Rounded.Delete,
+                selected = false,
+                onClick = { taps.clear() },
+                testTag = "extend_clear",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        val origin = anchor
+        if (origin != null && taps.isNotEmpty()) {
+            val meters = remember(origin, taps.toList()) {
+                val result = FloatArray(1)
+                var total = 0.0
+                var lat = origin.latitude
+                var lon = origin.longitude
+                for (p in taps) {
+                    android.location.Location.distanceBetween(lat, lon, p.latitude, p.longitude, result)
+                    total += result[0]
+                    lat = p.latitude
+                    lon = p.longitude
+                }
+                total
+            }
+            Text(
+                pluralStringResource(R.plurals.extend_summary, taps.size, taps.size, FormatUtils.formatDistanceShort(meters)),
+                style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(start = 4.dp, top = 10.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        FilledField(newName, { newName = it }, stringResource(R.string.tool_result_name_label), "extend_name_field")
+        Spacer(modifier = Modifier.height(10.dp))
+        SwitchCard(
+            title = stringResource(R.string.tool_delete_original),
+            subtitle = stringResource(R.string.extend_delete_original_hint),
+            checked = deleteSource,
+            onToggle = { deleteSource = !deleteSource },
+            testTag = "extend_delete_source_row"
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        InfoLine(Icons.Rounded.Verified, stringResource(R.string.extend_info))
     }
 
     if (picking) {

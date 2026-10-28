@@ -36,6 +36,10 @@ import org.osmdroid.views.overlay.Polyline
  * montrer les points, pas la silhouette de tout le parcours. [fitPoints] ne sert qu'à
  * cadrer la carte une fois, à l'ouverture.
  *
+ * Sert aussi à l'outil « Prolonger » : avec [onTapGeo], un appui renvoie l'endroit
+ * touché tel quel, et [sketch] — le tracé dessiné à la main — est dessiné depuis [start]
+ * en pointillés, un petit repère sur chaque appui.
+ *
  * Une carte à part, et non `MapViewContainer` : celle-là sert le suivi en direct et
  * l'affichage par fenêtre de vue (invariant 3), et reconstruit ses calques d'elle-même
  * au franchissement du seuil de zoom, ce qui effacerait ceux-ci.
@@ -53,13 +57,17 @@ fun PortionPickerMap(
     end: TrackPoint?,
     onTapPoint: (TrackPoint) -> Unit,
     onViewportChange: (BoundingBox) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sketch: List<GeoPoint> = emptyList(),
+    onTapGeo: ((GeoPoint) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val isDark = LocalIsDarkTheme.current
     val trackColor = MaterialTheme.colorScheme.primary.toArgb()
     val cutColor = MaterialTheme.colorScheme.error.toArgb()
     val currentOnTap = rememberUpdatedState(onTapPoint)
+    val currentOnTapGeo = rememberUpdatedState(onTapGeo)
+    val sketchColor = MaterialTheme.colorScheme.tertiary.toArgb()
     val currentOnViewport = rememberUpdatedState(onViewportChange)
     val currentPoints = rememberUpdatedState(points)
     val density = context.resources.displayMetrics.density
@@ -126,11 +134,13 @@ fun PortionPickerMap(
     }
 
     // Le tracé, la portion en rouge et les deux repères suivent le détail et les bornes.
-    LaunchedEffect(mapView, points, start, end, trackColor, cutColor) {
+    LaunchedEffect(mapView, points, start, end, trackColor, cutColor, sketch) {
         mapView.overlays.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                nearestPoint(currentPoints.value, p)?.let { currentOnTap.value(it) }
+                val raw = currentOnTapGeo.value
+                if (raw != null) raw(p)
+                else nearestPoint(currentPoints.value, p)?.let { currentOnTap.value(it) }
                 return true
             }
 
@@ -150,6 +160,14 @@ fun PortionPickerMap(
                 line.setPoints(inPortion.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
                 mapView.overlays.add(line)
             }
+        }
+        if (sketch.isNotEmpty()) {
+            val origin = start?.let { listOf(GeoPoint(it.latitude, it.longitude)) }.orEmpty()
+            val line = styledLine(mapView, sketchColor, 5f * density)
+            line.outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(14f * density, 8f * density), 0f)
+            line.setPoints(origin + sketch)
+            mapView.overlays.add(line)
+            sketch.forEach { mapView.overlays.add(dotMarker(mapView, it, sketchColor, density)) }
         }
         start?.let { mapView.overlays.add(boundaryMarker(mapView, it, trackColor, density)) }
         end?.let { mapView.overlays.add(boundaryMarker(mapView, it, cutColor, density)) }
@@ -187,6 +205,21 @@ private fun boundaryMarker(mapView: MapView, point: TrackPoint, fill: Int, densi
             shape = android.graphics.drawable.GradientDrawable.OVAL
             setColor(fill)
             setStroke((3 * density).toInt(), Color.WHITE)
+            setSize(size, size)
+        }
+        setOnMarkerClickListener { _, _ -> false }
+    }
+
+/** Un petit rond plein sur un appui du tracé dessiné. */
+private fun dotMarker(mapView: MapView, at: GeoPoint, fill: Int, density: Float): Marker =
+    Marker(mapView).apply {
+        position = at
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        val size = (12 * density).toInt()
+        icon = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(fill)
+            setStroke((2 * density).toInt(), Color.WHITE)
             setSize(size, size)
         }
         setOnMarkerClickListener { _, _ -> false }

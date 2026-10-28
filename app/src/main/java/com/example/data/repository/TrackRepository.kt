@@ -16,6 +16,7 @@ import com.example.util.UserFacingStateException
 import com.example.util.Exporter
 import com.example.util.MediaStoreExporter
 import com.example.util.StopCollapser
+import com.example.util.TrackExtender
 import com.example.util.TrackStatsAccumulator
 import com.example.util.TrackStylePreferences
 import kotlinx.coroutines.Dispatchers
@@ -1125,6 +1126,114 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             }
             invalidatePointCaches(sourceTrackId)
             listOf(newTrackId)
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Prolongement dessiné à la main
+    // ------------------------------------------------------------------
+
+    /** Le point par lequel [trackId] se prolonge : son dernier, ou son premier. */
+    suspend fun getEndPoint(trackId: Long, atEnd: Boolean): TrackPoint? =
+        if (atEnd) trackDao.getLastPoint(trackId) else trackDao.getFirstPoint(trackId)
+
+    /**
+     * Crée une copie de [sourceTrackId] prolongée par un tracé dessiné sur la carte :
+     * [taps] (latitude, longitude), à partir de son dernier point avec [atEnd], de son
+     * premier sinon. Les points du prolongement viennent de [TrackExtender], à
+     * l'allure moyenne du parcours.
+     *
+     * Le prolongement est raccordé sans rupture : c'est tout son intérêt. Prolongé par
+     * le début, l'ancien premier point — qui ouvrait le tracé, donc portait la marque
+     * de rupture — la perd, sans quoi le trait s'interromprait au raccord.
+     *
+     * Même écriture que le découpage : une lecture page par page pour les statistiques,
+     * puis une transaction unique où SQLite recopie les points d'origine
+     * (`copyPointRangeInto`, invariant 5) à côté des points fabriqués. Le parcours
+     * d'origine n'est supprimé que si [deleteSource] le demande.
+     */
+    suspend fun extendTrack(
+        sourceTrackId: Long,
+        taps: List<Pair<Double, Double>>,
+        atEnd: Boolean,
+        newName: String,
+        deleteSource: Boolean
+    ): Long {
+        val source = trackDao.getTrackById(sourceTrackId)
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
+        if (isBeingRecorded(source)) {
+            throw UserFacingArgumentException(R.string.err_track_is_recording)
+        }
+        if (taps.isEmpty()) throw UserFacingArgumentException(R.string.err_extend_empty)
+        val anchor = getEndPoint(sourceTrackId, atEnd)
+            ?: throw UserFacingStateException(R.string.err_extend_empty_track)
+        val added = TrackExtender.build(
+            anchor = anchor,
+            taps = taps,
+            speedMps = TrackExtender.speedFor(source.avgSpeed),
+            forward = atEnd,
+            trackId = 0L
+        )
+
+        val stats = TrackStatsAccumulator()
+        if (!atEnd) added.forEach(stats::add)
+        var first = true
+        var afterId = 0L
+        while (true) {
+            val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            for (point in page) {
+                stats.add(if (first && !atEnd) point.copy(isDiscontinuous = false) else point)
+                first = false
+            }
+        }
+        if (atEnd) added.forEach(stats::add)
+        val result = stats.result()
+        val startTime = if (atEnd) source.startTime else added.first().timestamp
+        val endTime = if (atEnd) added.last().timestamp else maxOf(source.endTime, source.startTime)
+
+        return database.withTransaction {
+            val newTrackId = trackDao.insertTrack(
+                Track(
+                    name = newName,
+                    activityType = source.activityType,
+                    startTime = startTime,
+                    endTime = endTime,
+                    totalDistance = result.distanceMeters,
+                    duration = result.durationSec,
+                    maxSpeed = result.maxSpeedMps,
+                    avgSpeed = result.avgSpeedMps,
+                    elevationGain = result.elevationGain,
+                    elevationLoss = result.elevationLoss,
+                    isRecording = false,
+                    // Même héritage que le découpage : provenance et apparence, mais
+                    // jamais l'affichage sur la carte.
+                    isImported = source.isImported,
+                    isMerged = source.isMerged,
+                    isSelectedForMap = false,
+                    sourceColor = source.sourceColor,
+                    displayColor = source.displayColor,
+                    displayWidthDp = source.displayWidthDp
+                )
+            )
+            val fabricated = added.map { it.copy(trackId = newTrackId) }
+            if (atEnd) {
+                trackDao.copyPointRangeInto(newTrackId, sourceTrackId, 0L, Long.MAX_VALUE)
+                trackDao.insertTrackPoints(fabricated)
+            } else {
+                trackDao.insertTrackPoints(fabricated)
+                val lastAddedId = trackDao.getMaxPointId(newTrackId) ?: 0L
+                trackDao.copyPointRangeInto(newTrackId, sourceTrackId, 0L, Long.MAX_VALUE)
+                trackDao.clearFirstPointAfterDiscontinuity(newTrackId, lastAddedId)
+            }
+            trackDao.clearFirstPointDiscontinuity(newTrackId)
+            if (deleteSource) {
+                trackDao.deletePointsForTrack(sourceTrackId)
+                trackDao.deleteTrack(sourceTrackId)
+            }
+            invalidatePointCaches(sourceTrackId)
+            newTrackId
         }
     }
 

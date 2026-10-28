@@ -406,5 +406,30 @@
     <string name="clean_delete_original_hint">Le résultat est une copie</string>
     <string name="clean_info">Les ruptures de tronçon sont toujours gardées : deux tronçons distincts ne sont jamais recollés.</string>
     <string name="err_clean_none">Aucun arrêt assez long dans ce parcours : il n\'y a rien à nettoyer.</string>
+    <string name="tool_extend">Prolonger</string>
+    <string name="tool_extend_subtitle">Compléter un parcours arrêté trop tôt en dessinant la suite sur la carte.</string>
+    <string name="extend_side_label">Où ajouter</string>
+    <string name="extend_side_end">À la fin</string>
+    <string name="extend_side_start">Au début</string>
+    <string name="extend_hint">Zoomez sur la carte, puis touchez-la point après point le long du chemin manquant : chaque appui est relié au précédent, et le premier part du bout du parcours (le rond).</string>
+    <string name="extend_undo">Annuler le point</string>
+    <string name="extend_clear">Tout effacer</string>
+    <plurals name="extend_summary">
+        <item quantity="one">%1$d point dessiné · %2$s ajoutés</item>
+        <item quantity="other">%1$d points dessinés · %2$s ajoutés</item>
+    </plurals>
+    <string name="extend_need_title">Aucun parcours à prolonger</string>
+    <string name="extend_need_body">Enregistrez ou importez un parcours pour pouvoir le prolonger ici.</string>
+    <string name="extend_busy_title">Prolongement…</string>
+    <string name="extend_busy_subtitle">Ajout des points dessinés</string>
+    <string name="extend_action">Prolonger le parcours</string>
+    <string name="extend_done_title">Parcours prolongé</string>
+    <string name="extend_done_body_kept">« %1$s » est dans l\'historique. L\'original est conservé.</string>
+    <string name="extend_done_body_deleted">« %1$s » est dans l\'historique, à la place de l\'original.</string>
+    <string name="extend_delete_original_hint">Pour ne garder qu\'une seule trace</string>
+    <string name="extend_info">Les points ajoutés suivent vos appuis en ligne droite, à l\'allure moyenne du parcours : distance, durée et vitesse en tiennent compte.</string>
+    <string name="err_extend_empty">Touchez la carte pour dessiner la partie à ajouter.</string>
+    <string name="err_extend_empty_track">Ce parcours n\'a aucun point à prolonger.</string>
+    <string name="err_extend_failed">Erreur de prolongement</string>
     <string name="err_clean_failed">Erreur de nettoyage</string>
 </resources>
