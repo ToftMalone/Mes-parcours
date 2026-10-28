@@ -375,6 +375,8 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_3_a">Nouvel outil « Prolonger » : dessinez sur la carte la partie manquante d\'un parcours arrêté trop tôt, à la fin ou au début, en touchant la carte point après point</string>
+    <string name="rel_2_3_b">« Découper », mode « Sur la carte » : le détail du tracé suit le zoom, on pose le début puis la fin d\'un appui, et le résultat tient en un seul parcours</string>
     <string name="rel_2_2_5_a">« Découper », mode « Sur la carte » : le résultat tient maintenant en un seul parcours, sans trait à travers la portion retirée</string>
     <string name="rel_2_2_5_b">L\'original est supprimé d\'office dans ce mode (l\'interrupteur reste là pour le garder)</string>
     <string name="rel_2_2_4_a">« Découper », mode « Sur la carte » : la carte montre le détail du tracé quand on zoome, sans plus couper les virages</string>
