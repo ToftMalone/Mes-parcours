@@ -375,6 +375,8 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_2_5_a">« Découper », mode « Sur la carte » : le résultat tient maintenant en un seul parcours, sans trait à travers la portion retirée</string>
+    <string name="rel_2_2_5_b">L\'original est supprimé d\'office dans ce mode (l\'interrupteur reste là pour le garder)</string>
     <string name="rel_2_2_4_a">« Découper », mode « Sur la carte » : la carte montre le détail du tracé quand on zoome, sans plus couper les virages</string>
     <string name="rel_2_2_4_b">On pose le début puis la fin de la portion d\'un appui sur la carte, au lieu des curseurs</string>
     <string name="rel_2_2_3_a">« Découper », mode « Sur la carte » : plus de trait entre des points que rien ne relie</string>
