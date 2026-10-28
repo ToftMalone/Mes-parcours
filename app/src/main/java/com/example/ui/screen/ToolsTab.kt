@@ -129,7 +129,6 @@ import kotlin.math.sin
 private enum class Tool(@StringRes val titleRes: Int) {
     MERGE(R.string.tool_merge),
     SPLIT(R.string.tool_split),
-    TRIM(R.string.tool_trim),
     CLEAN(R.string.tool_clean),
     EXTEND(R.string.tool_extend)
 }
@@ -164,7 +163,6 @@ fun ToolsTab(
         null -> ToolsMenu(onOpenTool = { openTool = it }, contentPadding = contentPadding, modifier = modifier)
         Tool.MERGE -> MergeTracksTool(viewModel, onNavigateToDetails, close, modifier)
         Tool.SPLIT -> SplitTrackTool(viewModel, onOpenHistory, close, modifier)
-        Tool.TRIM -> TrimTrackTool(viewModel, onNavigateToDetails, close, modifier)
         Tool.CLEAN -> CleanTrackTool(viewModel, onNavigateToDetails, close, modifier)
         Tool.EXTEND -> ExtendTrackTool(viewModel, onNavigateToDetails, close, modifier)
     }
@@ -221,16 +219,6 @@ private fun ToolsMenu(
                 subtitle = stringResource(R.string.tool_split_subtitle),
                 onClick = { onOpenTool(Tool.SPLIT) },
                 testTag = "open_split_tool_button"
-            )
-            ToolMenuEntry(
-                icon = Icons.Rounded.TimerOff,
-                shape = SunShape,
-                container = colors.secondaryContainer,
-                content = colors.onSecondaryContainer,
-                title = stringResource(R.string.tool_trim),
-                subtitle = stringResource(R.string.tool_trim_subtitle),
-                onClick = { onOpenTool(Tool.TRIM) },
-                testTag = "open_trim_tool_button"
             )
             ToolMenuEntry(
                 icon = Icons.Rounded.CleaningServices,
@@ -660,7 +648,7 @@ private fun SwitchCard(title: String, subtitle: String, checked: Boolean, onTogg
     }
 }
 
-/** Parcours choisi pour découper ou rogner ; l'appui ouvre la liste des parcours. */
+/** Parcours choisi pour découper, nettoyer ou prolonger ; l'appui ouvre la liste des parcours. */
 @Composable
 private fun SelectedTrackCard(track: Track, subtitle: String, onClick: () -> Unit) {
     Row(
@@ -688,7 +676,7 @@ private fun SelectedTrackCard(track: Track, subtitle: String, onClick: () -> Uni
     }
 }
 
-/** Choix d'un parcours, dans une feuille : pour découper ou rogner. */
+/** Choix d'un parcours, dans une feuille : pour découper, nettoyer ou prolonger. */
 @Composable
 private fun TrackPickerSheet(tracks: List<Track>, selectedId: Long?, onPick: (Track) -> Unit, onDismiss: () -> Unit) {
     MpSheet(onDismissRequest = onDismiss) {
@@ -1413,244 +1401,6 @@ private fun SegmentButton(
     }
 }
 
-// --------------------------------------------------------------------- Rogner
-
-/** Bornes des curseurs de rognage, en minutes, et pas du curseur. */
-private const val TRIM_MAX_MINUTES = 60f
-private const val TRIM_SLIDER_STEPS = 59 // un cran par minute
-
-@Composable
-private fun TrimTrackTool(
-    viewModel: TrackViewModel,
-    onNavigateToDetails: (Long) -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val messenger = LocalAppMessenger.current
-    val trimNameFormat = stringResource(R.string.trim_name_format)
-    val tracks by viewModel.allTracks.collectAsState()
-    val eligibleTracks = tracks.filter { !it.isRecording }.sortedByDescending { it.startTime }
-
-    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
-    val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
-
-    var dropStartMinutes by remember { mutableFloatStateOf(0f) }
-    var dropEndMinutes by remember { mutableFloatStateOf(0f) }
-    var newName by remember { mutableStateOf("") }
-    var deleteSource by remember { mutableStateOf(false) }
-    var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
-    var picking by remember { mutableStateOf(false) }
-
-    // Le nom proposé est celui du parcours choisi, suffixé : le résultat est une
-    // copie, et deux lignes du même nom dans l'historique ne se distingueraient pas.
-    LaunchedEffect(selectedTrack?.id) {
-        selectedTrack?.let { newName = trimNameFormat.format(it.name) }
-    }
-
-    val a = dropStartMinutes.roundToInt()
-    val b = dropEndMinutes.roundToInt()
-    val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
-        ToolPhase.Need(stringResource(R.string.trim_need_title), stringResource(R.string.trim_need_body))
-    } else phase
-
-    ToolScaffold(
-        tool = Tool.TRIM,
-        phase = shownPhase,
-        onBack = onBack,
-        screenTag = "trim_tool",
-        backTag = "trim_tool_back_button",
-        modifier = modifier,
-        busyTitle = stringResource(R.string.trim_busy_title),
-        busySubtitle = stringResource(R.string.trim_busy_subtitle),
-        doneActions = {
-            val result = (phase as? ToolPhase.Done)?.resultTrackId
-            DoneButtons(
-                onFinish = onBack,
-                primaryLabel = if (result != null) stringResource(R.string.tool_view_track) else null,
-                onPrimary = {
-                    if (result != null) {
-                        viewModel.selectTrack(result)
-                        onNavigateToDetails(result)
-                    }
-                },
-                primaryTag = "trim_open_result"
-            )
-        },
-        action = {
-            ToolActionButton(
-                text = stringResource(R.string.trim_action),
-                icon = Icons.Rounded.TimerOff,
-                enabled = selectedTrack != null && newName.isNotBlank() && (a > 0 || b > 0),
-                testTag = "confirm_trim_button",
-                onClick = {
-                    val track = selectedTrack ?: return@ToolActionButton
-                    val name = newName.trim()
-                    val deleting = deleteSource
-                    phase = ToolPhase.Busy
-                    viewModel.trimTrack(
-                        trackId = track.id,
-                        dropStartMillis = a * 60_000L,
-                        dropEndMillis = b * 60_000L,
-                        newName = name,
-                        deleteSource = deleting,
-                        onSuccess = { newTrackId ->
-                            phase = ToolPhase.Done(
-                                title = context.getString(R.string.trim_done_title),
-                                body = context.getString(
-                                    if (deleting) R.string.trim_done_body_deleted else R.string.trim_done_body_kept,
-                                    name
-                                ),
-                                resultTrackId = newTrackId
-                            )
-                        },
-                        onError = { error ->
-                            phase = ToolPhase.Form
-                            messenger.show(error, Icons.Rounded.Error, isError = true)
-                        }
-                    )
-                }
-            )
-        }
-    ) {
-        val track = selectedTrack ?: return@ToolScaffold
-        val end = if (track.endTime > track.startTime) track.endTime else track.startTime + track.duration * 1000
-        SelectedTrackCard(
-            track = track,
-            subtitle = "${FormatUtils.formatClock(track.startTime)} → ${FormatUtils.formatClock(end)} · ${FormatUtils.formatDurationShort(track.duration)}",
-            onClick = { picking = true }
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-        KeptDurationBar(totalSeconds = track.duration, dropStartMinutes = a, dropEndMinutes = b)
-
-        Spacer(modifier = Modifier.height(12.dp))
-        TrimSliderCard(stringResource(R.string.trim_remove_start), a, dropStartMinutes, { dropStartMinutes = it }, "trim_start_slider")
-        Spacer(modifier = Modifier.height(8.dp))
-        TrimSliderCard(stringResource(R.string.trim_remove_end), b, dropEndMinutes, { dropEndMinutes = it }, "trim_end_slider")
-
-        Spacer(modifier = Modifier.height(12.dp))
-        FilledField(newName, { newName = it }, stringResource(R.string.tool_result_name_label), "trim_name_field")
-        Spacer(modifier = Modifier.height(10.dp))
-        SwitchCard(
-            title = stringResource(R.string.tool_delete_original),
-            subtitle = stringResource(R.string.trim_delete_original_hint),
-            checked = deleteSource,
-            onToggle = { deleteSource = !deleteSource },
-            testTag = "trim_delete_source_row"
-        )
-        if (a > 0 || b > 0) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .testTag("trim_warning")
-            ) {
-                Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(20.dp))
-                Text(
-                    trimWarning(a, b),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-    }
-
-    if (picking) {
-        TrackPickerSheet(
-            tracks = eligibleTracks,
-            selectedId = selectedTrack?.id,
-            onPick = {
-                selectedTrackId = it.id
-                picking = false
-            },
-            onDismiss = { picking = false }
-        )
-    }
-}
-
-@Composable
-private fun trimWarning(a: Int, b: Int): String = when {
-    a > 0 && b > 0 -> stringResource(R.string.trim_warning_both, formatMinutes(a), formatMinutes(b))
-    a > 0 -> stringResource(R.string.trim_warning_start, formatMinutes(a))
-    else -> stringResource(R.string.trim_warning_end, formatMinutes(b))
-}
-
-@Composable
-private fun TrimSliderCard(label: String, minutes: Int, value: Float, onValueChange: (Float) -> Unit, testTag: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp), modifier = Modifier.weight(1f))
-            Text(formatMinutes(minutes), style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp))
-        }
-        MpSlider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = 0f..TRIM_MAX_MINUTES,
-            steps = TRIM_SLIDER_STEPS,
-            testTag = testTag
-        )
-    }
-}
-
-/**
- * Barre de la durée conservée : le parcours entier, dont les bouts retirés sont
- * hachurés, en proportion de leur durée réelle.
- */
-@Composable
-private fun KeptDurationBar(totalSeconds: Long, dropStartMinutes: Int, dropEndMinutes: Int) {
-    val colors = MaterialTheme.colorScheme
-    val total = totalSeconds.coerceAtLeast(1L).toFloat()
-    val startFraction = (dropStartMinutes * 60f / total).coerceIn(0f, 1f)
-    val endFraction = (dropEndMinutes * 60f / total).coerceIn(0f, 1f - startFraction)
-    val keptSeconds = (totalSeconds - (dropStartMinutes + dropEndMinutes) * 60L).coerceAtLeast(0L)
-    val hatchLight = colors.errorContainer
-    val hatchDark = colors.error
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(40.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.primary)
-            .testTag("trim_kept_bar")
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            fun hatch(x0: Float, width: Float) {
-                if (width <= 0f) return
-                clipRect(left = x0, top = 0f, right = x0 + width, bottom = size.height) {
-                    drawRect(hatchLight, Offset(x0, 0f), Size(width, size.height))
-                    val step = 8.dp.toPx()
-                    var x = x0 - size.height
-                    while (x < x0 + width) {
-                        drawLine(hatchDark, Offset(x, size.height), Offset(x + size.height, 0f), strokeWidth = 2.dp.toPx())
-                        x += step
-                    }
-                }
-            }
-            hatch(0f, size.width * startFraction)
-            hatch(size.width * (1f - endFraction), size.width * endFraction)
-        }
-        Text(
-            if (keptSeconds > 0) stringResource(R.string.trim_kept_label, FormatUtils.formatDurationShort(keptSeconds)) else stringResource(R.string.trim_nothing_left),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.onPrimary
-        )
-    }
-}
-
 // -------------------------------------------------------------------- Nettoyer
 
 /**
@@ -1683,7 +1433,7 @@ private fun CleanTrackTool(
     var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
     var picking by remember { mutableStateOf(false) }
 
-    // Même raison que le rognage : le résultat est une copie, et deux lignes de même
+    // Le résultat est une copie, et deux lignes de même
     // nom dans l'historique seraient impossibles à distinguer.
     LaunchedEffect(selectedTrack?.id) {
         selectedTrack?.let { newName = nameFormat.format(it.name) }

@@ -151,7 +151,7 @@ la mise à jour, sans reprise à écrire. Cette valeur générale sert aussi à 
 cours d'enregistrement. `TrackStylePreferences.resolveThicknessDp` tranche ; chaque
 tracé superposé est dessiné à sa propre épaisseur, **les plus épais d'abord**, donc
 en dessous : des parcours refaits sur le même chemin se superposent, et un trait
-épais dessiné en dernier recouvrait les fins. Découpage et rognage la transmettent
+épais dessiné en dernier recouvrait les fins. Le découpage la transmet
 aux morceaux, comme la couleur.
 
 **La reprise des couleurs existantes est obligatoire.** La migration 7→8 ne peut pas
@@ -210,8 +210,6 @@ deux réglages, un bouton de confirmation.
   toute la liste.
 - **Découper un parcours** — l'inverse de la fusion, décrit ci-dessous ; ou en
   retirer une portion choisie sur la carte.
-- **Rogner un parcours** — retirer ses premières et dernières minutes, décrit
-  ci-dessous.
 - **Nettoyer un parcours** — retirer les points immobiles, décrit ci-dessous.
 - **Prolonger un parcours** — dessiner sur la carte la partie manquante, décrit
   ci-dessous.
@@ -263,39 +261,6 @@ morceaux les allumerait tous d'un coup sur la carte.
 
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
-
-### Rogner un parcours
-
-`TrackRepository.trimTrack` crée une copie amputée de ses premières et dernières
-minutes. C'est le besoin le plus banal d'un traqueur GPS : l'enregistrement oublié
-qui a continué sur la route du retour, ou démarré depuis le parking.
-
-Même forme que le découpage, et pour les mêmes raisons : une seule lecture page par
-page, des bornes relevées en **identifiants de points**, les statistiques cumulées
-pendant cette même passe, puis une transaction unique où SQLite recopie la tranche
-(`copyPointRangeInto`, invariant 5).
-
-**Les bornes se comparent aux horodatages, jamais à un rang.** Sur un enregistrement
-à trous — pause, perte de signal — « retirer les cinq premières minutes » ne veut pas
-dire retirer un nombre fixe de points. `getFirstPointTimestamp` et
-`getLastPointTimestamp` donnent les deux extrémités sans charger un seul point.
-
-Trois refus, chacun avec son message :
-
-1. **Ne rien retirer** — le résultat ne serait qu'un doublon.
-2. **Retirer plus que la durée du parcours** — les deux bornes se croisent.
-3. **Ne laisser qu'un point** — ni tracé, ni distance, ni durée à en tirer. Ce
-   troisième cas n'est atteignable que sur un parcours à trous : sur des points
-   régulièrement espacés, tout rognage assez large fait d'abord se croiser les
-   bornes, et c'est le refus précédent qui se déclenche.
-
-`clearFirstPointDiscontinuity` sur le résultat, pour la même raison que le découpage :
-le point devenu premier ouvrait peut-être un tronçon, il ne fait plus qu'ouvrir le
-tracé.
-
-Le parcours d'origine n'est jamais modifié, et n'est supprimé que si l'utilisateur
-coche la case. Le résultat hérite de la provenance et de l'apparence du parent, mais
-jamais de `isSelectedForMap`.
 
 ### Nettoyer un parcours
 
@@ -784,9 +749,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 226 tests unitaires en 26 suites : `ScreensScreenshotTest` (38, captures seules —
+- 212 tests unitaires en 25 suites : `ScreensScreenshotTest` (37, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `TrimTrackTest` (14), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
@@ -1490,6 +1455,16 @@ inadvertance :
   jamais concernée), et l'entrée `Tool.CSV_CONVERT`. `MediaStoreExporter
   .saveToLocalDownloadsStreaming` reste : la sauvegarde automatique s'en sert
   toujours.
+
+- Cinquième passe, après la 2.3, à la demande de l'auteur : **l'outil « Rogner »**.
+  « Découper » > « Sur la carte » fait la même chose en mieux : retirer le début ou
+  la fin d'un parcours, c'est y choisir une portion qui touche l'un des bouts (aucune
+  rupture n'est laissée, voir « Retirer une portion choisie sur la carte »). Sont
+  partis avec lui `TrackRepository.trimTrack`, `TrackViewModel.trimTrack`,
+  `TrackDao.getFirstPointTimestamp` / `getLastPointTimestamp`, le composable
+  `TrimTrackTool` (et `TrimSliderCard`, `trimWarning`), l'entrée `Tool.TRIM`, les
+  textes `trim_*` et `TrimTrackTest`. `err_clean_too_few` reprend le message de
+  « moins de deux points restants », que le rognage partageait.
 
 `Track.isMerged` n'est plus du poids mort : la colonne porte de nouveau l'onglet
 « Fusionnés » de l'historique.

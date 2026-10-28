@@ -757,151 +757,6 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
-    // Rognage du début et de la fin
-    // ------------------------------------------------------------------
-
-    /**
-     * Crée une copie de [sourceTrackId] amputée de ses [dropStartMillis] premières
-     * millisecondes et de ses [dropEndMillis] dernières.
-     *
-     * Le besoin le plus banal d'un traqueur GPS : l'enregistrement oublié qui a
-     * continué pendant la route du retour, ou démarré depuis le parking dix minutes
-     * avant le départ réel.
-     *
-     * Même forme que [splitTrack], et pour les mêmes raisons : une seule lecture du
-     * parcours page par page — donc une empreinte mémoire bornée quelle que soit sa
-     * taille — qui repère les bornes **par identifiant de point** et cumule au
-     * passage les statistiques de ce qui sera conservé ; puis une transaction unique
-     * où SQLite recopie la tranche lui-même (invariant 5).
-     *
-     * Les bornes se comparent aux horodatages, jamais à un rang : sur un
-     * enregistrement à trous — pause, perte de signal — retirer « les cinq premières
-     * minutes » ne veut pas dire retirer un nombre fixe de points.
-     *
-     * Le parcours d'origine n'est jamais modifié, et n'est supprimé que si
-     * [deleteSource] le demande. Lève [IllegalArgumentException] si le parcours est
-     * introuvable ou en cours d'enregistrement, et [IllegalStateException] s'il n'y a
-     * rien à rogner ou s'il ne resterait pas de quoi faire un parcours.
-     */
-    suspend fun trimTrack(
-        sourceTrackId: Long,
-        dropStartMillis: Long,
-        dropEndMillis: Long,
-        newName: String,
-        deleteSource: Boolean
-    ): Long {
-        val source = trackDao.getTrackById(sourceTrackId)
-            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
-        if (source.isRecording) {
-            throw UserFacingArgumentException(R.string.err_track_is_recording)
-        }
-        if (dropStartMillis <= 0L && dropEndMillis <= 0L) {
-            throw UserFacingStateException(R.string.err_trim_none_selected)
-        }
-
-        // --- 1. Bornes du parcours, puis repérage, en deux lectures légères ---
-
-        val firstTimestamp = trackDao.getFirstPointTimestamp(sourceTrackId)
-            ?: throw UserFacingStateException(R.string.err_track_empty)
-        val lastTimestamp = trackDao.getLastPointTimestamp(sourceTrackId)
-            ?: throw UserFacingStateException(R.string.err_track_empty)
-
-        val keepFromTime = firstTimestamp + dropStartMillis
-        val keepUntilTime = lastTimestamp - dropEndMillis
-        if (keepFromTime >= keepUntilTime) {
-            throw UserFacingStateException(R.string.err_trim_nothing_left)
-        }
-
-        // Une seule passe : les bornes retenues sont des identifiants, et les
-        // statistiques sont cumulées sur les seuls points conservés. Sans ce cumul il
-        // faudrait relire la copie après coup, soit deux fois le parcours.
-        val accumulator = TrackStatsAccumulator()
-        var fromId = -1L
-        var untilId = Long.MAX_VALUE
-        var keptStartTime = 0L
-        var keptEndTime = 0L
-        var keptCount = 0
-        var afterId = 0L
-
-        while (true) {
-            val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
-            if (page.isEmpty()) break
-            afterId = page.last().id
-
-            for (point in page) {
-                if (point.timestamp < keepFromTime) continue
-                if (point.timestamp > keepUntilTime) {
-                    // Premier point au-delà de la fin conservée : il donne la borne
-                    // haute, qui est exclusive.
-                    if (untilId == Long.MAX_VALUE) untilId = point.id
-                    continue
-                }
-                if (fromId < 0L) {
-                    fromId = point.id
-                    keptStartTime = point.timestamp
-                }
-                accumulator.add(point)
-                keptEndTime = point.timestamp
-                keptCount++
-            }
-        }
-
-        // Deux points au moins : en dessous, il n'y a ni tracé ni distance à montrer.
-        if (keptCount < 2) {
-            throw UserFacingStateException(R.string.err_trim_too_few)
-        }
-
-        val stats = accumulator.result()
-
-        // --- 2. Écriture ---
-
-        return database.withTransaction {
-            val newTrackId = trackDao.insertTrack(
-                Track(
-                    name = newName,
-                    activityType = source.activityType,
-                    startTime = keptStartTime,
-                    endTime = keptEndTime,
-                    totalDistance = stats.distanceMeters,
-                    duration = stats.durationSec,
-                    maxSpeed = stats.maxSpeedMps,
-                    avgSpeed = stats.avgSpeedMps,
-                    elevationGain = stats.elevationGain,
-                    elevationLoss = stats.elevationLoss,
-                    isRecording = false,
-                    // Même héritage que le découpage : la provenance et l'apparence
-                    // du parent, mais jamais son affichage sur la carte.
-                    isImported = source.isImported,
-                    isMerged = source.isMerged,
-                    isSelectedForMap = false,
-                    sourceColor = source.sourceColor,
-                    displayColor = source.displayColor,
-                    displayWidthDp = source.displayWidthDp
-                )
-            )
-
-            trackDao.copyPointRangeInto(
-                destinationId = newTrackId,
-                sourceId = sourceTrackId,
-                fromId = fromId,
-                untilId = untilId
-            )
-            // Le premier point conservé ouvrait peut-être un tronçon dans le parcours
-            // d'origine ; dans le parcours neuf il ne fait qu'ouvrir le tracé.
-            trackDao.clearFirstPointDiscontinuity(newTrackId)
-
-            if (deleteSource) {
-                trackDao.deletePointsForTrack(sourceTrackId)
-                trackDao.deleteTrack(sourceTrackId)
-            }
-
-            invalidatePointCaches(sourceTrackId)
-
-            newTrackId
-        }
-    }
-
-    // ------------------------------------------------------------------
     // Retrait d'une portion choisie sur la carte
     // ------------------------------------------------------------------
 
@@ -1256,7 +1111,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * sa forme. La détection, et l'histoire de ses deux premières versions ratées, sont
      * dans [StopCollapser].
      *
-     * Contrairement au rognage, les points gardés ne forment pas une tranche : SQLite
+     * Contrairement au découpage, les points gardés ne forment pas une tranche : SQLite
      * ne peut donc pas les recopier d'un seul `INSERT … SELECT`. Ils passent par la
      * mémoire, une page à la fois, et sont écrits au fur et à mesure. Chaque page est
      * une écriture courte, comme à l'import : une transaction unique autour de toute la
@@ -1289,7 +1144,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 activityType = source.activityType,
                 startTime = Track.IMPORT_PLACEHOLDER_START_TIME,
                 isRecording = false,
-                // Même héritage que le découpage et le rognage : la provenance et
+                // Même héritage que le découpage : la provenance et
                 // l'apparence du parent, mais jamais son affichage sur la carte.
                 isImported = source.isImported,
                 isMerged = source.isMerged,
@@ -1333,7 +1188,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
             if (readCount == 0) throw UserFacingStateException(R.string.err_track_empty)
             if (collapser.stopCount == 0) throw UserFacingStateException(R.string.err_clean_none)
-            if (keptCount < 2) throw UserFacingStateException(R.string.err_trim_too_few)
+            if (keptCount < 2) throw UserFacingStateException(R.string.err_clean_too_few)
             val firstKeptTime = firstKept!!.timestamp
 
             val stats = accumulator.result()

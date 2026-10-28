@@ -344,13 +344,6 @@ class ScreensScreenshotTest {
         shoot("outils_decoupe_carte", true)
     }
 
-    @Test fun outils_rognage() {
-        seed(); tools(false); waitForTag("tools_tab")
-        compose.onNodeWithTag("open_trim_tool_button").performClick()
-        waitForTag("trim_kept_bar")
-        shoot("outils_rognage", false)
-    }
-
     @Test fun outils_nettoyage() {
         seed(); tools(true); waitForTag("tools_tab")
         compose.onNodeWithTag("open_clean_tool_button").performScrollTo().performClick()
