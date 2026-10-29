@@ -60,7 +60,16 @@ data class Track(
      * tant que [isRecording] est vrai.
      */
     @ColumnInfo(defaultValue = "0")
-    val isPaused: Boolean = false
+    val isPaused: Boolean = false,
+    /**
+     * Heure de mise à la corbeille, ou null pour un parcours bien vivant (migration
+     * 10→11). Demandé par le père de l'auteur après une suppression regrettée :
+     * supprimer met à la corbeille, d'où l'on peut restaurer pendant
+     * [TRASH_RETENTION_MS] ; passé ce délai le parcours est effacé pour de bon au
+     * démarrage suivant (`TrackRepository.purgeTrash`). Pas de bouton pour vider la
+     * corbeille, à sa demande : c'est le temps qui la vide.
+     */
+    val deletedAt: Long? = null
 ) {
     companion object {
         /**
@@ -71,5 +80,8 @@ data class Track(
          * permet de la retrouver si l'application est tuée en cours de route.
          */
         const val IMPORT_PLACEHOLDER_START_TIME = -1L
+
+        /** Durée de séjour dans la corbeille avant l'effacement définitif : 30 jours. */
+        const val TRASH_RETENTION_MS = 30L * 24 * 60 * 60 * 1000
     }
 }

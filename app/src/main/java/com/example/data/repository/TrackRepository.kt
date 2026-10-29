@@ -746,8 +746,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             }
 
             if (deleteSource) {
-                trackDao.deletePointsForTrack(sourceTrackId)
-                trackDao.deleteTrack(sourceTrackId)
+                // L\'original part à la corbeille, comme une suppression à la main.
+                trackDao.moveToTrash(sourceTrackId, System.currentTimeMillis())
             }
 
             invalidatePointCaches(sourceTrackId)
@@ -976,8 +976,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             if (lastBeforeId != null) trackDao.markFirstPointAfterDiscontinuous(newTrackId, lastBeforeId)
             trackDao.clearFirstPointDiscontinuity(newTrackId)
             if (deleteSource) {
-                trackDao.deletePointsForTrack(sourceTrackId)
-                trackDao.deleteTrack(sourceTrackId)
+                // L\'original part à la corbeille, comme une suppression à la main.
+                trackDao.moveToTrash(sourceTrackId, System.currentTimeMillis())
             }
             invalidatePointCaches(sourceTrackId)
             listOf(newTrackId)
@@ -1084,8 +1084,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             }
             trackDao.clearFirstPointDiscontinuity(newTrackId)
             if (deleteSource) {
-                trackDao.deletePointsForTrack(sourceTrackId)
-                trackDao.deleteTrack(sourceTrackId)
+                // L\'original part à la corbeille, comme une suppression à la main.
+                trackDao.moveToTrash(sourceTrackId, System.currentTimeMillis())
             }
             invalidatePointCaches(sourceTrackId)
             newTrackId
@@ -1212,8 +1212,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                 trackDao.clearFirstPointDiscontinuity(newTrackId)
 
                 if (deleteSource) {
-                    trackDao.deletePointsForTrack(sourceTrackId)
-                    trackDao.deleteTrack(sourceTrackId)
+                    // L\'original part à la corbeille, comme une suppression à la main.
+                    trackDao.moveToTrash(sourceTrackId, System.currentTimeMillis())
                 }
             }
             invalidatePointCaches(sourceTrackId)
@@ -1284,8 +1284,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     /**
-     * Supprime un parcours, sauf s'il est en cours d'enregistrement : renvoie alors
-     * false sans rien toucher.
+     * Met un parcours à la corbeille, sauf s'il est en cours d'enregistrement :
+     * renvoie alors false sans rien toucher. Il en sort par [restoreFromTrash], ou
+     * disparaît pour de bon trente jours plus tard ([purgeTrash]).
      *
      * Le supprimer sous le service le laissait tourner à vide — GPS allumé,
      * notification affichée, chaque point refusé par la clé étrangère — pendant que
@@ -1294,12 +1295,31 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     suspend fun deleteTrack(trackId: Long): Boolean {
         val track = trackDao.getTrackById(trackId)
         if (track != null && isBeingRecorded(track)) return false
-        database.withTransaction {
-            trackDao.deletePointsForTrack(trackId)
-            trackDao.deleteTrack(trackId)
-        }
+        trackDao.moveToTrash(trackId, System.currentTimeMillis())
         invalidatePointCaches(trackId)
         return true
+    }
+
+    /** Les parcours de la corbeille, du plus récemment supprimé au plus ancien. */
+    val trashedTracks: Flow<List<Track>> = trackDao.getTrashedTracks()
+
+    /** Sort un parcours de la corbeille ; il revient dans l'historique, masqué sur la carte. */
+    suspend fun restoreFromTrash(trackId: Long) {
+        trackDao.restoreFromTrash(trackId)
+    }
+
+    /**
+     * Efface pour de bon les parcours mis à la corbeille il y a plus de
+     * [Track.TRASH_RETENTION_MS], avec leurs points. Appelé à chaque démarrage : aucun
+     * minuteur n'est nécessaire, un parcours expiré attend simplement le lancement
+     * suivant. Renvoie le nombre de parcours effacés.
+     */
+    suspend fun purgeTrash(now: Long = System.currentTimeMillis()): Int {
+        val before = now - Track.TRASH_RETENTION_MS
+        return database.withTransaction {
+            trackDao.deleteExpiredTrashPoints(before)
+            trackDao.deleteExpiredTrash(before)
+        }
     }
 
     /** Vrai pour le parcours qu'un enregistrement alimente, ou laissé ouvert en base. */

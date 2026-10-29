@@ -142,6 +142,20 @@ fusionner (même règle que l'outil : le plus ancien accueille), supprimer (conf
 le parcours en cours d'enregistrement est refusé, comme à l'unité). Retour quitte le
 mode.
 
+**La corbeille**, demandée par le père de l'auteur après une suppression regrettée :
+supprimer un parcours (à l'unité, en mode sélection, ou l'original qu'un outil remplace)
+le **met à la corbeille** (`Track.deletedAt`, migration 10→11) au lieu de l'effacer. Il
+quitte l'historique et la carte, mais garde ses points ; un bouton « Corbeille (n) »,
+au-dessus de la liste et seulement quand elle n'est pas vide, ouvre une feuille où
+chaque parcours se restaure. **Pas de bouton pour la vider**, à sa demande : c'est le
+temps qui la vide. `TrackRepository.purgeTrash`, appelé au démarrage depuis
+`TrackApplication`, efface pour de bon (points compris) ce qui y a passé plus de
+30 jours (`Track.TRASH_RETENTION_MS`). Restent des effacements immédiats, voulus : les
+parcours absorbés par une fusion (leurs points sont recopiés dans le plus ancien), la
+ligne d'un import ou d'un nettoyage qui échoue. **Toute nouvelle requête qui liste des
+parcours doit exclure `deletedAt IS NOT NULL`**, comme `getAllTracks` et
+`getSelectedImportedTracksFlow`. `TrashTest` verrouille.
+
 **L'épaisseur du trait appartient elle aussi au parcours** (`Track.displayWidthDp`,
 migration 8→9), à la demande de l'auteur : elle se règle dans la même feuille que la
 couleur (« Apparence du tracé », pastille du parcours dans l'historique), et le réglage
@@ -461,7 +475,7 @@ pourquoi. À relire avant d'y toucher.
    déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
    (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`), `MIGRATION_7_8`
    (`Track.displayColor`), `MIGRATION_8_9` (`Track.displayWidthDp`), `MIGRATION_9_10`
-   (`Track.isPaused`) — rendrait la base illisible pour tout utilisateur venant
+   (`Track.isPaused`), `MIGRATION_10_11` (`Track.deletedAt`, la corbeille) — rendrait la base illisible pour tout utilisateur venant
    d'une version antérieure. Toute nouvelle version de schéma doit venir avec la sienne.
    Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
    la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec
@@ -749,9 +763,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 212 tests unitaires en 25 suites : `ScreensScreenshotTest` (37, captures seules —
+- 217 tests unitaires en 26 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

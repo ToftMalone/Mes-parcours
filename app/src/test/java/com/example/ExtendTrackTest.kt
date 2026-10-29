@@ -10,6 +10,7 @@ import com.example.data.repository.TrackRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -98,7 +99,7 @@ class ExtendTrackTest {
         assertEquals("148,5 m enregistrés + 300 m dessinés", 448.5, track.totalDistance, 2.0)
         assertEquals("300 m à 1,5 m/s : 200 s de plus", 299.0, track.duration.toDouble(), 1.0)
         assertEquals(0xFF445566.toInt(), track.displayColor)
-        assertNull("l'original est remplacé", db.trackDao.getTrackById(trackId))
+        assertNotNull("l'original part à la corbeille", db.trackDao.getTrackById(trackId)?.deletedAt)
     }
 
     @Test
@@ -114,7 +115,7 @@ class ExtendTrackTest {
         assertEquals(first.latitude, points.first { it.timestamp == start }.latitude, 1e-12)
         assertNoVisibleGap(points)
         assertEquals(248.5, db.trackDao.getTrackById(newId)!!.totalDistance, 2.0)
-        assertFalse("l'original est gardé sur demande", db.trackDao.getTrackById(trackId) == null)
+        assertNull("l'original est gardé sur demande", db.trackDao.getTrackById(trackId)!!.deletedAt)
     }
 
     @Test

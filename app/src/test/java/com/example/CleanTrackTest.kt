@@ -242,13 +242,13 @@ class CleanTrackTest {
     }
 
     @Test
-    fun `le parcours d'origine est supprimé sur demande`() = runBlocking {
+    fun `le parcours d'origine part à la corbeille sur demande`() = runBlocking {
         val sourceId = createTrack(walk(0, 100) + noise(100.0, 1000))
 
         repository.removeStationaryPoints(sourceId, 300, "Nettoyé", true)
 
-        assertNull(db.trackDao.getTrackById(sourceId))
-        assertTrue(pointsOf(sourceId).isEmpty())
+        assertNotNull("l'original part à la corbeille", db.trackDao.getTrackById(sourceId)?.deletedAt)
+        assertTrue("ses points restent, pour pouvoir le restaurer", pointsOf(sourceId).isNotEmpty())
     }
 
     // ------------------------------------------------------------------

@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Polyline
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.RestoreFromTrash
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Straighten
@@ -147,6 +149,8 @@ fun HistoryTab(
     var selecting by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
     var confirmBulkDelete by remember { mutableStateOf(false) }
+    var showTrash by remember { mutableStateOf(false) }
+    val trashed by viewModel.trashedTracks.collectAsState()
     var confirmBulkMerge by remember { mutableStateOf(false) }
     val exitSelection = {
         selecting = false
@@ -266,6 +270,20 @@ fun HistoryTab(
                             )
                         }
                     } else {
+                        // La corbeille n'apparaît que lorsqu'elle contient quelque chose.
+                        if (trashed.isNotEmpty()) {
+                            TextButton(
+                                onClick = { showTrash = true },
+                                modifier = Modifier.testTag("history_open_trash")
+                            ) {
+                                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    stringResource(R.string.trash_button, trashed.size),
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.weight(1f))
                         TextButton(
                             onClick = { selecting = true },
@@ -405,6 +423,18 @@ fun HistoryTab(
                     else messenger.show(context.getString(R.string.delete_refused_recording), Icons.Rounded.Error, isError = true)
                 }
             }
+        )
+    }
+
+    if (showTrash) {
+        TrashSheet(
+            tracks = trashed,
+            onRestore = { track ->
+                viewModel.restoreFromTrash(track.id) {
+                    messenger.show(context.getString(R.string.trash_restored, track.name), Icons.Rounded.RestoreFromTrash)
+                }
+            },
+            onDismiss = { showTrash = false }
         )
     }
 
@@ -1266,4 +1296,62 @@ fun ResumeRefusedDialog(trackName: String, onDismiss: () -> Unit, onOpenRecordin
         confirmLabel = stringResource(R.string.resume_refused_confirm),
         onConfirm = onOpenRecording
     )
+}
+
+/**
+ * La corbeille : les parcours supprimés, chacun avec ce qu'il lui reste de jours avant
+ * l'effacement définitif et un bouton pour le restaurer. **Pas de bouton pour la
+ * vider**, à la demande du père de l'auteur : c'est le temps qui la vide (voir
+ * `Track.deletedAt`).
+ */
+@Composable
+private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onDismiss: () -> Unit) {
+    // Plus rien à montrer après la dernière restauration : la feuille se range.
+    LaunchedEffect(tracks.isEmpty()) { if (tracks.isEmpty()) onDismiss() }
+    MpSheet(onDismissRequest = onDismiss) {
+        SheetHeader(stringResource(R.string.trash_title), stringResource(R.string.trash_subtitle))
+        Spacer(modifier = Modifier.height(14.dp))
+        val now = remember { System.currentTimeMillis() }
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .heightIn(max = 480.dp)
+                .testTag("trash_list")
+        ) {
+            items(tracks, key = { it.id }) { track ->
+                val deletedAt = track.deletedAt ?: now
+                val daysLeft = ((deletedAt + Track.TRASH_RETENTION_MS - now) / (24L * 60 * 60 * 1000))
+                    .toInt().coerceAtLeast(0) + 1
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(track.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            pluralStringResource(
+                                R.plurals.trash_item_subtitle, daysLeft,
+                                FormatUtils.formatDistanceShort(track.totalDistance), daysLeft
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(
+                        onClick = { onRestore(track) },
+                        modifier = Modifier.testTag("trash_restore_${track.id}")
+                    ) {
+                        Icon(Icons.Rounded.RestoreFromTrash, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.trash_restore), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+    }
 }

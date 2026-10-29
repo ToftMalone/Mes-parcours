@@ -31,6 +31,7 @@ import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -190,6 +191,18 @@ class ScreensScreenshotTest {
         waitForTag("selection_action_bar")
         compose.onNodeWithTag("history_select_all").performClick()
         shoot("historique_selection", false)
+    }
+
+    @Test fun historique_corbeille() {
+        seed()
+        runBlocking {
+            val trashed = db.trackDao.getAllTracks().first().takeLast(2)
+            trashed.forEach { repository.deleteTrack(it.id) }
+        }
+        history(false); waitForTag("history_open_trash")
+        compose.onNodeWithTag("history_open_trash").performClick()
+        waitForTag("trash_list")
+        captureScreenRoboImage("src/test/screenshots/refonte/historique_corbeille_clair.png")
     }
 
     @Test fun historique_clair() { seed(); history(false); waitForTag("history_list"); shoot("historique", false) }

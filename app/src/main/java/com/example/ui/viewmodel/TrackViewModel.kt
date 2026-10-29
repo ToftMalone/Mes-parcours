@@ -433,6 +433,18 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    /** Les parcours de la corbeille. */
+    val trashedTracks: StateFlow<List<Track>> = repository.trashedTracks
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Sort un parcours de la corbeille. */
+    fun restoreFromTrash(trackId: Long, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.restoreFromTrash(trackId)
+            onDone()
+        }
+    }
+
     /** Vrai pour le parcours qu'un enregistrement alimente : ni fusion ni suppression. */
     fun isBeingRecorded(track: Track): Boolean = repository.isBeingRecorded(track)
 

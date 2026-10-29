@@ -173,7 +173,7 @@ class SplitTrackTest {
     }
 
     @Test
-    fun `le parcours d origine est supprime si on le demande`() = runBlocking {
+    fun `le parcours d origine part a la corbeille si on le demande`() = runBlocking {
         val sourceId = createTrack("Voyages", listOf(3 to 0L, 4 to 0L))
 
         val newIds = repository.splitTrack(
@@ -184,8 +184,8 @@ class SplitTrackTest {
             deleteSource = true
         )
 
-        assertNull(db.trackDao.getTrackById(sourceId))
-        assertTrue("ses points sont partis avec lui", pointsOf(sourceId).isEmpty())
+        assertNotNull("l'original part à la corbeille", db.trackDao.getTrackById(sourceId)?.deletedAt)
+        assertEquals("ses points restent, pour pouvoir le restaurer", 7, pointsOf(sourceId).size)
         // Les morceaux, eux, ont bien tout gardé.
         assertEquals(7, newIds.sumOf { pointsOf(it).size })
     }

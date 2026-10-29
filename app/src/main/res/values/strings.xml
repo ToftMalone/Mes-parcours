@@ -143,7 +143,7 @@
     <string name="history_merged">Fusionnés</string>
     <string name="track_imported_toast">Parcours importé.</string>
     <string name="history_title">Historique</string>
-    <string name="track_deleted_toast">Parcours supprimé.</string>
+    <string name="track_deleted_toast">Parcours mis à la corbeille.</string>
     <string name="tag_google_earth">Google Earth</string>
     <string name="track_hide_from_map">Masquer de la carte</string>
     <string name="selection_start">Sélectionner</string>
@@ -151,7 +151,7 @@
     <string name="selection_show">Afficher</string>
     <string name="selection_hide">Masquer</string>
     <string name="selection_merge">Fusionner</string>
-    <string name="selection_delete_body">Ils seront effacés avec tous leurs points. Cette action est définitive.</string>
+    <string name="selection_delete_body">Ils iront à la corbeille, d\'où vous pourrez les restaurer pendant 30 jours.</string>
     <string name="selection_merge_title">Fusionner %1$d parcours ?</string>
     <string name="selection_merge_body">Ils seront réunis en un seul, « %1$s », le plus ancien de la sélection.</string>
     <plurals name="selection_count">
@@ -163,8 +163,8 @@
         <item quantity="other">Supprimer %1$d parcours ?</item>
     </plurals>
     <plurals name="selection_deleted_toast">
-        <item quantity="one">%1$d parcours supprimé</item>
-        <item quantity="other">%1$d parcours supprimés</item>
+        <item quantity="one">%1$d parcours mis à la corbeille</item>
+        <item quantity="other">%1$d parcours mis à la corbeille</item>
     </plurals>
     <string name="common_select_all">Tout sélectionner</string>
     <string name="common_deselect_all">Tout désélectionner</string>
@@ -193,7 +193,16 @@
     <string name="common_apply">Appliquer</string>
     <string name="style_color_chosen">Couleur choisie</string>
     <string name="delete_dialog_title">Supprimer ce parcours ?</string>
-    <string name="delete_dialog_body">« %1$s » sera effacé définitivement de votre téléphone. Cette action est irréversible.</string>
+    <string name="delete_dialog_body">« %1$s » ira à la corbeille, d\'où vous pourrez le restaurer pendant 30 jours.</string>
+    <string name="trash_button">Corbeille (%1$d)</string>
+    <string name="trash_title">Corbeille</string>
+    <string name="trash_subtitle">Les parcours supprimés restent ici 30 jours, puis sont effacés d\'eux-mêmes.</string>
+    <string name="trash_restore">Restaurer</string>
+    <string name="trash_restored">« %1$s » est de retour dans l\'historique.</string>
+    <plurals name="trash_item_subtitle">
+        <item quantity="one">%1$s · effacé dans %2$d jour</item>
+        <item quantity="other">%1$s · effacé dans %2$d jours</item>
+    </plurals>
     <string name="resume_refused_title">Un enregistrement est en cours</string>
     <string name="resume_refused_body">Arrêtez-le avant de reprendre « %1$s ». On ne peut enregistrer qu\'une trace à la fois.</string>
     <string name="common_ok">OK</string>
@@ -282,7 +291,7 @@
     <string name="cut_action">Retirer la portion</string>
     <string name="cut_busy">Retrait de la portion</string>
     <string name="cut_done_title">Portion retirée</string>
-    <string name="cut_delete_original_hint">La portion retirée sera perdue</string>
+    <string name="cut_delete_original_hint">L\'original part à la corbeille pendant 30 jours</string>
     <string name="cut_info">La portion en rouge est retirée ; le reste reste en un seul parcours, sans trait à travers le trou.</string>
     <string name="err_cut_everything">Il ne resterait pas de quoi faire un parcours : réduisez la portion à retirer.</string>
     <string name="cut_done_body_kept">« %1$s » est dans l\'historique, en un seul parcours. L\'original est conservé.</string>
@@ -405,7 +414,7 @@
     <string name="extend_done_title">Parcours prolongé</string>
     <string name="extend_done_body_kept">« %1$s » est dans l\'historique. L\'original est conservé.</string>
     <string name="extend_done_body_deleted">« %1$s » est dans l\'historique, à la place de l\'original.</string>
-    <string name="extend_delete_original_hint">Pour ne garder qu\'une seule trace</string>
+    <string name="extend_delete_original_hint">L\'original part à la corbeille pendant 30 jours</string>
     <string name="extend_info">Les points ajoutés suivent vos appuis en ligne droite, à l\'allure moyenne du parcours : distance, durée et vitesse en tiennent compte.</string>
     <string name="err_extend_empty">Touchez la carte pour dessiner la partie à ajouter.</string>
     <string name="err_extend_empty_track">Ce parcours n\'a aucun point à prolonger.</string>

@@ -51,6 +51,11 @@ class TrackApplication : Application() {
                 TrackRepository.getInstance(this@TrackApplication)
                     .backfillDisplayColors(this@TrackApplication)
             }
+            // La corbeille se vide d'elle-même : ce qui y a passé trente jours est
+            // effacé au démarrage (voir Track.deletedAt).
+            runCatching {
+                TrackRepository.getInstance(this@TrackApplication).purgeTrash()
+            }
         }
     }
 }

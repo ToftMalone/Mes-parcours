@@ -10,6 +10,7 @@ import com.example.data.repository.TrackRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -93,7 +94,7 @@ class CutPortionTest {
         val kept = db.trackDao.getPointsForTrack(ids[0])
         assertEquals(80, kept.size)
         assertEquals(0, kept.count { it.isDiscontinuous })
-        assertNull("l'original est supprimé sur demande", db.trackDao.getTrackById(trackId))
+        assertNotNull("l'original part à la corbeille sur demande", db.trackDao.getTrackById(trackId)?.deletedAt)
     }
 
     @Test

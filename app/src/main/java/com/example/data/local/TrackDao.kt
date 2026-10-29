@@ -15,10 +15,10 @@ interface TrackDao {
     // La ligne réservée d'un import en cours n'est pas encore un parcours : la montrer
     // permettrait de l'ouvrir, de la fusionner ou de la supprimer pendant que l'import
     // y écrit encore.
-    @Query("SELECT * FROM tracks WHERE startTime != ${Track.IMPORT_PLACEHOLDER_START_TIME} ORDER BY startTime DESC")
+    @Query("SELECT * FROM tracks WHERE startTime != ${Track.IMPORT_PLACEHOLDER_START_TIME} AND deletedAt IS NULL ORDER BY startTime DESC")
     fun getAllTracks(): Flow<List<Track>>
 
-    @Query("SELECT * FROM tracks WHERE isSelectedForMap = 1")
+    @Query("SELECT * FROM tracks WHERE isSelectedForMap = 1 AND deletedAt IS NULL")
     fun getSelectedImportedTracksFlow(): Flow<List<Track>>
 
     @Query("SELECT * FROM tracks WHERE id = :trackId LIMIT 1")
@@ -277,6 +277,27 @@ interface TrackDao {
 
     @Query("DELETE FROM tracks WHERE id = :trackId")
     suspend fun deleteTrack(trackId: Long)
+
+    // ------------------------------------------------------------------
+    // Corbeille : un parcours supprimé y reste trente jours (voir Track.deletedAt).
+    // ------------------------------------------------------------------
+
+    /** Les parcours de la corbeille, du plus récemment supprimé au plus ancien. */
+    @Query("SELECT * FROM tracks WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC")
+    fun getTrashedTracks(): Flow<List<Track>>
+
+    /** Met à la corbeille, et retire de la carte : un parcours supprimé ne s'y dessine plus. */
+    @Query("UPDATE tracks SET deletedAt = :now, isSelectedForMap = 0 WHERE id = :trackId")
+    suspend fun moveToTrash(trackId: Long, now: Long)
+
+    @Query("UPDATE tracks SET deletedAt = NULL WHERE id = :trackId")
+    suspend fun restoreFromTrash(trackId: Long)
+
+    @Query("DELETE FROM track_points WHERE trackId IN (SELECT id FROM tracks WHERE deletedAt IS NOT NULL AND deletedAt < :before)")
+    suspend fun deleteExpiredTrashPoints(before: Long)
+
+    @Query("DELETE FROM tracks WHERE deletedAt IS NOT NULL AND deletedAt < :before")
+    suspend fun deleteExpiredTrash(before: Long): Int
 
     @Query("DELETE FROM track_points WHERE trackId = :trackId")
     suspend fun deletePointsForTrack(trackId: Long)

@@ -79,12 +79,12 @@ class RecordingGuardsTest {
     }
 
     @Test
-    fun `un parcours termine se supprime avec ses points`() = runBlocking {
+    fun `un parcours termine part à la corbeille avec ses points`() = runBlocking {
         val done = createTrack("fini", startTime = 1_000L, count = 3)
 
         assertTrue(repository.deleteTrack(done))
-        assertNull(db.trackDao.getTrackById(done))
-        assertTrue(db.trackDao.getPointsForTrack(done).isEmpty())
+        assertNotNull("le parcours part à la corbeille", db.trackDao.getTrackById(done)?.deletedAt)
+        assertEquals("ses points le suivent, pour pouvoir le restaurer", 3, db.trackDao.getPointsForTrack(done).size)
     }
 
     @Test
