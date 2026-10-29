@@ -12,7 +12,7 @@ toutes les données restent sur l'appareil.
   dans `ExampleRobolectricTest`). Anciennement « Sillage ».
 - `applicationId` : `com.toche.mesparcours` — `namespace` Kotlin : `com.example`
 - Licence : GPL-3.0 (`LICENSE`, texte officiel complet de la Free Software Foundation).
-- Version courante : `2.3.1` (`versionCode` 51). Elle n'est écrite qu'une fois,
+- Version courante : `2.3.2` (`versionCode` 52). Elle n'est écrite qu'une fois,
   dans `app/build.gradle.kts` ; l'écran « À propos » la lit via `BuildConfig.VERSION_NAME`.
   Le suffixe `-thierry` a été abandonné à partir de la `0.9.15`.
 - **Journal des nouveautés** : la liste `RELEASES` de `SettingsTab.kt`.
@@ -232,7 +232,7 @@ prolongement aussi. L'export (`KmlWriter`, carte `placemarks` lue par
 ouvre et referme les `<Folder>` au fil de l'eau, et n'écrit plus la mention « Track
 recorded with Mes parcours » pour un parcours importé. Les lignes orphelines sont
 retirées après une purge de la corbeille (`deleteOrphanPlacemarks`). **Limite :** un
-fichier importé avant la 2.3.1 n'a pas cette structure ; il faut le réimporter.
+fichier importé avant la 2.3.2 n'a pas cette structure ; il faut le réimporter.
 `KmlRoundTripTest` vérifie l'aller-retour complet (dossiers imbriqués, styles partagés
 et `<StyleMap>`, couleurs, épaisseurs, ruptures).
 
