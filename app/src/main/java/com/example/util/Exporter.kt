@@ -1,6 +1,7 @@
 package com.example.util
 
 import com.example.data.model.Track
+import com.example.data.model.TrackPlacemark
 import com.example.data.model.TrackPoint
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,60 +72,77 @@ object Exporter {
     }
 
     /**
-     * Un Placemark par couleur, dont la géométrie est un `<MultiGeometry>` réunissant
-     * un `<LineString>` par tronçon continu.
+     * Le KML d'un parcours, rangé comme dans Google Earth : un Placemark par tracé,
+     * dont la géométrie est un `<MultiGeometry>` réunissant un `<LineString>` par
+     * tronçon continu, et ces Placemarks dans leurs `<Folder>`.
      *
-     * Trois exigences à tenir ensemble :
+     * Exigences à tenir ensemble :
      *
      * - **Les ruptures doivent survivre.** Tout écrire dans un unique bloc
      *   `<coordinates>` les perdrait : après une pause, une reprise ou une fusion,
      *   réimporter le fichier relierait les tronçons par une ligne droite.
-     * - **Le parcours doit rester d'un seul tenant.** Un Placemark par tronçon
+     * - **Un parcours enregistré reste d'un seul tenant.** Un Placemark par tronçon
      *   présentait un parcours fusionné à partir de dix traces comme dix entrées
-     *   distinctes dans Google Earth, alors que l'utilisateur venait de les réunir.
-     *   D'où `<MultiGeometry>` : une seule entrée, des lignes distinctes.
-     * - **Les couleurs doivent survivre.** L'export écrivait tout en rouge, quelle que
-     *   soit la couleur à l'écran : le père de l'auteur, qui avait colorié chaque pays
-     *   d'un voyage, a retrouvé un fichier d'une seule couleur. La couleur d'un point
-     *   se résout comme au dessin : celle choisie pour le parcours, sinon celle du
-     *   tronçon (`TrackPoint.segmentColor`), sinon celle du fichier ou de la
-     *   catégorie. Un `<Style>` ne vaut que pour tout un Placemark : chaque
-     *   changement de couleur en ouvre donc un nouveau, avec son style écrit dedans
-     *   (l'écriture étant en flux, on ne connaît pas les couleurs à l'avance). Un
-     *   parcours d'une seule couleur reste un seul Placemark. La réimportation relit
-     *   ces styles en ligne : la boucle est bouclée.
+     *   distinctes dans Google Earth. D'où `<MultiGeometry>` : une entrée, des lignes.
+     * - **Un KML importé ressort tel qu'il est entré** : demandé par le père de
+     *   l'auteur, dont le fichier rangé en dossiers (France, Étranger, À refaire…) et
+     *   en tracés nommés ressortait en une liste plate de « Mes traces », tout en
+     *   rouge et d'une seule épaisseur. Les points portent leur tracé d'origine
+     *   (`TrackPoint.placemarkId`, voir `TrackPlacemark`) : chacun redevient un
+     *   Placemark à son nom, dans ses dossiers, à sa couleur et à son épaisseur.
+     *   L'écriture étant en flux, un dossier est ouvert à l'arrivée de son premier
+     *   tracé et refermé quand vient un tracé qui n'y est plus.
+     * - **Les couleurs suivent l'écran** : celle choisie pour le parcours, sinon celle
+     *   du tronçon (`TrackPoint.segmentColor`), sinon celle du fichier ou de la
+     *   catégorie. Un `<Style>` ne vaut que pour tout un Placemark : un changement de
+     *   couleur en ouvre donc un nouveau, style écrit dedans. La réimportation relit
+     *   ces styles en ligne, ces noms et ces dossiers.
      */
-    class KmlWriter(private val out: Appendable) {
+    class KmlWriter(
+        private val out: Appendable,
+        /** Les tracés KML d'origine du parcours, par identifiant (`TrackDao.getPlacemarksForTrack`). */
+        private val placemarks: Map<Long, TrackPlacemark> = emptyMap()
+    ) {
         private var trackName = ""
         private var placemarkOpen = false
         private var lineOpen = false
         private var forcedColor: Int? = null
         private var fallbackColor = 0
-        private var widthPx = DEFAULT_KML_WIDTH
+        private var trackWidth = DEFAULT_KML_WIDTH
         private var placemarkColor: Int? = null
+        private var placemarkKey: Long? = null
+        private val openFolders = ArrayList<String>()
 
         fun start(track: Track) {
             trackName = track.name
             forcedColor = track.displayColor
             fallbackColor = TrackStylePreferences.resolveTrackColor(null, track.sourceColor, track.isImported, track.isMerged)
-            widthPx = track.displayWidthDp ?: DEFAULT_KML_WIDTH
+            trackWidth = track.displayWidthDp ?: DEFAULT_KML_WIDTH
             out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
             out.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n")
             out.append("  <Document>\n")
             out.append("    <name>${escapeXml(track.name)}</name>\n")
-            out.append("    <description>Track recorded with Mes parcours - ${escapeXml(track.activityType)}</description>\n")
+            // La mention de l'application n'a rien à faire dans un fichier qu'on rend
+            // à Google Earth tel qu'il en venait.
+            if (!track.isImported) {
+                out.append("    <description>Track recorded with Mes parcours - ${escapeXml(track.activityType)}</description>\n")
+            }
         }
 
         fun add(pt: TrackPoint) {
             val color = forcedColor ?: pt.segmentColor ?: fallbackColor
+            val key = pt.placemarkId
             // Le Placemark n'est ouvert qu'à l'arrivée du premier point : une trace
             // vide ne doit pas produire une entrée sans géométrie.
-            if (placemarkOpen && color != placemarkColor) {
+            if (placemarkOpen && (color != placemarkColor || key != placemarkKey)) {
                 if (lineOpen) closeLine()
                 closePlacemark()
             }
             if (!placemarkOpen) {
-                openPlacemark(color)
+                val placemark = key?.let { placemarks[it] }
+                moveToFolders(placemark?.folders.orEmpty())
+                openPlacemark(placemark, color)
+                placemarkKey = key
             }
             if (pt.isDiscontinuous && lineOpen) {
                 closeLine()
@@ -133,7 +151,7 @@ object Exporter {
                 openLine()
             }
             // Format des coordonnées KML : longitude,latitude,altitude
-            out.append("            ${pt.longitude},${pt.latitude},${pt.altitude}\n")
+            out.append("${indent()}          ${pt.longitude},${pt.latitude},${pt.altitude}\n")
         }
 
         fun finish() {
@@ -143,50 +161,70 @@ object Exporter {
             if (placemarkOpen) {
                 closePlacemark()
             }
+            moveToFolders(emptyList())
             out.append("  </Document>\n")
             out.append("</kml>")
         }
 
-        private fun openPlacemark(color: Int) {
-            out.append("    <Placemark>\n")
-            out.append("      <name>${escapeXml(trackName)}</name>\n")
-            out.append("      <Style>\n")
-            out.append("        <LineStyle>\n")
-            out.append("          <color>${KmlColor.format(color)}</color>\n")
-            out.append("          <width>${formatWidth(widthPx)}</width>\n")
-            out.append("        </LineStyle>\n")
-            out.append("      </Style>\n")
-            out.append("      <MultiGeometry>\n")
+        /** Referme les dossiers qui ne contiennent plus le tracé suivant, ouvre les siens. */
+        private fun moveToFolders(target: List<String>) {
+            var common = 0
+            while (common < openFolders.size && common < target.size && openFolders[common] == target[common]) common++
+            while (openFolders.size > common) {
+                openFolders.removeAt(openFolders.lastIndex)
+                out.append("${indent()}    </Folder>\n")
+            }
+            for (i in common until target.size) {
+                out.append("${indent()}    <Folder>\n")
+                out.append("${indent()}      <name>${escapeXml(target[i])}</name>\n")
+                openFolders += target[i]
+            }
+        }
+
+        private fun indent() = "  ".repeat(openFolders.size)
+
+        private fun openPlacemark(placemark: TrackPlacemark?, color: Int) {
+            val pad = indent()
+            out.append("$pad    <Placemark>\n")
+            out.append("$pad      <name>${escapeXml(placemark?.name ?: trackName)}</name>\n")
+            out.append("$pad      <Style>\n")
+            out.append("$pad        <LineStyle>\n")
+            out.append("$pad          <color>${KmlColor.format(color)}</color>\n")
+            out.append("$pad          <width>${formatWidth(placemark?.width ?: trackWidth)}</width>\n")
+            out.append("$pad        </LineStyle>\n")
+            out.append("$pad      </Style>\n")
+            out.append("$pad      <MultiGeometry>\n")
             placemarkOpen = true
             placemarkColor = color
         }
 
         private fun closePlacemark() {
-            out.append("      </MultiGeometry>\n")
-            out.append("    </Placemark>\n")
+            out.append("${indent()}      </MultiGeometry>\n")
+            out.append("${indent()}    </Placemark>\n")
             placemarkOpen = false
         }
 
         private fun openLine() {
-            out.append("        <LineString>\n")
-            out.append("          <extrude>0</extrude>\n")
-            out.append("          <tessellate>1</tessellate>\n")
-            out.append("          <altitudeMode>clampToGround</altitudeMode>\n")
-            out.append("          <coordinates>\n")
+            val pad = indent()
+            out.append("$pad        <LineString>\n")
+            out.append("$pad          <extrude>0</extrude>\n")
+            out.append("$pad          <tessellate>1</tessellate>\n")
+            out.append("$pad          <altitudeMode>clampToGround</altitudeMode>\n")
+            out.append("$pad          <coordinates>\n")
             lineOpen = true
         }
 
         private fun closeLine() {
-            out.append("          </coordinates>\n")
-            out.append("        </LineString>\n")
+            out.append("${indent()}          </coordinates>\n")
+            out.append("${indent()}        </LineString>\n")
             lineOpen = false
         }
 
         private fun formatWidth(width: Float): String =
-            if (width % 1f == 0f) width.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", width)
+            if (width % 1f == 0f) width.toInt().toString() else String.format(Locale.ROOT, "%.1f", width)
 
         private companion object {
-            /** Épaisseur écrite quand le parcours n'en a pas choisi : celle d'avant. */
+            /** Épaisseur écrite quand ni le tracé ni le parcours n'en ont : celle d'avant. */
             const val DEFAULT_KML_WIDTH = 5f
         }
     }

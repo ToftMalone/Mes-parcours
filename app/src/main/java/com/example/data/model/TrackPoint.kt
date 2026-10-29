@@ -40,5 +40,11 @@ data class TrackPoint(
      * couleur par parcours les peindrait tous pareil, ce qui reviendrait à perdre
      * l'information qu'on cherche justement à conserver.
      */
-    val segmentColor: Int? = null
+    val segmentColor: Int? = null,
+    /**
+     * Le tracé KML d'origine de ce point (`TrackPlacemark`), ou null pour un point
+     * enregistré ou venu d'un GPX. Nullable et sans valeur par défaut, comme
+     * [segmentColor] : la migration ne réécrit aucune ligne.
+     */
+    val placemarkId: Long? = null
 )

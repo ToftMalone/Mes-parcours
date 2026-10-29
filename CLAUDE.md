@@ -146,7 +146,7 @@ mode.
 supprimer un parcours (à l'unité, en mode sélection, ou l'original qu'un outil remplace)
 le **met à la corbeille** (`Track.deletedAt`, migration 10→11) au lieu de l'effacer. Il
 quitte l'historique et la carte, mais garde ses points ; un bouton « Corbeille (n) »,
-au-dessus de la liste et seulement quand elle n'est pas vide, ouvre une feuille où
+au-dessus de la liste (même quand l'onglet n'a plus aucun parcours) et seulement quand elle n'est pas vide, ouvre une feuille où
 chaque parcours se restaure. **Pas de bouton pour la vider**, à sa demande : c'est le
 temps qui la vide. `TrackRepository.purgeTrash`, appelé au démarrage depuis
 `TrackApplication`, efface pour de bon (points compris) ce qui y a passé plus de
@@ -216,8 +216,25 @@ d'office : le père de l'auteur, qui avait colorié chaque pays d'un voyage, a r
 un fichier d'une seule couleur après un découpage. Un `<Style>` vaut pour tout un
 Placemark : chaque changement de couleur en ouvre un nouveau, style écrit dedans
 (écriture en flux), et un parcours d'une seule couleur reste une seule entrée.
-`KmlColor.format` écrit l'AABBGGRR ; `KmlRoundTripTest` vérifie qu'un export réimporté
-retrouve ses couleurs et ses ruptures.
+`KmlColor.format` écrit l'AABBGGRR.
+
+**Un KML importé ressort rangé comme il est entré.** Le père de l'auteur, juste après :
+« il faut qu'il garde l'épaisseur des traits, le nom de chaque tracé et les sous-dossiers,
+je veux tout pareil qu'avant » — son fichier « Mes traces » (dossiers France, Étranger,
+À refaire… ; tracés Belgique, Luxembourg…) ressortait en une liste plate de « Mes
+traces ». À l'import, chaque `<Placemark>` devient une ligne `TrackPlacemark` (table
+`placemarks`, migration 11→12 : nom, chemin des `<Folder>` joint par `\u001F`,
+couleur, épaisseur `<width>` en ligne ou résolue par `KmlStyleTable.resolveWidth`) et
+ses points portent son identifiant (`TrackPoint.placemarkId`, nullable). Les recopies
+SQL (`copyPointsInto`, `copyPointRangeInto`) emportent la colonne ; nettoyage et
+prolongement aussi. L'export (`KmlWriter`, carte `placemarks` lue par
+`TrackDao.getPlacemarksForTrack`) rouvre un Placemark à chaque changement de tracé,
+ouvre et referme les `<Folder>` au fil de l'eau, et n'écrit plus la mention « Track
+recorded with Mes parcours » pour un parcours importé. Les lignes orphelines sont
+retirées après une purge de la corbeille (`deleteOrphanPlacemarks`). **Limite :** un
+fichier importé avant la 2.3.1 n'a pas cette structure ; il faut le réimporter.
+`KmlRoundTripTest` vérifie l'aller-retour complet (dossiers imbriqués, styles partagés
+et `<StyleMap>`, couleurs, épaisseurs, ruptures).
 
 `TrackRepository` est la **source de vérité** de l'état en direct (`isTracking`,
 `livePoints`, `liveStats`, `gpsStatus`…). Le service écrit, l'interface lit.
@@ -485,7 +502,8 @@ pourquoi. À relire avant d'y toucher.
    déclarées — `MIGRATION_4_5` (index de fenêtre de vue), `MIGRATION_5_6`
    (`Track.sourceColor`), `MIGRATION_6_7` (`TrackPoint.segmentColor`), `MIGRATION_7_8`
    (`Track.displayColor`), `MIGRATION_8_9` (`Track.displayWidthDp`), `MIGRATION_9_10`
-   (`Track.isPaused`), `MIGRATION_10_11` (`Track.deletedAt`, la corbeille) — rendrait la base illisible pour tout utilisateur venant
+   (`Track.isPaused`), `MIGRATION_10_11` (`Track.deletedAt`, la corbeille), `MIGRATION_11_12` (table
+   `placemarks` et `TrackPoint.placemarkId`) — rendrait la base illisible pour tout utilisateur venant
    d'une version antérieure. Toute nouvelle version de schéma doit venir avec la sienne.
    Deux garde-fous, depuis la `0.11.2`, là où l'invariant ne tenait qu'à la vigilance :
    la base n'est plus construite avec `fallbackToDestructiveMigration()` mais avec
@@ -773,10 +791,10 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 221 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 222 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (10), `KmlRoundTripTest` (1),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (10), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
   `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),

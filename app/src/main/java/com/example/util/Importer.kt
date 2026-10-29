@@ -4,6 +4,7 @@ import com.example.R
 import android.content.Context
 import android.net.Uri
 import android.util.Xml
+import com.example.data.model.TrackPlacemark
 import com.example.data.model.TrackPoint
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
@@ -110,6 +111,11 @@ object Importer {
         context: Context,
         uri: Uri,
         trackId: Long,
+        /**
+         * Enregistre un tracé KML (nom, dossiers, couleur, épaisseur) et renvoie son
+         * identifiant, que ses points porteront. Null : rien n'est retenu.
+         */
+        onPlacemark: ((TrackPlacemark) -> Long)? = null,
         onBatch: (List<TrackPoint>) -> Unit
     ): ImportSummary? {
         val fileName = getFileName(context, uri)
@@ -139,7 +145,7 @@ object Importer {
 
         val meta = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             if (isKml) {
-                parseKML(inputStream, defaultName, prescan, sink)
+                parseKML(inputStream, defaultName, prescan, sink, onPlacemark)
             } else {
                 parseGPX(inputStream, defaultName, sink)
             }
@@ -271,7 +277,8 @@ object Importer {
         inputStream: InputStream,
         defaultName: String,
         prescan: KmlPrescan,
-        sink: PointSink
+        sink: PointSink,
+        onPlacemark: ((TrackPlacemark) -> Long)?
     ): TrackMeta {
         // Le KML ne porte pas d'horodatage : on garde la convention historique d'un
         // point par seconde, calée pour que la trace se termine à l'instant présent.
@@ -284,7 +291,7 @@ object Importer {
         // de 100 000 points se datait de « maintenant » à « maintenant + 27 heures » :
         // le parcours importé se rangeait dans le futur, donc en tête de l'historique.
         val startClock = System.currentTimeMillis() - prescan.pointCount * 1000L
-        val handler = KmlHandler(sink, defaultName, startClock, prescan.styles)
+        val handler = KmlHandler(sink, defaultName, startClock, prescan.styles, onPlacemark)
 
         newSaxParser().parse(inputStream, handler)
 
@@ -536,7 +543,8 @@ private class PointSink(
         altitude: Double,
         speed: Float,
         timestamp: Long,
-        segmentColor: Int? = null
+        segmentColor: Int? = null,
+        placemarkId: Long? = null
     ) {
         if (hasPrevious) {
             totalDistance += haversineMeters(prevLat, prevLon, latitude, longitude)
@@ -556,7 +564,8 @@ private class PointSink(
                 speed = speed,
                 timestamp = timestamp,
                 isDiscontinuous = segmentIndex > 0 && pointsInSegment == 0,
-                segmentColor = segmentColor
+                segmentColor = segmentColor,
+                placemarkId = placemarkId
             )
         )
 
@@ -608,6 +617,9 @@ private class KmlStyleHandler : DefaultHandler() {
     private var inColor = false
     private val colorBuffer = StringBuilder()
     private var styleColor: Int? = null
+    private var inWidth = false
+    private val widthBuffer = StringBuilder()
+    private var styleWidth: Float? = null
 
     // Un <StyleMap> distingue l'apparence au repos de celle au survol. Seule la
     // première nous intéresse : c'est celle que l'utilisateur voit dans Google Earth.
@@ -623,6 +635,11 @@ private class KmlStyleHandler : DefaultHandler() {
             "style" -> {
                 styleId = attributes?.getValue("id")
                 styleColor = null
+                styleWidth = null
+            }
+            "width" -> if (inLineStyle) {
+                inWidth = true
+                widthBuffer.setLength(0)
             }
             "stylemap" -> {
                 styleMapId = attributes?.getValue("id")
@@ -652,6 +669,8 @@ private class KmlStyleHandler : DefaultHandler() {
             inCoordinates -> counter.feed(ch, start, length)
             inColor && colorBuffer.length < MAX_COLOR_LENGTH ->
                 colorBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - colorBuffer.length))
+            inWidth && widthBuffer.length < MAX_COLOR_LENGTH ->
+                widthBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - widthBuffer.length))
             inKey && keyBuffer.length < MAX_STYLE_ID_LENGTH ->
                 keyBuffer.append(ch, start, minOf(length, MAX_STYLE_ID_LENGTH - keyBuffer.length))
             inStyleUrl && styleUrlBuffer.length < MAX_STYLE_ID_LENGTH ->
@@ -670,9 +689,14 @@ private class KmlStyleHandler : DefaultHandler() {
                 KmlColor.parse(colorBuffer.toString())?.let { styleColor = it }
                 colorBuffer.setLength(0)
             }
+            "width" -> if (inWidth) {
+                inWidth = false
+                parseKmlWidth(widthBuffer.toString())?.let { styleWidth = it }
+            }
             "linestyle" -> {
                 inLineStyle = false
                 inColor = false
+                inWidth = false
             }
             "key" -> inKey = false
             "styleurl" -> inStyleUrl = false
@@ -683,9 +707,10 @@ private class KmlStyleHandler : DefaultHandler() {
                 inPair = false
             }
             "style" -> {
-                table.putStyle(styleId, styleColor)
+                table.putStyle(styleId, styleColor, styleWidth)
                 styleId = null
                 styleColor = null
+                styleWidth = null
             }
             "stylemap" -> {
                 table.putStyleMap(styleMapId, normalStyleUrl)
@@ -700,7 +725,8 @@ private class KmlHandler(
     private val sink: PointSink,
     defaultName: String,
     startClock: Long,
-    private val styleTable: KmlStyleTable
+    private val styleTable: KmlStyleTable,
+    private val onPlacemark: ((TrackPlacemark) -> Long)? = null
 ) : DefaultHandler() {
 
     var trackName: String = defaultName
@@ -739,6 +765,48 @@ private class KmlHandler(
     /** Couleur retenue pour les points en cours d'émission. */
     private val currentColor: Int? get() = inlineColor ?: referencedColor
 
+    // ------------------------------------------------------------------
+    // Structure du fichier, pour la réécrire à l'export (voir TrackPlacemark) :
+    // les dossiers qui contiennent le tracé en cours, son nom et son épaisseur.
+    // Le <Document> le plus extérieur n'est pas un dossier : c'est le parcours.
+    // ------------------------------------------------------------------
+
+    /** Les balises ouvertes, pour savoir de quoi un <name> est le nom. */
+    private val openTags = ArrayList<String>()
+
+    /** Nom de chaque conteneur ouvert (<Folder>, <Document> imbriqué), null s'il n'en a pas encore. */
+    private val containerNames = ArrayList<String?>()
+    private var documentDepth = 0
+
+    private var placemarkName: String? = null
+    private var referencedWidth: Float? = null
+    private var inlineWidth: Float? = null
+    private var inWidth = false
+    private val widthBuffer = StringBuilder()
+    private val anyNameBuffer = StringBuilder()
+    private var inAnyName = false
+
+    /** Identifiant du tracé en cours une fois enregistré : au premier point, quand son nom et son style sont connus. */
+    private var placemarkId: Long? = null
+    private var placemarkSaved = false
+
+    private fun currentPlacemarkId(): Long? {
+        if (!inPlacemark || onPlacemark == null) return null
+        if (!placemarkSaved) {
+            placemarkSaved = true
+            val folders = containerNames.map { it ?: "" }
+            placemarkId = onPlacemark.invoke(
+                TrackPlacemark(
+                    name = placemarkName,
+                    folderPath = if (folders.isEmpty()) null else folders.joinToString(TrackPlacemark.FOLDER_SEPARATOR),
+                    color = currentColor,
+                    width = inlineWidth ?: referencedWidth
+                )
+            )
+        }
+        return placemarkId
+    }
+
     private var clock = startClock
 
     private val tokenizer = CoordinateTokenizer { lon, lat, ele ->
@@ -748,21 +816,45 @@ private class KmlHandler(
             altitude = ele,
             speed = 0f,
             timestamp = clock,
-            segmentColor = currentColor
+            segmentColor = currentColor,
+            placemarkId = currentPlacemarkId()
         )
         clock += 1000L
     }
 
     override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
-        when (kmlTagOf(localName, qName)) {
-            "name" -> if (!nameResolved) {
-                inName = true
-                nameBuffer.setLength(0)
+        val tag = kmlTagOf(localName, qName)
+        val parent = openTags.lastOrNull()
+        openTags += tag
+        when (tag) {
+            "name" -> {
+                if (!nameResolved) {
+                    inName = true
+                    nameBuffer.setLength(0)
+                }
+                if (parent == "placemark" || parent == "folder" || (parent == "document" && documentDepth > 1)) {
+                    inAnyName = true
+                    anyNameBuffer.setLength(0)
+                }
             }
+            "document" -> {
+                documentDepth++
+                if (documentDepth > 1) containerNames += null
+            }
+            "folder" -> containerNames += null
             "placemark" -> {
                 inPlacemark = true
                 referencedColor = null
                 inlineColor = null
+                placemarkName = null
+                referencedWidth = null
+                inlineWidth = null
+                placemarkId = null
+                placemarkSaved = false
+            }
+            "width" -> if (inLineStyle) {
+                inWidth = true
+                widthBuffer.setLength(0)
             }
             "styleurl" -> if (inPlacemark) {
                 inStyleUrl = true
@@ -787,8 +879,14 @@ private class KmlHandler(
     override fun characters(ch: CharArray, start: Int, length: Int) {
         when {
             inCoordinates -> tokenizer.feed(ch, start, length)
-            inName && nameBuffer.length < MAX_NAME_LENGTH ->
-                nameBuffer.append(ch, start, minOf(length, MAX_NAME_LENGTH - nameBuffer.length))
+            inName || inAnyName -> {
+                if (inName && nameBuffer.length < MAX_NAME_LENGTH)
+                    nameBuffer.append(ch, start, minOf(length, MAX_NAME_LENGTH - nameBuffer.length))
+                if (inAnyName && anyNameBuffer.length < MAX_NAME_LENGTH)
+                    anyNameBuffer.append(ch, start, minOf(length, MAX_NAME_LENGTH - anyNameBuffer.length))
+            }
+            inWidth && widthBuffer.length < MAX_COLOR_LENGTH ->
+                widthBuffer.append(ch, start, minOf(length, MAX_COLOR_LENGTH - widthBuffer.length))
             inStyleUrl && styleUrlBuffer.length < MAX_STYLE_ID_LENGTH ->
                 styleUrlBuffer.append(ch, start, minOf(length, MAX_STYLE_ID_LENGTH - styleUrlBuffer.length))
             inLineStyleColor && colorBuffer.length < MAX_COLOR_LENGTH ->
@@ -797,19 +895,41 @@ private class KmlHandler(
     }
 
     override fun endElement(uri: String?, localName: String?, qName: String?) {
-        when (kmlTagOf(localName, qName)) {
-            "name" -> if (inName) {
-                inName = false
-                val text = nameBuffer.toString().trim()
-                if (text.isNotEmpty()) {
-                    trackName = text
-                    nameResolved = true
+        val tag = kmlTagOf(localName, qName)
+        if (openTags.isNotEmpty()) openTags.removeAt(openTags.lastIndex)
+        when (tag) {
+            "name" -> {
+                if (inName) {
+                    inName = false
+                    val text = nameBuffer.toString().trim()
+                    if (text.isNotEmpty()) {
+                        trackName = text
+                        nameResolved = true
+                    }
+                    nameBuffer.setLength(0)
                 }
-                nameBuffer.setLength(0)
+                if (inAnyName) {
+                    inAnyName = false
+                    val text = anyNameBuffer.toString().trim().ifEmpty { null }
+                    when (openTags.lastOrNull()) {
+                        "placemark" -> placemarkName = text
+                        else -> if (containerNames.isNotEmpty()) containerNames[containerNames.lastIndex] = text
+                    }
+                }
             }
+            "width" -> if (inWidth) {
+                inWidth = false
+                parseKmlWidth(widthBuffer.toString())?.let { inlineWidth = it }
+            }
+            "document" -> {
+                if (documentDepth > 1 && containerNames.isNotEmpty()) containerNames.removeAt(containerNames.lastIndex)
+                documentDepth--
+            }
+            "folder" -> if (containerNames.isNotEmpty()) containerNames.removeAt(containerNames.lastIndex)
             "styleurl" -> if (inStyleUrl) {
                 inStyleUrl = false
                 referencedColor = styleTable.resolve(styleUrlBuffer.toString())
+                referencedWidth = styleTable.resolveWidth(styleUrlBuffer.toString())
                 rememberFirstColor()
                 styleUrlBuffer.setLength(0)
             }
@@ -826,6 +946,7 @@ private class KmlHandler(
             "linestyle" -> {
                 inLineStyle = false
                 inLineStyleColor = false
+                inWidth = false
             }
             "coordinates" -> if (inCoordinates) {
                 tokenizer.finish()
@@ -843,6 +964,10 @@ private class KmlHandler(
         if (firstLineColor == null) firstLineColor = currentColor
     }
 }
+
+/** Épaisseur de ligne KML, en pixels ; null si illisible, nulle ou démesurée. */
+internal fun parseKmlWidth(raw: String): Float? =
+    raw.trim().toFloatOrNull()?.takeIf { it > 0f && it <= 100f }
 
 /**
  * Découpe un flux de coordonnées KML ("lon,lat[,alt]" séparés par des blancs) sans

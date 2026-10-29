@@ -76,7 +76,10 @@ object AutoBackupManager {
                         fileName = "$baseFileName.kml",
                         mimeType = "application/vnd.google-earth.kml+xml"
                     ) { out ->
-                        val writer = Exporter.KmlWriter(out)
+                        val writer = Exporter.KmlWriter(
+                            out,
+                            db.trackDao.getPlacemarksForTrackBlocking(trackId).associateBy { it.id }
+                        )
                         writer.start(track)
                         forEachPointOf(db, trackId) { writer.add(it) }
                         writer.finish()

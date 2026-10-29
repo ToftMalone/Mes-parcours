@@ -19,7 +19,7 @@ import kotlin.math.ceil
  * quinze secondes (`buildSegmentsFromPoints`). Sans ce redécoupage, le prolongement
  * serait dessiné en pointillés, voire pas du tout.
  *
- * L'altitude et la couleur de tronçon sont celles de [anchor] : rien de mieux n'est
+ * L'altitude, la couleur de tronçon et le tracé KML sont ceux de [anchor] : rien de mieux n'est
  * connu, et une altitude à zéro fausserait le dénivelé.
  */
 object TrackExtender {
@@ -71,7 +71,8 @@ object TrackExtender {
                     altitude = anchor.altitude,
                     speed = speedMps.toFloat(),
                     timestamp = if (forward) anchor.timestamp + offsetMs else anchor.timestamp - offsetMs,
-                    segmentColor = anchor.segmentColor
+                    segmentColor = anchor.segmentColor,
+                    placemarkId = anchor.placemarkId
                 )
             }
             elapsedMeters += length

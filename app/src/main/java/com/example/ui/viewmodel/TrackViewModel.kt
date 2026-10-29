@@ -661,7 +661,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 writer.finish()
             }
             ExportFormat.KML -> {
-                val writer = Exporter.KmlWriter(out)
+                val writer = Exporter.KmlWriter(out, repository.getPlacemarks(track.id))
                 writer.start(track)
                 repository.forEachPoint(track.id) { writer.add(it) }
                 writer.finish()

@@ -393,7 +393,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             )
             val trackId = trackDao.insertTrackBlocking(placeholder)
             try {
-                val summary = Importer.importFromUri(context, uri, trackId) { batch ->
+                val summary = Importer.importFromUri(
+                    context, uri, trackId,
+                    onPlacemark = { trackDao.insertPlacemarkBlocking(it) }
+                ) { batch ->
                     trackDao.insertTrackPointsBlocking(batch)
                 } ?: throw Importer.ImportException(R.string.err_import_unreadable)
 
@@ -1316,11 +1319,19 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      */
     suspend fun purgeTrash(now: Long = System.currentTimeMillis()): Int {
         val before = now - Track.TRASH_RETENTION_MS
-        return database.withTransaction {
+        val purged = database.withTransaction {
             trackDao.deleteExpiredTrashPoints(before)
             trackDao.deleteExpiredTrash(before)
         }
+        // Les tracés KML auxquels plus aucun point ne renvoie partent avec eux. Le
+        // ménage relit toute la table des points : seulement quand il y a eu effacement.
+        if (purged > 0) trackDao.deleteOrphanPlacemarks()
+        return purged
     }
+
+    /** Les tracés KML d'origine d'un parcours, par identifiant, pour l'export. */
+    suspend fun getPlacemarks(trackId: Long): Map<Long, com.example.data.model.TrackPlacemark> =
+        trackDao.getPlacemarksForTrack(trackId).associateBy { it.id }
 
     /** Vrai pour le parcours qu'un enregistrement alimente, ou laissé ouvert en base. */
     fun isBeingRecorded(track: Track): Boolean =

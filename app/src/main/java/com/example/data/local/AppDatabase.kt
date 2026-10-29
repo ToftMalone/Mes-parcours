@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.Track
+import com.example.data.model.TrackPlacemark
 import com.example.data.model.TrackPoint
 
 /**
@@ -17,7 +18,7 @@ import com.example.data.model.TrackPoint
  * l'exécution. L'incrémenter sans ajouter la migration correspondante fait échouer ce
  * test — c'est précisément ce qu'on lui demande.
  */
-internal const val DATABASE_VERSION = 11
+internal const val DATABASE_VERSION = 12
 
 /**
  * `exportSchema = true` : Room écrit le schéma de chaque version dans
@@ -31,7 +32,7 @@ internal const val DATABASE_VERSION = 11
  * que l'oublier efface tous les parcours des utilisateurs sans un mot.
  */
 @Database(
-    entities = [Track::class, TrackPoint::class],
+    entities = [Track::class, TrackPoint::class, TrackPlacemark::class],
     version = DATABASE_VERSION,
     exportSchema = true
 )
@@ -146,6 +147,22 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * Garde la structure d'un KML importé (dossiers, noms et épaisseurs de ses
+         * tracés) : la table `placemarks`, et le renvoi de chaque point vers la sienne.
+         * Colonne nullable et sans valeur par défaut : aucune ligne de `track_points`
+         * n'est réécrite.
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `placemarks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT, `folderPath` TEXT, `color` INTEGER, `width` REAL)"
+                )
+                db.execSQL("ALTER TABLE `track_points` ADD COLUMN `placemarkId` INTEGER")
+            }
+        }
+
+        /**
          * Toutes les migrations déclarées, dans l'ordre.
          *
          * Exposée pour que le test de migration applique exactement la même liste que
@@ -153,7 +170,7 @@ abstract class AppDatabase : RoomDatabase() {
          * ajoutée ici et oubliée là.
          */
         @androidx.annotation.VisibleForTesting
-        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {

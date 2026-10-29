@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.example.data.model.Track
+import com.example.data.model.TrackPlacemark
 import com.example.data.model.TrackPoint
 import com.example.data.model.TrackPointMeta
 import kotlinx.coroutines.flow.Flow
@@ -172,8 +173,8 @@ interface TrackDao {
      * relire les lignes que l'on vient d'écrire.
      */
     @Query(
-        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor) " +
-                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor " +
+        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor, placemarkId) " +
+                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor, placemarkId " +
                 "FROM track_points WHERE trackId = :sourceId AND id <= :maxSourceId ORDER BY id ASC"
     )
     suspend fun copyPointsInto(destinationId: Long, sourceId: Long, maxSourceId: Long)
@@ -191,8 +192,8 @@ interface TrackDao {
      * Pour la dernière tranche, passer `Long.MAX_VALUE` en [untilId].
      */
     @Query(
-        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor) " +
-                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor " +
+        "INSERT INTO track_points (trackId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor, placemarkId) " +
+                "SELECT :destinationId, latitude, longitude, altitude, speed, timestamp, isDiscontinuous, segmentColor, placemarkId " +
                 "FROM track_points WHERE trackId = :sourceId AND id >= :fromId AND id < :untilId ORDER BY id ASC"
     )
     suspend fun copyPointRangeInto(
@@ -277,6 +278,27 @@ interface TrackDao {
 
     @Query("DELETE FROM tracks WHERE id = :trackId")
     suspend fun deleteTrack(trackId: Long)
+
+    // ------------------------------------------------------------------
+    // Tracés d'un KML importé (voir TrackPlacemark).
+    // ------------------------------------------------------------------
+
+    @Insert
+    fun insertPlacemarkBlocking(placemark: TrackPlacemark): Long
+
+    /** Les tracés KML auxquels renvoient les points d'un parcours. */
+    @Query(
+        "SELECT * FROM placemarks WHERE id IN " +
+            "(SELECT DISTINCT placemarkId FROM track_points WHERE trackId = :trackId AND placemarkId IS NOT NULL)"
+    )
+    suspend fun getPlacemarksForTrack(trackId: Long): List<TrackPlacemark>
+
+    @Query("SELECT * FROM placemarks WHERE id IN (SELECT DISTINCT placemarkId FROM track_points WHERE trackId = :trackId AND placemarkId IS NOT NULL)")
+    fun getPlacemarksForTrackBlocking(trackId: Long): List<TrackPlacemark>
+
+    /** Retire les tracés auxquels plus aucun point ne renvoie. */
+    @Query("DELETE FROM placemarks WHERE id NOT IN (SELECT DISTINCT placemarkId FROM track_points WHERE placemarkId IS NOT NULL)")
+    suspend fun deleteOrphanPlacemarks()
 
     // ------------------------------------------------------------------
     // Corbeille : un parcours supprimé y reste trente jours (voir Track.deletedAt).

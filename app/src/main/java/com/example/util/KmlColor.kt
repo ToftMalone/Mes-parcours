@@ -63,12 +63,14 @@ object KmlColor {
 class KmlStyleTable {
 
     private val lineColors = HashMap<String, Int>()
+    private val lineWidths = HashMap<String, Float>()
     private val normalStyleOf = HashMap<String, String>()
 
-    /** Enregistre la couleur de ligne d'un `<Style id="…">`. */
-    fun putStyle(id: String?, color: Int?) {
+    /** Enregistre la couleur et l'épaisseur de ligne d'un `<Style id="…">`. */
+    fun putStyle(id: String?, color: Int?, width: Float? = null) {
         val key = normalize(id) ?: return
         if (color != null) lineColors[key] = color
+        if (width != null) lineWidths[key] = width
     }
 
     /** Enregistre le style « au repos » désigné par un `<StyleMap id="…">`. */
@@ -89,6 +91,16 @@ class KmlStyleTable {
         var key = normalize(styleUrl) ?: return null
         repeat(MAX_INDIRECTION) {
             lineColors[key]?.let { return it }
+            key = normalStyleOf[key] ?: return null
+        }
+        return null
+    }
+
+    /** Épaisseur de ligne associée à [styleUrl], résolue comme la couleur. */
+    fun resolveWidth(styleUrl: String?): Float? {
+        var key = normalize(styleUrl) ?: return null
+        repeat(MAX_INDIRECTION) {
+            lineWidths[key]?.let { return it }
             key = normalStyleOf[key] ?: return null
         }
         return null

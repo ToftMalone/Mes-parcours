@@ -242,7 +242,9 @@ fun HistoryTab(
                 }
             }
 
-            if (shown.isNotEmpty()) {
+            // La rangée reste là même sans parcours à montrer : la corbeille doit rester
+            // accessible quand on vient de supprimer le dernier.
+            if (shown.isNotEmpty() || trashed.isNotEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -285,13 +287,15 @@ fun HistoryTab(
                             }
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        TextButton(
-                            onClick = { selecting = true },
-                            modifier = Modifier.testTag("history_start_selection")
-                        ) {
-                            Icon(Icons.Rounded.Checklist, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(stringResource(R.string.selection_start), style = MaterialTheme.typography.labelLarge)
+                        if (shown.isNotEmpty()) {
+                            TextButton(
+                                onClick = { selecting = true },
+                                modifier = Modifier.testTag("history_start_selection")
+                            ) {
+                                Icon(Icons.Rounded.Checklist, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(stringResource(R.string.selection_start), style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
                 }
