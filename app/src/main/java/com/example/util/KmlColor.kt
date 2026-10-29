@@ -37,6 +37,15 @@ object KmlColor {
 
         return (alpha shl 24) or (red shl 16) or (green shl 8) or blue
     }
+
+    /** L'inverse de [parse] : une couleur ARGB écrite en AABBGGRR, pour l'export. */
+    fun format(argb: Int): String {
+        val alpha = (argb ushr 24) and 0xFF
+        val red = (argb shr 16) and 0xFF
+        val green = (argb shr 8) and 0xFF
+        val blue = argb and 0xFF
+        return "%02x%02x%02x%02x".format(alpha, blue, green, red)
+    }
 }
 
 /**

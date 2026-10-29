@@ -21,20 +21,21 @@ class KmlExportTest {
 
     private val track = Track(id = 1L, name = "Voyages", startTime = 1_000_000L)
 
-    private fun point(index: Int, discontinuous: Boolean = false) = TrackPoint(
+    private fun point(index: Int, discontinuous: Boolean = false, color: Int? = null) = TrackPoint(
         id = index.toLong(),
         trackId = 1L,
         latitude = 45.0 + index / 1000.0,
         longitude = 6.0,
         altitude = 100.0,
         timestamp = 1_000_000L + index * 1000L,
-        isDiscontinuous = discontinuous
+        isDiscontinuous = discontinuous,
+        segmentColor = color
     )
 
-    private fun export(points: List<TrackPoint>): String {
+    private fun export(points: List<TrackPoint>, of: Track = track): String {
         val out = StringBuilder()
         val writer = Exporter.KmlWriter(out)
-        writer.start(track)
+        writer.start(of)
         points.forEach { writer.add(it) }
         writer.finish()
         return out.toString()
@@ -126,5 +127,42 @@ class KmlExportTest {
         assertEquals(kml.countOf("<LineString>"), kml.countOf("</LineString>"))
         assertEquals(kml.countOf("<coordinates>"), kml.countOf("</coordinates>"))
         assertEquals(kml.countOf("<MultiGeometry>"), kml.countOf("</MultiGeometry>"))
+    }
+
+    private val france = 0xFF2F7DE1.toInt()   // bleu
+    private val belgique = 0xFFE8505B.toInt() // rouge
+
+    @Test
+    fun `chaque couleur de troncon garde la sienne`() {
+        // Un voyage importé de Google Earth : un pays par couleur.
+        val points = listOf(
+            point(1, color = france), point(2, color = france),
+            point(3, discontinuous = true, color = belgique), point(4, color = belgique)
+        )
+
+        val kml = export(points, track.copy(isImported = true))
+
+        assertEquals("une entrée par couleur", 2, kml.countOf("<Placemark>"))
+        assertTrue("bleu en AABBGGRR", kml.contains("<color>ffe17d2f</color>"))
+        assertTrue("rouge en AABBGGRR", kml.contains("<color>ff5b50e8</color>"))
+        assertEquals(2, kml.countOf("<LineString>"))
+    }
+
+    @Test
+    fun `la couleur choisie pour le parcours s'impose a tout le trace`() {
+        val points = listOf(point(1, color = france), point(2, discontinuous = true, color = belgique))
+
+        val kml = export(points, track.copy(displayColor = 0xFF13A38A.toInt(), displayWidthDp = 8f))
+
+        assertEquals(1, kml.countOf("<Placemark>"))
+        assertTrue(kml.contains("<color>ff8aa313</color>"))
+        assertTrue("l'épaisseur du parcours", kml.contains("<width>8</width>"))
+        assertTrue("plus jamais le rouge d'office", !kml.contains("ff0000ff"))
+    }
+
+    @Test
+    fun `la couleur exportee se relit telle quelle`() {
+        val written = com.example.util.KmlColor.format(france)
+        assertEquals(france, com.example.util.KmlColor.parse(written))
     }
 }

@@ -209,6 +209,16 @@ raison.
 Corollaire à l'affichage : `buildSegmentsFromPoints` coupe aussi sur **changement de
 couleur**, une polyligne osmdroid n'en portant qu'une.
 
+**L'export KML écrit ces couleurs** (`Exporter.KmlWriter`), résolues comme au dessin :
+`displayColor` du parcours, sinon `segmentColor` du point, sinon couleur du fichier ou
+de la catégorie ; épaisseur `displayWidthDp` (5 à défaut). Il écrivait tout en rouge
+d'office : le père de l'auteur, qui avait colorié chaque pays d'un voyage, a retrouvé
+un fichier d'une seule couleur après un découpage. Un `<Style>` vaut pour tout un
+Placemark : chaque changement de couleur en ouvre un nouveau, style écrit dedans
+(écriture en flux), et un parcours d'une seule couleur reste une seule entrée.
+`KmlColor.format` écrit l'AABBGGRR ; `KmlRoundTripTest` vérifie qu'un export réimporté
+retrouve ses couleurs et ses ruptures.
+
 `TrackRepository` est la **source de vérité** de l'état en direct (`isTracking`,
 `livePoints`, `liveStats`, `gpsStatus`…). Le service écrit, l'interface lit.
 
@@ -763,10 +773,10 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 217 tests unitaires en 26 suites : `ScreensScreenshotTest` (38, captures seules —
+- 221 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (7),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (10), `KmlRoundTripTest` (1),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
   `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),

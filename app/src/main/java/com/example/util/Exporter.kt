@@ -71,51 +71,60 @@ object Exporter {
     }
 
     /**
-     * Un seul Placemark, dont la géométrie est un `<MultiGeometry>` réunissant un
-     * `<LineString>` par tronçon continu.
+     * Un Placemark par couleur, dont la géométrie est un `<MultiGeometry>` réunissant
+     * un `<LineString>` par tronçon continu.
      *
-     * Deux exigences à tenir ensemble :
+     * Trois exigences à tenir ensemble :
      *
      * - **Les ruptures doivent survivre.** Tout écrire dans un unique bloc
      *   `<coordinates>` les perdrait : après une pause, une reprise ou une fusion,
      *   réimporter le fichier relierait les tronçons par une ligne droite.
-     * - **Le parcours doit rester d'un seul tenant.** La version précédente ouvrait
-     *   un Placemark par tronçon, nommés « Nom », « Nom (2) »… : un parcours fusionné
-     *   à partir de dix traces se présentait comme dix entrées distinctes dans Google
-     *   Earth, alors que l'utilisateur venait justement de les réunir.
-     *
-     * `<MultiGeometry>` répond aux deux : une seule entrée, des lignes distinctes.
-     *
-     * Un tronçon unique donne un `<MultiGeometry>` d'un seul `<LineString>`. C'est
-     * valide, et l'uniformité vaut mieux ici qu'un cas particulier : l'écriture étant
-     * incrémentale, on ne sait pas au moment d'ouvrir la géométrie combien de
-     * tronçons suivront.
+     * - **Le parcours doit rester d'un seul tenant.** Un Placemark par tronçon
+     *   présentait un parcours fusionné à partir de dix traces comme dix entrées
+     *   distinctes dans Google Earth, alors que l'utilisateur venait de les réunir.
+     *   D'où `<MultiGeometry>` : une seule entrée, des lignes distinctes.
+     * - **Les couleurs doivent survivre.** L'export écrivait tout en rouge, quelle que
+     *   soit la couleur à l'écran : le père de l'auteur, qui avait colorié chaque pays
+     *   d'un voyage, a retrouvé un fichier d'une seule couleur. La couleur d'un point
+     *   se résout comme au dessin : celle choisie pour le parcours, sinon celle du
+     *   tronçon (`TrackPoint.segmentColor`), sinon celle du fichier ou de la
+     *   catégorie. Un `<Style>` ne vaut que pour tout un Placemark : chaque
+     *   changement de couleur en ouvre donc un nouveau, avec son style écrit dedans
+     *   (l'écriture étant en flux, on ne connaît pas les couleurs à l'avance). Un
+     *   parcours d'une seule couleur reste un seul Placemark. La réimportation relit
+     *   ces styles en ligne : la boucle est bouclée.
      */
     class KmlWriter(private val out: Appendable) {
         private var trackName = ""
         private var placemarkOpen = false
         private var lineOpen = false
+        private var forcedColor: Int? = null
+        private var fallbackColor = 0
+        private var widthPx = DEFAULT_KML_WIDTH
+        private var placemarkColor: Int? = null
 
         fun start(track: Track) {
             trackName = track.name
+            forcedColor = track.displayColor
+            fallbackColor = TrackStylePreferences.resolveTrackColor(null, track.sourceColor, track.isImported, track.isMerged)
+            widthPx = track.displayWidthDp ?: DEFAULT_KML_WIDTH
             out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
             out.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n")
             out.append("  <Document>\n")
             out.append("    <name>${escapeXml(track.name)}</name>\n")
             out.append("    <description>Track recorded with Mes parcours - ${escapeXml(track.activityType)}</description>\n")
-            out.append("    <Style id=\"routeStyle\">\n")
-            out.append("      <LineStyle>\n")
-            out.append("        <color>ff0000ff</color> <!-- Red line -->\n")
-            out.append("        <width>5</width>\n")
-            out.append("      </LineStyle>\n")
-            out.append("    </Style>\n")
         }
 
         fun add(pt: TrackPoint) {
+            val color = forcedColor ?: pt.segmentColor ?: fallbackColor
             // Le Placemark n'est ouvert qu'à l'arrivée du premier point : une trace
             // vide ne doit pas produire une entrée sans géométrie.
+            if (placemarkOpen && color != placemarkColor) {
+                if (lineOpen) closeLine()
+                closePlacemark()
+            }
             if (!placemarkOpen) {
-                openPlacemark()
+                openPlacemark(color)
             }
             if (pt.isDiscontinuous && lineOpen) {
                 closeLine()
@@ -138,12 +147,18 @@ object Exporter {
             out.append("</kml>")
         }
 
-        private fun openPlacemark() {
+        private fun openPlacemark(color: Int) {
             out.append("    <Placemark>\n")
             out.append("      <name>${escapeXml(trackName)}</name>\n")
-            out.append("      <styleUrl>#routeStyle</styleUrl>\n")
+            out.append("      <Style>\n")
+            out.append("        <LineStyle>\n")
+            out.append("          <color>${KmlColor.format(color)}</color>\n")
+            out.append("          <width>${formatWidth(widthPx)}</width>\n")
+            out.append("        </LineStyle>\n")
+            out.append("      </Style>\n")
             out.append("      <MultiGeometry>\n")
             placemarkOpen = true
+            placemarkColor = color
         }
 
         private fun closePlacemark() {
@@ -165,6 +180,14 @@ object Exporter {
             out.append("          </coordinates>\n")
             out.append("        </LineString>\n")
             lineOpen = false
+        }
+
+        private fun formatWidth(width: Float): String =
+            if (width % 1f == 0f) width.toInt().toString() else String.format(java.util.Locale.ROOT, "%.1f", width)
+
+        private companion object {
+            /** Épaisseur écrite quand le parcours n'en a pas choisi : celle d'avant. */
+            const val DEFAULT_KML_WIDTH = 5f
         }
     }
 
