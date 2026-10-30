@@ -30,8 +30,8 @@ android {
     applicationId = "com.toche.mesparcours"
     minSdk = 24
     targetSdk = 36
-    versionCode = 53
-    versionName = "2.3.3"
+    versionCode = 54
+    versionName = "2.3.4"
 
     // Nom de paquet que doit porter un APK de mise à jour avant d'être présenté à
     // l'installateur (voir UpdateDownloader.isExpectedApk). Celui de la release, y
