@@ -7,6 +7,7 @@ import com.example.data.local.AppDatabase
 import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.repository.TrackRepository
+import com.example.util.PortionBound
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -63,23 +64,25 @@ class CutPortionTest {
         return trackId to db.trackDao.getPointsForTrack(trackId)
     }
 
+    private fun at(point: TrackPoint) = PortionBound.at(point)
+
     @Test
     fun `la portion du milieu disparaît et le reste tient en un seul parcours`() = runBlocking {
         val (trackId, points) = createTrack()
 
-        val ids = repository.cutPortion(trackId, points[40].id, points[59].id, "Sortie", false)
+        val ids = repository.cutPortion(trackId, at(points[40]), at(points[59]), "Sortie", false)
 
         assertEquals(1, ids.size)
         val kept = db.trackDao.getPointsForTrack(ids[0])
-        assertEquals(80, kept.size)
-        assertEquals(points[39].timestamp, kept[39].timestamp)
-        assertEquals(points[60].timestamp, kept[40].timestamp)
+        assertEquals("les deux bornes restent, chacune au bout de son côté", 82, kept.size)
+        assertEquals(points[40].timestamp, kept[40].timestamp)
+        assertEquals(points[59].timestamp, kept[41].timestamp)
         assertFalse("le début n'ouvre pas de rupture", kept.first().isDiscontinuous)
-        assertTrue("la suite ouvre un nouveau tronçon", kept[40].isDiscontinuous)
+        assertTrue("la suite ouvre un nouveau tronçon", kept[41].isDiscontinuous)
         assertEquals(1, kept.count { it.isDiscontinuous })
         assertEquals("Sortie", db.trackDao.getTrackById(ids[0])!!.name)
-        // 39 + 39 intervalles de cinq mètres : rien n'est compté à travers le trou.
-        assertEquals(390.0, db.trackDao.getTrackById(ids[0])!!.totalDistance, 1.0)
+        // 40 + 40 intervalles de cinq mètres : rien n'est compté à travers le trou.
+        assertEquals(400.0, db.trackDao.getTrackById(ids[0])!!.totalDistance, 1.0)
         assertEquals(0xFF445566.toInt(), db.trackDao.getTrackById(ids[0])!!.displayColor)
         assertEquals("l'original reste", 100, db.trackDao.getPointsForTrack(trackId).size)
     }
@@ -88,11 +91,12 @@ class CutPortionTest {
     fun `une portion au bout ne laisse que le début, sans rupture`() = runBlocking {
         val (trackId, points) = createTrack()
 
-        val ids = repository.cutPortion(trackId, points[80].id, points[99].id, "Sortie", true)
+        val ids = repository.cutPortion(trackId, at(points[80]), at(points[99]), "Sortie", true)
 
         assertEquals(1, ids.size)
         val kept = db.trackDao.getPointsForTrack(ids[0])
-        assertEquals(80, kept.size)
+        assertEquals(81, kept.size)
+        assertEquals(points[80].timestamp, kept.last().timestamp)
         assertEquals(0, kept.count { it.isDiscontinuous })
         assertNotNull("l'original part à la corbeille sur demande", db.trackDao.getTrackById(trackId)?.deletedAt)
     }
@@ -101,10 +105,11 @@ class CutPortionTest {
     fun `une portion au début ne laisse que la fin, sans rupture`() = runBlocking {
         val (trackId, points) = createTrack()
 
-        val ids = repository.cutPortion(trackId, points[0].id, points[19].id, "Sortie", false)
+        val ids = repository.cutPortion(trackId, at(points[0]), at(points[19]), "Sortie", false)
 
         val kept = db.trackDao.getPointsForTrack(ids[0])
-        assertEquals(80, kept.size)
+        assertEquals(81, kept.size)
+        assertEquals(points[19].timestamp, kept.first().timestamp)
         assertEquals(0, kept.count { it.isDiscontinuous })
     }
 
@@ -112,21 +117,58 @@ class CutPortionTest {
     fun `les bornes peuvent être données dans les deux sens`() = runBlocking {
         val (trackId, points) = createTrack()
 
-        val ids = repository.cutPortion(trackId, points[59].id, points[40].id, "Sortie", false)
+        val ids = repository.cutPortion(trackId, at(points[59]), at(points[40]), "Sortie", false)
 
-        assertEquals(1, ids.size)
+        assertEquals(82, db.trackDao.getPointsForTrack(ids[0]).size)
     }
 
     @Test
-    fun `ne laisser qu'un point est refusé`() = runBlocking {
+    fun `tout retirer est refusé`() = runBlocking {
         val (trackId, points) = createTrack()
 
         val failure = runCatching {
-            repository.cutPortion(trackId, points[1].id, points[99].id, "Sortie", true)
+            repository.cutPortion(trackId, at(points[0]), at(points[99]), "Sortie", true)
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
         assertEquals("rien n'est supprimé", 100, db.trackDao.getPointsForTrack(trackId).size)
+    }
+
+    @Test
+    fun `la coupe tombe là où l'on a touché, même entre deux points`() = runBlocking {
+        val (trackId, points) = createTrack()
+        val step = 5 / 111_132.0
+
+        // Deux appuis à mi-chemin entre deux points, un peu à côté du tracé.
+        val from = repository.findPortionBound(trackId, points[38].id, points[45].id, 45.0 + 40.5 * step, 5.00002)!!
+        val to = repository.findPortionBound(trackId, points[55].id, points[62].id, 45.0 + 58.5 * step, 4.99998)!!
+
+        assertEquals(points[40].id, from.beforeId)
+        assertEquals(points[41].id, from.afterId)
+        assertEquals(0.5, from.fraction, 0.05)
+        assertEquals(points[58].id, to.beforeId)
+
+        val ids = repository.cutPortion(trackId, from, to, "Sortie", false)
+        val kept = db.trackDao.getPointsForTrack(ids[0])
+        assertEquals("deux points fabriqués aux bornes", 84, kept.size)
+        assertEquals(45.0 + 40.5 * step, kept[41].latitude, 1e-7)
+        assertEquals(5.0, kept[41].longitude, 1e-9)
+        assertEquals(45.0 + 58.5 * step, kept[42].latitude, 1e-7)
+        assertTrue("la suite repart de la fin, en ouvrant un tronçon", kept[42].isDiscontinuous)
+        assertEquals(1, kept.count { it.isDiscontinuous })
+        assertEquals(405.0, db.trackDao.getTrackById(ids[0])!!.totalDistance, 1.0)
+        assertEquals(90.0, repository.measurePortion(trackId, from, to), 0.5)
+    }
+
+    @Test
+    fun `un appui tout près d'un point se pose sur lui`() = runBlocking {
+        val (trackId, points) = createTrack()
+        val step = 5 / 111_132.0
+
+        val bound = repository.findPortionBound(trackId, points[10].id, points[20].id, 45.0 + 15.05 * step, 5.0)!!
+
+        assertTrue(bound.isVertex)
+        assertEquals(points[15].id, bound.point.id)
     }
 
     @Test
@@ -207,7 +249,7 @@ class CutPortionTest {
     fun `la distance d'une portion s'additionne point à point`() = runBlocking {
         val (trackId, points) = createTrack()
 
-        val meters = repository.measurePortion(trackId, points[40].id, points[59].id)
+        val meters = repository.measurePortion(trackId, at(points[40]), at(points[59]))
 
         assertEquals(19 * 5.0, meters, 1.0)
     }

@@ -17,6 +17,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.model.TrackPoint
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.util.OsmConfig
+import com.example.util.PortionBound
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -28,8 +29,10 @@ import org.osmdroid.views.overlay.Polyline
 
 /**
  * Carte où l'on désigne une portion de parcours : le tracé, et en rouge la portion comprise
- * entre [start] et [end]. Un appui sur la carte renvoie, par [onTapPoint], le point du
- * tracé le plus proche ; la carte pose elle-même un repère sur le début et sur la fin.
+ * entre les bornes [cut]. Un appui sur la carte renvoie, par [onTapTrack], l'endroit
+ * touché et les identifiants des points affichés qui encadrent le segment le plus
+ * proche : l'appelant y cherche la borne exacte parmi les vrais points, que la carte ne
+ * montre pas tous. Un repère est posé sur [start] et sur [end].
  *
  * [points] est le détail de la zone visible, que l'appelant recharge à chaque
  * déplacement signalé par [onViewportChange] : une carte zoomée sur un virage doit en
@@ -55,17 +58,18 @@ fun PortionPickerMap(
     fitPoints: List<TrackPoint>,
     start: TrackPoint?,
     end: TrackPoint?,
-    onTapPoint: (TrackPoint) -> Unit,
+    onTapTrack: (lowId: Long, highId: Long, tap: GeoPoint) -> Unit,
     onViewportChange: (BoundingBox) -> Unit,
     modifier: Modifier = Modifier,
     sketch: List<GeoPoint> = emptyList(),
-    onTapGeo: ((GeoPoint) -> Unit)? = null
+    onTapGeo: ((GeoPoint) -> Unit)? = null,
+    cut: Pair<PortionBound, PortionBound>? = null
 ) {
     val context = LocalContext.current
     val isDark = LocalIsDarkTheme.current
     val trackColor = MaterialTheme.colorScheme.primary.toArgb()
     val cutColor = MaterialTheme.colorScheme.error.toArgb()
-    val currentOnTap = rememberUpdatedState(onTapPoint)
+    val currentOnTap = rememberUpdatedState(onTapTrack)
     val currentOnTapGeo = rememberUpdatedState(onTapGeo)
     val sketchColor = MaterialTheme.colorScheme.tertiary.toArgb()
     val currentOnViewport = rememberUpdatedState(onViewportChange)
@@ -134,27 +138,29 @@ fun PortionPickerMap(
     }
 
     // Le tracé, la portion en rouge et les deux repères suivent le détail et les bornes.
-    LaunchedEffect(mapView, points, start, end, trackColor, cutColor, sketch) {
+    LaunchedEffect(mapView, points, start, end, cut, trackColor, cutColor, sketch) {
         mapView.overlays.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                 val raw = currentOnTapGeo.value
                 if (raw != null) raw(p)
-                else nearestPoint(currentPoints.value, p)?.let { currentOnTap.value(it) }
+                else tapRange(currentPoints.value, p)?.let { (low, high) -> currentOnTap.value(low, high, p) }
                 return true
             }
 
             override fun longPressHelper(p: GeoPoint): Boolean = false
         }))
-        val low = listOfNotNull(start?.id, end?.id).minOrNull()
-        val high = listOfNotNull(start?.id, end?.id).maxOrNull()
         for (range in segmentRanges(points)) {
             val line = styledLine(mapView, trackColor, 4f * density)
             line.setPoints(points.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
             mapView.overlays.add(line)
         }
-        if (low != null && high != null && low != high) {
-            val inPortion = points.filter { it.id in low..high }
+        if (cut != null) {
+            val (low, high) = cut
+            // La portion va d'une borne à l'autre, points affichés compris entre les deux.
+            val inPortion = listOf(low.point.copy(isDiscontinuous = false)) +
+                points.filter { it.id > low.beforeId && it.id < high.afterId } +
+                high.point.copy(isDiscontinuous = false)
             for (range in segmentRanges(inPortion)) {
                 val line = styledLine(mapView, cutColor, 7f * density)
                 line.setPoints(inPortion.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
@@ -254,19 +260,15 @@ private fun segmentRanges(points: List<TrackPoint>): List<IntRange> {
     return ranges
 }
 
-/** Le point de [points] le plus proche de [target], ou null si la liste est vide. */
-private fun nearestPoint(points: List<TrackPoint>, target: GeoPoint): TrackPoint? {
-    val cosLat = kotlin.math.cos(Math.toRadians(target.latitude))
-    var best: TrackPoint? = null
-    var bestDistance = Double.MAX_VALUE
-    for (p in points) {
-        val dy = p.latitude - target.latitude
-        val dx = (p.longitude - target.longitude) * cosLat
-        val d = dx * dx + dy * dy
-        if (d < bestDistance) {
-            bestDistance = d
-            best = p
-        }
-    }
-    return best
+/**
+ * Les identifiants des points affichés qui encadrent le segment le plus proche de
+ * [target], élargis d'un voisin de chaque côté : à pas régulier, le segment affiché ne
+ * suit le tracé réel qu'à peu près, et le bon segment réel peut tomber juste à côté.
+ */
+private fun tapRange(points: List<TrackPoint>, target: GeoPoint): Pair<Long, Long>? {
+    val bound = PortionBound.nearest(points, target.latitude, target.longitude) ?: return null
+    val first = points.indexOfFirst { it.id == bound.beforeId }
+    val last = points.indexOfFirst { it.id == bound.afterId }
+    if (first < 0 || last < 0) return null
+    return points[maxOf(first - 1, 0)].id to points[minOf(last + 1, points.lastIndex)].id
 }

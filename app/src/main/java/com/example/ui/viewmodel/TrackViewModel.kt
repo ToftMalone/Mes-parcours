@@ -546,17 +546,33 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             repository.getPickerPoints(trackId, minLat, maxLat, minLon, maxLon)
         }
 
-    /** Distance de la portion comprise entre deux points d'un parcours. */
-    suspend fun measurePortion(trackId: Long, fromPointId: Long, toPointId: Long): Double =
+    /** Distance de la portion comprise entre deux bornes d'un parcours. */
+    suspend fun measurePortion(
+        trackId: Long,
+        from: com.example.util.PortionBound,
+        to: com.example.util.PortionBound
+    ): Double =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            repository.measurePortion(trackId, fromPointId, toPointId)
+            repository.measurePortion(trackId, from, to)
+        }
+
+    /** La borne exacte d'un appui sur le tracé (voir [TrackRepository.findPortionBound]). */
+    suspend fun findPortionBound(
+        trackId: Long,
+        lowId: Long,
+        highId: Long,
+        lat: Double,
+        lon: Double
+    ): com.example.util.PortionBound? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.findPortionBound(trackId, lowId, highId, lat, lon)
         }
 
     /** Retire une portion choisie sur la carte (voir [TrackRepository.cutPortion]). */
     fun cutPortion(
         trackId: Long,
-        fromPointId: Long,
-        toPointId: Long,
+        from: com.example.util.PortionBound,
+        to: com.example.util.PortionBound,
         baseName: String,
         deleteSource: Boolean,
         onSuccess: (List<Long>) -> Unit,
@@ -564,7 +580,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     ) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val newTrackIds = repository.cutPortion(trackId, fromPointId, toPointId, baseName, deleteSource)
+                val newTrackIds = repository.cutPortion(trackId, from, to, baseName, deleteSource)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(newTrackIds) }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -661,7 +677,11 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 writer.finish()
             }
             ExportFormat.KML -> {
-                val writer = Exporter.KmlWriter(out, repository.getPlacemarks(track.id))
+                val writer = Exporter.KmlWriter(
+                    out,
+                    repository.getPlacemarks(track.id),
+                    com.example.util.TrackStylePreferences.getThicknessDp(appContext)
+                )
                 writer.start(track)
                 repository.forEachPoint(track.id) { writer.add(it) }
                 writer.finish()

@@ -78,7 +78,8 @@ object AutoBackupManager {
                     ) { out ->
                         val writer = Exporter.KmlWriter(
                             out,
-                            db.trackDao.getPlacemarksForTrackBlocking(trackId).associateBy { it.id }
+                            db.trackDao.getPlacemarksForTrackBlocking(trackId).associateBy { it.id },
+                            TrackStylePreferences.getThicknessDp(context)
                         )
                         writer.start(track)
                         forEachPointOf(db, trackId) { writer.add(it) }

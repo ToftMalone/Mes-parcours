@@ -211,7 +211,9 @@ couleur**, une polyligne osmdroid n'en portant qu'une.
 
 **L'export KML écrit ces couleurs** (`Exporter.KmlWriter`), résolues comme au dessin :
 `displayColor` du parcours, sinon `segmentColor` du point, sinon couleur du fichier ou
-de la catégorie ; épaisseur `displayWidthDp` (5 à défaut). Il écrivait tout en rouge
+de la catégorie ; épaisseur dans le même ordre : `displayWidthDp` du parcours, sinon
+celle du tracé d'origine (`TrackPlacemark.width`), sinon l'épaisseur générale
+(`getThicknessDp`, celle de l'écran — c'était 5 d'office, le père de l'auteur voulait 2). Il écrivait tout en rouge
 d'office : le père de l'auteur, qui avait colorié chaque pays d'un voyage, a retrouvé
 un fichier d'une seule couleur après un découpage. Un `<Style>` vaut pour tout un
 Placemark : chaque changement de couleur en ouvre un nouveau, style écrit dedans
@@ -371,12 +373,22 @@ tant qu'il y en a moins de 4 000, sinon à pas régulier ; l'aperçu entier
 contient plus de 40 000 points. **Aucun trait ne relie deux points que rien ne relie** :
 le point qui suit une sortie de zone (identifiants non contigus), un trou de plus de
 15 s ou une rupture ouvre un tronçon, et la carte dessine un tracé par tronçon.
-Les bornes sont des **points** (donc des identifiants de la base), jamais des indices :
-elles survivent au rechargement du détail. `measurePortion` additionne la distance entre
-elles, page par page.
+**Les bornes tombent là où l'on a touché** (`util/PortionBound`), et non plus sur le
+point le plus proche : sur un tracé dessiné dans Google Earth, deux points sont souvent
+à des centaines de mètres, et le père de l'auteur trouvait que « ça ne coupe pas
+exactement là où j'ai mis les points ». La carte repère le segment affiché le plus
+proche (`tapRange`, élargi d'un voisin de chaque côté, l'affichage pouvant être à pas
+régulier) ; `TrackRepository.findPortionBound` relit les **vrais** points de cet
+intervalle et y projette l'appui. Une borne est soit un point existant (`isVertex`, à
+moins d'un mètre), soit un point fabriqué entre deux identifiants, à une fraction
+donnée. Jamais d'indices : elles survivent au rechargement du détail. `measurePortion`
+additionne la distance de borne à borne, page par page.
 
-`TrackRepository.cutPortion` retire les points entre les deux identifiants, inclus, et
-**crée un seul parcours** : ce qui précède la portion, puis ce qui la suit. Le père de
+`TrackRepository.cutPortion` retire ce qui est entre les deux bornes et **crée un seul
+parcours** : ce qui précède la portion, jusqu'à la borne de début comprise, puis ce qui
+la suit, depuis la borne de fin (un point fabriqué y est inséré au besoin, apparence du
+point qui suit pour la borne de fin). Une borne posée sur le tout premier ou le tout
+dernier point ne laisse rien de ce côté. Le père de
 l'auteur avait obtenu trois fichiers (l'original, l'avant, l'après) et veut « une seule
 trace ». Le premier point de la suite est marqué rupture de tronçon : aucun trait n'est
 dessiné à travers le trou, et la distance à vol d'oiseau n'est pas comptée (le
@@ -791,10 +803,10 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 222 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 225 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (8), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (10), `KmlRoundTripTest` (2),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (10), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (11), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
   `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),

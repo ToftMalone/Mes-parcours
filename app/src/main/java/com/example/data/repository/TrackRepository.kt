@@ -582,6 +582,9 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     /** Au-delà, la zone du sélecteur de portion est trop chargée pour être lue d'un coup. */
     private val maxPickerScan = 40_000
 
+    /** Points relus au plus pour placer une borne : de quoi couvrir l'écart entre deux points affichés. */
+    private val maxBoundScan = 20_000
+
 
     /**
      * Une tranche repérée pendant la lecture, avant d'être écrite en base.
@@ -849,47 +852,79 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         return sampled
     }
 
-    /** Distance parcourue entre deux points d'un parcours, ruptures de tronçon exclues. */
-    suspend fun measurePortion(trackId: Long, fromPointId: Long, toPointId: Long): Double {
-        val low = minOf(fromPointId, toPointId)
-        val high = maxOf(fromPointId, toPointId)
-        var total = 0.0
-        var previous: TrackPoint? = null
-        var afterId = low - 1
-        val result = FloatArray(1)
-        while (true) {
+    /**
+     * La borne exacte d'un appui en ([lat], [lon]) sur le tracé, cherchée parmi les vrais
+     * points de [trackId] d'identifiant compris entre [lowId] et [highId] : la carte
+     * n'en montre parfois qu'un sur dix, et c'est sur le tracé réel que l'on coupe.
+     */
+    suspend fun findPortionBound(trackId: Long, lowId: Long, highId: Long, lat: Double, lon: Double): com.example.util.PortionBound? {
+        val real = ArrayList<TrackPoint>()
+        var afterId = minOf(lowId, highId) - 1
+        val last = maxOf(lowId, highId)
+        while (real.size < maxBoundScan) {
             val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
             if (page.isEmpty()) break
             afterId = page.last().id
             for (point in page) {
-                if (point.id > high) return total
-                val last = previous
-                if (last != null && !point.isDiscontinuous) {
-                    android.location.Location.distanceBetween(
-                        last.latitude, last.longitude, point.latitude, point.longitude, result
-                    )
-                    total += result[0]
-                }
-                previous = point
+                if (point.id > last) return com.example.util.PortionBound.nearest(real, lat, lon)
+                real += point
             }
         }
+        return com.example.util.PortionBound.nearest(real, lat, lon)
+    }
+
+    /** Distance parcourue entre deux bornes d'un parcours, ruptures de tronçon exclues. */
+    suspend fun measurePortion(
+        trackId: Long,
+        from: com.example.util.PortionBound,
+        to: com.example.util.PortionBound
+    ): Double {
+        val low = if (from <= to) from else to
+        val high = if (from <= to) to else from
+        var total = 0.0
+        var previous: TrackPoint = low.point
+        val result = FloatArray(1)
+        fun walk(point: TrackPoint) {
+            if (!point.isDiscontinuous) {
+                android.location.Location.distanceBetween(
+                    previous.latitude, previous.longitude, point.latitude, point.longitude, result
+                )
+                total += result[0]
+            }
+            previous = point
+        }
+        var afterId = low.beforeId
+        scan@ while (true) {
+            val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            for (point in page) {
+                if (point.id >= high.afterId) break@scan
+                walk(point)
+            }
+        }
+        walk(if (high.isVertex) high.point else high.point.copy(isDiscontinuous = false))
         return total
     }
 
     /**
-     * Retire de [sourceTrackId] les points d'identifiant compris entre [fromPointId] et
-     * [toPointId] inclus, choisis sur la carte, et crée les morceaux qui restent : celui
-     * d'avant et celui d'après, chacun s'il compte au moins deux points.
+     * Retire de [sourceTrackId] la portion comprise entre deux bornes choisies sur la
+     * carte, et crée un seul parcours : ce qui précède, puis ce qui suit.
      *
-     * C'est un découpage : même lecture unique page par page, mêmes statistiques
-     * cumulées au passage, même transaction finale où SQLite recopie chaque tranche
+     * Chaque borne garde sa place exacte (voir [com.example.util.PortionBound]) : le
+     * tracé d'avant s'arrête sur le début, celui d'après repart de la fin, au besoin par
+     * un point fabriqué au milieu d'un segment. Une borne posée sur le tout premier
+     * point, ou sur le tout dernier, ne laisse rien de ce côté.
+     *
+     * Même lecture unique page par page que le découpage, mêmes statistiques cumulées au
+     * passage, même transaction finale où SQLite recopie les tranches réelles
      * (`copyPointRangeInto`, invariant 5). Le parcours d'origine n'est jamais modifié,
      * et n'est supprimé que si [deleteSource] le demande.
      */
     suspend fun cutPortion(
         sourceTrackId: Long,
-        fromPointId: Long,
-        toPointId: Long,
+        from: com.example.util.PortionBound,
+        to: com.example.util.PortionBound,
         baseName: String,
         deleteSource: Boolean
     ): List<Long> {
@@ -898,37 +933,58 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         if (isBeingRecorded(source)) {
             throw UserFacingArgumentException(R.string.err_track_is_recording)
         }
-        val low = minOf(fromPointId, toPointId)
-        val high = maxOf(fromPointId, toPointId)
+        if (from.compareTo(to) == 0) throw UserFacingStateException(R.string.err_cut_everything)
+        val low = if (from < to) from else to
+        val high = if (from < to) to else from
 
-        // Un seul parcours en sortie : ce qui précède la portion, puis ce qui la suit. Le
-        // premier point de la suite ouvre un nouveau tronçon — rien n'est tracé ni compté
-        // à travers le trou, la distance à vol d'oiseau n'a jamais été parcourue.
+        // Le premier point de la suite ouvre un nouveau tronçon : rien n'est tracé ni
+        // compté à travers le trou, la distance à vol d'oiseau n'a jamais été parcourue.
         val stats = TrackStatsAccumulator()
         var keptCount = 0
         var startTime = 0L
         var endTime = 0L
-        var beforeFirstId: Long? = null
-        var afterFirstId: Long? = null
+        var beforeReal = 0
+        var lowPoint: TrackPoint? = null
+        var highPoint: TrackPoint? = null
+        fun keep(point: TrackPoint) {
+            if (keptCount == 0) startTime = point.timestamp
+            endTime = point.timestamp
+            stats.add(point)
+            keptCount++
+        }
         var afterId = 0L
         while (true) {
             val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
             if (page.isEmpty()) break
             afterId = page.last().id
             for (point in page) {
-                if (point.id in low..high) continue
-                var counted = point
-                if (point.id < low) {
-                    if (beforeFirstId == null) beforeFirstId = point.id
-                } else if (afterFirstId == null) {
-                    afterFirstId = point.id
-                    if (beforeFirstId != null) counted = point.copy(isDiscontinuous = true)
+                if (point.id < low.afterId) {
+                    beforeReal++
+                    keep(point)
+                    continue
                 }
-                if (keptCount == 0) startTime = point.timestamp
-                endTime = point.timestamp
-                stats.add(counted)
-                keptCount++
+                if (point.id <= high.beforeId) continue
+                if (highPoint == null) {
+                    // La borne de début n'est gardée qu'avec quelque chose avant elle.
+                    if (lowPoint == null && (beforeReal > 0 || !low.isVertex)) {
+                        lowPoint = low.point
+                        keep(low.point)
+                    }
+                    // Un point fabriqué reprend l'apparence du tracé qui repart.
+                    val resumed = if (high.isVertex) high.point else high.point.copy(
+                        speed = point.speed,
+                        segmentColor = point.segmentColor,
+                        placemarkId = point.placemarkId
+                    )
+                    highPoint = resumed.copy(isDiscontinuous = keptCount > 0)
+                    keep(highPoint!!)
+                }
+                keep(point)
             }
+        }
+        if (highPoint == null && lowPoint == null && (beforeReal > 0 || !low.isVertex)) {
+            lowPoint = low.point
+            keep(low.point)
         }
         if (keptCount < 2) throw UserFacingStateException(R.string.err_cut_everything)
 
@@ -957,29 +1013,28 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                     displayWidthDp = source.displayWidthDp
                 )
             )
-            beforeFirstId?.let {
+            if (beforeReal > 0) {
                 trackDao.copyPointRangeInto(
                     destinationId = newTrackId,
                     sourceId = sourceTrackId,
-                    fromId = it,
-                    untilId = low
+                    fromId = 0L,
+                    untilId = low.afterId
                 )
             }
-            val lastBeforeId = trackDao.getMaxPointId(newTrackId)
-            afterFirstId?.let {
+            lowPoint?.let { trackDao.insertTrackPoint(it.copy(id = 0, trackId = newTrackId)) }
+            highPoint?.let { trackDao.insertTrackPoint(it.copy(id = 0, trackId = newTrackId)) }
+            if (highPoint != null) {
                 trackDao.copyPointRangeInto(
                     destinationId = newTrackId,
                     sourceId = sourceTrackId,
-                    fromId = it,
+                    fromId = high.beforeId + 1,
                     untilId = Long.MAX_VALUE
                 )
             }
-            // Le premier point de la suite ouvre un tronçon ; celui du tout début du
-            // parcours, lui, n'a plus à en ouvrir un (voir le découpage).
-            if (lastBeforeId != null) trackDao.markFirstPointAfterDiscontinuous(newTrackId, lastBeforeId)
+            // Le tout premier point n'a pas de tronçon à ouvrir (voir le découpage).
             trackDao.clearFirstPointDiscontinuity(newTrackId)
             if (deleteSource) {
-                // L\'original part à la corbeille, comme une suppression à la main.
+                // L'original part à la corbeille, comme une suppression à la main.
                 trackDao.moveToTrash(sourceTrackId, System.currentTimeMillis())
             }
             invalidatePointCaches(sourceTrackId)

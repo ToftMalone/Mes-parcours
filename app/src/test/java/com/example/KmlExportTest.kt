@@ -161,6 +161,28 @@ class KmlExportTest {
     }
 
     @Test
+    fun `l'epaisseur choisie dans l'application passe devant celle du fichier`() {
+        val placemark = com.example.data.model.TrackPlacemark(id = 3, name = "Belgique", folderPath = null, color = null, width = 5f)
+        val points = listOf(point(1).copy(placemarkId = 3), point(2).copy(placemarkId = 3))
+
+        fun write(of: Track, default: Float): String {
+            val out = StringBuilder()
+            val writer = Exporter.KmlWriter(out, mapOf(3L to placemark), default)
+            writer.start(of)
+            points.forEach { writer.add(it) }
+            writer.finish()
+            return out.toString()
+        }
+
+        assertTrue(write(track.copy(displayWidthDp = 2f), 4f).contains("<width>2</width>"))
+        assertTrue("sinon celle du fichier", write(track, 4f).contains("<width>5</width>"))
+        val bare = StringBuilder().also { out ->
+            Exporter.KmlWriter(out, emptyMap(), 3f).apply { start(track); points.forEach { add(it.copy(placemarkId = null)) }; finish() }
+        }.toString()
+        assertTrue("sinon l'épaisseur générale", bare.contains("<width>3</width>"))
+    }
+
+    @Test
     fun `la couleur exportee se relit telle quelle`() {
         val written = com.example.util.KmlColor.format(france)
         assertEquals(france, com.example.util.KmlColor.parse(written))

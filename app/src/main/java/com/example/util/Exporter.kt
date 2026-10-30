@@ -101,14 +101,19 @@ object Exporter {
     class KmlWriter(
         private val out: Appendable,
         /** Les tracés KML d'origine du parcours, par identifiant (`TrackDao.getPlacemarksForTrack`). */
-        private val placemarks: Map<Long, TrackPlacemark> = emptyMap()
+        private val placemarks: Map<Long, TrackPlacemark> = emptyMap(),
+        /**
+         * Épaisseur d'un tracé qui n'en a aucune : l'épaisseur générale des Paramètres,
+         * celle que l'application lui donne à l'écran.
+         */
+        private val defaultWidth: Float = DEFAULT_KML_WIDTH
     ) {
         private var trackName = ""
         private var placemarkOpen = false
         private var lineOpen = false
         private var forcedColor: Int? = null
         private var fallbackColor = 0
-        private var trackWidth = DEFAULT_KML_WIDTH
+        private var trackWidth: Float? = null
         private var placemarkColor: Int? = null
         private var placemarkKey: Long? = null
         private val openFolders = ArrayList<String>()
@@ -117,7 +122,7 @@ object Exporter {
             trackName = track.name
             forcedColor = track.displayColor
             fallbackColor = TrackStylePreferences.resolveTrackColor(null, track.sourceColor, track.isImported, track.isMerged)
-            trackWidth = track.displayWidthDp ?: DEFAULT_KML_WIDTH
+            trackWidth = track.displayWidthDp
             out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
             out.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n")
             out.append("  <Document>\n")
@@ -190,7 +195,9 @@ object Exporter {
             out.append("$pad      <Style>\n")
             out.append("$pad        <LineStyle>\n")
             out.append("$pad          <color>${KmlColor.format(color)}</color>\n")
-            out.append("$pad          <width>${formatWidth(placemark?.width ?: trackWidth)}</width>\n")
+            // Même ordre que la couleur : l'épaisseur choisie dans l'application pour
+            // ce parcours, sinon celle du fichier d'origine, sinon l'épaisseur générale.
+            out.append("$pad          <width>${formatWidth(trackWidth ?: placemark?.width ?: defaultWidth)}</width>\n")
             out.append("$pad        </LineStyle>\n")
             out.append("$pad      </Style>\n")
             out.append("$pad      <MultiGeometry>\n")
@@ -224,7 +231,7 @@ object Exporter {
             if (width % 1f == 0f) width.toInt().toString() else String.format(Locale.ROOT, "%.1f", width)
 
         private companion object {
-            /** Épaisseur écrite quand ni le tracé ni le parcours n'en ont : celle d'avant. */
+            /** Épaisseur écrite à défaut de mieux, quand l'appelant n'a pas de contexte. */
             const val DEFAULT_KML_WIDTH = 5f
         }
     }

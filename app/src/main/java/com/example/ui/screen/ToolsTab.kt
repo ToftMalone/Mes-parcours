@@ -117,6 +117,8 @@ import com.example.ui.component.TrackTile
 import com.example.ui.theme.DisplayFontFamily
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
+import com.example.util.PortionBound
+import kotlinx.coroutines.launch
 import com.example.util.TrackStylePreferences
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1043,8 +1045,8 @@ private fun SplitTrackTool(
     var preview by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
     var detail by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
     var viewport by remember(selectedTrack?.id) { mutableStateOf<org.osmdroid.util.BoundingBox?>(null) }
-    var cutStart by remember(selectedTrack?.id) { mutableStateOf<TrackPoint?>(null) }
-    var cutEnd by remember(selectedTrack?.id) { mutableStateOf<TrackPoint?>(null) }
+    var cutStart by remember(selectedTrack?.id) { mutableStateOf<PortionBound?>(null) }
+    var cutEnd by remember(selectedTrack?.id) { mutableStateOf<PortionBound?>(null) }
     LaunchedEffect(selectedTrack?.id, onMap) {
         val id = selectedTrack?.id ?: return@LaunchedEffect
         if (onMap && preview == null) {
@@ -1087,7 +1089,7 @@ private fun SplitTrackTool(
                 text = stringResource(if (onMap) R.string.cut_action else R.string.split_action),
                 icon = Icons.Rounded.ContentCut,
                 enabled = selectedTrack != null && baseName.isNotBlank() &&
-                    (!onMap || (cutStart != null && cutEnd != null && cutStart?.id != cutEnd?.id)),
+                    (!onMap || (cutStart != null && cutEnd != null && cutStart?.compareTo(cutEnd!!) != 0)),
                 testTag = "confirm_split_button",
                 onClick = {
                     val track = selectedTrack ?: return@ToolActionButton
@@ -1099,8 +1101,8 @@ private fun SplitTrackTool(
                         phase = ToolPhase.Busy
                         viewModel.cutPortion(
                             trackId = track.id,
-                            fromPointId = minOf(from.id, to.id),
-                            toPointId = maxOf(from.id, to.id),
+                            from = from,
+                            to = to,
                             baseName = base,
                             deleteSource = deleting,
                             onSuccess = { newTrackIds ->
@@ -1290,15 +1292,16 @@ private fun CutOnMapSection(
     trackId: Long,
     fitPoints: List<TrackPoint>?,
     points: List<TrackPoint>?,
-    start: TrackPoint?,
-    end: TrackPoint?,
-    onStartChange: (TrackPoint) -> Unit,
-    onEndChange: (TrackPoint) -> Unit,
+    start: PortionBound?,
+    end: PortionBound?,
+    onStartChange: (PortionBound) -> Unit,
+    onEndChange: (PortionBound) -> Unit,
     onViewportChange: (org.osmdroid.util.BoundingBox) -> Unit,
     viewModel: TrackViewModel
 ) {
     // Vrai tant que le prochain appui doit poser le début ; il passe tout seul à la fin.
     var placingStart by remember(trackId) { mutableStateOf(true) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val none = stringResource(R.string.cut_unset)
     Column(modifier = Modifier.padding(top = 12.dp)) {
         Text(
@@ -1309,7 +1312,7 @@ private fun CutOnMapSection(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 10.dp)) {
             SegmentButton(
-                stringResource(R.string.cut_start_label, start?.let { FormatUtils.formatClock(it.timestamp) } ?: none),
+                stringResource(R.string.cut_start_label, start?.let { FormatUtils.formatClock(it.point.timestamp) } ?: none),
                 Icons.Rounded.Flag,
                 selected = placingStart,
                 onClick = { placingStart = true },
@@ -1317,7 +1320,7 @@ private fun CutOnMapSection(
                 modifier = Modifier.weight(1f)
             )
             SegmentButton(
-                stringResource(R.string.cut_end_label, end?.let { FormatUtils.formatClock(it.timestamp) } ?: none),
+                stringResource(R.string.cut_end_label, end?.let { FormatUtils.formatClock(it.point.timestamp) } ?: none),
                 Icons.Rounded.Flag,
                 selected = !placingStart,
                 onClick = { placingStart = false },
@@ -1339,29 +1342,39 @@ private fun CutOnMapSection(
                 PortionPickerMap(
                     points = points,
                     fitPoints = fitPoints,
-                    start = start,
-                    end = end,
-                    onTapPoint = { point ->
-                        if (placingStart) onStartChange(point) else onEndChange(point)
+                    start = start?.point,
+                    end = end?.point,
+                    cut = if (start != null && end != null && start.compareTo(end) != 0) {
+                        if (start < end) start to end else end to start
+                    } else null,
+                    onTapTrack = { lowId, highId, tap ->
+                        // La borne exacte se cherche parmi les vrais points : la carte
+                        // n'en montre parfois qu'une partie.
+                        val placing = placingStart
                         placingStart = !placingStart
+                        scope.launch {
+                            val bound = viewModel.findPortionBound(trackId, lowId, highId, tap.latitude, tap.longitude)
+                                ?: return@launch
+                            if (placing) onStartChange(bound) else onEndChange(bound)
+                        }
                     },
                     onViewportChange = onViewportChange,
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
-        if (start != null && end != null && start.id != end.id) {
-            val from = if (start.id <= end.id) start else end
-            val to = if (start.id <= end.id) end else start
-            var meters by remember(from.id, to.id) { mutableStateOf<Double?>(null) }
-            LaunchedEffect(trackId, from.id, to.id) {
-                meters = viewModel.measurePortion(trackId, from.id, to.id)
+        if (start != null && end != null && start.compareTo(end) != 0) {
+            val from = if (start < end) start else end
+            val to = if (start < end) end else start
+            var meters by remember(from, to) { mutableStateOf<Double?>(null) }
+            LaunchedEffect(trackId, from, to) {
+                meters = viewModel.measurePortion(trackId, from, to)
             }
             Text(
                 stringResource(
                     R.string.cut_summary,
-                    FormatUtils.formatClock(from.timestamp),
-                    FormatUtils.formatClock(to.timestamp),
+                    FormatUtils.formatClock(from.point.timestamp),
+                    FormatUtils.formatClock(to.point.timestamp),
                     meters?.let { FormatUtils.formatDistanceShort(it) } ?: "…"
                 ),
                 style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
@@ -1742,7 +1755,7 @@ private fun ExtendTrackTool(
                     fitPoints = fit,
                     start = anchor,
                     end = null,
-                    onTapPoint = {},
+                    onTapTrack = { _, _, _ -> },
                     onViewportChange = { viewport = it },
                     sketch = taps.toList(),
                     onTapGeo = { taps.add(it) },
