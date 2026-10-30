@@ -361,6 +361,8 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_3_3_a">Découper sur la carte coupe exactement là où l\'on a touché le tracé, même entre deux points éloignés</string>
+    <string name="rel_2_3_3_b">L\'export KML garde l\'épaisseur choisie pour le parcours, sinon celle du fichier d\'origine</string>
     <string name="rel_2_3_2_a">L\'export KML rend un fichier Google Earth tel qu\'il était à l\'import : mêmes dossiers, mêmes noms de tracés, mêmes couleurs et épaisseurs (réimporter les fichiers déjà importés)</string>
     <string name="rel_2_3_2_b">Le bouton Corbeille reste visible même quand l\'historique est vide</string>
     <string name="rel_2_3_1_a">Corbeille : un parcours supprimé y reste 30 jours et peut être restauré depuis l\'historique, puis s\'efface de lui-même</string>
