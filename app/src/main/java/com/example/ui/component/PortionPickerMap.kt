@@ -65,7 +65,8 @@ fun PortionPickerMap(
     sketch: List<GeoPoint> = emptyList(),
     onTapGeo: ((GeoPoint) -> Unit)? = null,
     cut: Pair<PortionBound, PortionBound>? = null,
-    initialBox: BoundingBox? = null
+    initialBox: BoundingBox? = null,
+    colorOf: ((TrackPoint) -> Int)? = null
 ) {
     val context = LocalContext.current
     val isDark = LocalIsDarkTheme.current
@@ -145,7 +146,7 @@ fun PortionPickerMap(
     }
 
     // Le tracé, la portion en rouge et les deux repères suivent le détail et les bornes.
-    LaunchedEffect(mapView, points, start, end, cut, trackColor, cutColor, sketch) {
+    LaunchedEffect(mapView, points, start, end, cut, trackColor, cutColor, sketch, colorOf) {
         mapView.overlays.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
@@ -158,9 +159,13 @@ fun PortionPickerMap(
             override fun longPressHelper(p: GeoPoint): Boolean = false
         }))
         for (range in segmentRanges(points)) {
-            val line = styledLine(mapView, trackColor, 4f * density)
-            line.setPoints(points.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
-            mapView.overlays.add(line)
+            // Les couleurs du parcours, comme sur la carte principale : le père de
+            // l'auteur reconnaît ses pays à leur couleur.
+            for ((color, run) in colorRuns(points.subList(range.first, range.last + 1), colorOf, trackColor)) {
+                val line = styledLine(mapView, color, 4f * density)
+                line.setPoints(run.map { GeoPoint(it.latitude, it.longitude) })
+                mapView.overlays.add(line)
+            }
         }
         if (cut != null) {
             val (low, high) = cut
@@ -169,9 +174,11 @@ fun PortionPickerMap(
                 points.filter { it.id > low.beforeId && it.id < high.afterId } +
                 high.point.copy(isDiscontinuous = false)
             for (range in segmentRanges(inPortion)) {
-                val line = styledLine(mapView, cutColor, 7f * density)
-                line.setPoints(inPortion.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) })
-                mapView.overlays.add(line)
+                // Un liseré blanc sous le rouge : sur un tracé déjà rouge, la portion
+                // se confondrait sinon avec lui.
+                val geo = inPortion.subList(range.first, range.last + 1).map { GeoPoint(it.latitude, it.longitude) }
+                mapView.overlays.add(styledLine(mapView, Color.WHITE, 11f * density).apply { setPoints(geo) })
+                mapView.overlays.add(styledLine(mapView, cutColor, 7f * density).apply { setPoints(geo) })
             }
         }
         if (sketch.isNotEmpty()) {
@@ -265,6 +272,28 @@ private fun segmentRanges(points: List<TrackPoint>): List<IntRange> {
     }
     if (points.isNotEmpty()) ranges += start until points.size
     return ranges
+}
+
+/**
+ * Découpe un tronçon en suites d'une seule couleur, une polyligne n'en portant qu'une.
+ * Chaque suite reprend le dernier point de la précédente, pour qu'aucun jour ne
+ * s'ouvre entre deux couleurs.
+ */
+private fun colorRuns(points: List<TrackPoint>, colorOf: ((TrackPoint) -> Int)?, fallback: Int): List<Pair<Int, List<TrackPoint>>> {
+    if (colorOf == null || points.isEmpty()) return listOf(fallback to points)
+    val runs = mutableListOf<Pair<Int, List<TrackPoint>>>()
+    var start = 0
+    var color = colorOf(points[0])
+    for (i in 1 until points.size) {
+        val next = colorOf(points[i])
+        if (next != color) {
+            runs += color to points.subList(start, i)
+            start = i - 1
+            color = next
+        }
+    }
+    runs += color to points.subList(start, points.size)
+    return runs
 }
 
 /**

@@ -355,6 +355,11 @@ enregistrement oublié) et l'absence de trou visible.
 ### Retirer une portion choisie sur la carte
 
 Troisième mode de « Découper », demandé par le père de l'auteur : « Sur la carte ».
+C'est le mode ouvert d'office (« Supprimer l'original » coché avec lui), à sa demande.
+Le tracé y garde ses couleurs, résolues comme sur la carte principale (`colorOf` de
+`PortionPickerMap` : `displayColor`, sinon `segmentColor`, sinon la couleur du
+parcours) ; la portion rouge porte un liseré blanc pour rester visible sur un tracé
+déjà rouge.
 Le parcours s'affiche sur une carte dédiée (`ui/component/PortionPickerMap`, et non
 `MapViewContainer`, qui reconstruit ses calques d'elle-même), zoomable jusqu'au niveau
 21. On touche le début, puis la fin : deux boutons « Début hh:mm » / « Fin hh:mm » disent

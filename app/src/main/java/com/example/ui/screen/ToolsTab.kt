@@ -1027,10 +1027,12 @@ private fun SplitTrackTool(
     var mode by remember { mutableStateOf(TrackRepository.SplitMode.SEGMENT_BREAKS) }
     // Troisième mode, demandé par le père de l'auteur : désigner sur la carte la
     // portion à retirer. Les deux autres coupent sans rien perdre ; celui-ci retire.
-    var onMap by remember { mutableStateOf(false) }
+    // C'est le mode ouvert d'office, à sa demande : c'est celui dont il se sert.
+    var onMap by remember { mutableStateOf(true) }
     var pauseIndex by remember { mutableIntStateOf(PAUSE_STEPS_MINUTES.indexOf(30)) }
     var baseName by remember { mutableStateOf("") }
-    var deleteSource by remember { mutableStateOf(false) }
+    // Coché d'office avec le mode « Sur la carte » (voir le choix du mode, plus bas).
+    var deleteSource by remember { mutableStateOf(true) }
     var phase by remember { mutableStateOf<ToolPhase>(ToolPhase.Form) }
     var picking by remember { mutableStateOf(false) }
 
@@ -1195,6 +1197,14 @@ private fun SplitTrackTool(
                     viewport = it
                     viewModel.pickerViewports[track.id] = it
                 },
+                colorOf = remember(track.displayColor, track.sourceColor, track.isImported, track.isMerged) {
+                    // Même résolution qu'au dessin de la carte principale : la couleur
+                    // choisie pour le parcours, sinon celle du tronçon, sinon la sienne.
+                    val forced = track.displayColor
+                    val base = TrackStylePreferences.resolveTrackColor(null, track.sourceColor, track.isImported, track.isMerged)
+                    val resolve: (TrackPoint) -> Int = { forced ?: it.segmentColor ?: base }
+                    resolve
+                },
                 viewModel = viewModel
             )
         } else if (mode == TrackRepository.SplitMode.SEGMENT_BREAKS) {
@@ -1300,6 +1310,7 @@ private fun CutOnMapSection(
     onStartChange: (PortionBound?) -> Unit,
     onEndChange: (PortionBound?) -> Unit,
     onViewportChange: (org.osmdroid.util.BoundingBox) -> Unit,
+    colorOf: (TrackPoint) -> Int,
     viewModel: TrackViewModel
 ) {
     // Vrai tant que le prochain appui doit poser le début ; il passe tout seul à la fin.
@@ -1366,6 +1377,7 @@ private fun CutOnMapSection(
                     start = start?.point,
                     end = end?.point,
                     initialBox = resumedBox,
+                    colorOf = colorOf,
                     cut = if (start != null && end != null && start.compareTo(end) != 0) {
                         if (start < end) start to end else end to start
                     } else null,
