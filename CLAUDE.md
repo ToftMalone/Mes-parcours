@@ -409,6 +409,23 @@ l'original » est coché à l'entrée du mode, et reste là pour le garder) : si
 garde deux parcours là où l'on en voulait un. Refusé s'il reste moins de deux points.
 `CutPortionTest` verrouille.
 
+### Supprimer un morceau d'un appui prolongé sur la carte
+
+Demandé par le père de l'auteur : « une fonction supprimer un morceau de trace
+directement sur la carte en faisant un appui prolongé » — la carte principale, onglet
+Enregistrer. `MapViewContainer` reconnaît l'appui long (`trackLongPressDetector`, un
+`GestureDetector` branché sur le même écouteur de toucher, qui ne consomme rien ; un
+second doigt annule) sur un tracé superposé dessiné, à 28 dp près, en projetant l'appui
+sur le segment le plus proche (`PortionBound.nearest`) et en comparant en mètres —
+indépendant de l'orientation de la carte. « Un morceau » est un **tronçon** : d'une
+rupture (`isDiscontinuous`) à la suivante, donc un tracé KML d'origine (un pays) ou ce
+qui sépare deux pauses. `TrackRepository.findSegment` le retrouve et le nomme (nom du
+`TrackPlacemark`, sinon sa longueur) pour le dialogue de confirmation ;
+`removeSegment` passe par `cutPortion` avec pour bornes les points qui l'encadrent :
+parcours neuf du même nom, **gardé affiché sur la carte** si l'original l'était,
+original à la corbeille. Le seul tronçon d'un parcours est refusé
+(`err_segment_only`). `CutPortionTest` verrouille.
+
 ### Prolonger un parcours
 
 Demandé par le père de l'auteur : « si j'ai arrêté ma trace trop tôt, créer des points
@@ -812,9 +829,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 227 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 230 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (12), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (15), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (11), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

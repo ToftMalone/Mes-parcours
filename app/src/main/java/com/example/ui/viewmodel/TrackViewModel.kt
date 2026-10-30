@@ -574,6 +574,30 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             repository.findPortionBound(trackId, lowId, highId, lat, lon)
         }
 
+    /** Le tronçon touché d'un appui prolongé sur la carte (voir [TrackRepository.findSegment]). */
+    suspend fun findSegment(trackId: Long, pointId: Long): TrackRepository.TrackSegment? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.findSegment(trackId, pointId)
+        }
+
+    /** Retire un tronçon de son parcours (voir [TrackRepository.removeSegment]). */
+    fun removeSegment(
+        segment: TrackRepository.TrackSegment,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.removeSegment(segment)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess() }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.userMessage(appContext, R.string.err_split_failed))
+                }
+            }
+        }
+    }
+
     /** Retire une portion choisie sur la carte (voir [TrackRepository.cutPortion]). */
     fun cutPortion(
         trackId: Long,

@@ -40,6 +40,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddLocationAlt
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.GpsOff
 import androidx.compose.material.icons.rounded.LocationDisabled
@@ -97,6 +98,8 @@ import com.example.data.model.Track
 import com.example.ui.component.CookieShape
 import com.example.ui.component.LocalAppMessenger
 import com.example.ui.component.MapViewContainer
+import com.example.ui.component.MpDialog
+import kotlinx.coroutines.launch
 import com.example.ui.component.MpSheet
 import com.example.ui.component.SheetHeader
 import com.example.ui.component.ShapeBadge
@@ -139,6 +142,8 @@ fun TrackingTab(
     val selectedImportedPoints by viewModel.selectedImportedPoints.collectAsState()
     val bypassZoomThreshold by viewModel.bypassZoomThreshold.collectAsState()
     val allTracks by viewModel.allTracks.collectAsState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var segmentToDelete by remember { mutableStateOf<com.example.data.repository.TrackRepository.TrackSegment?>(null) }
 
     // Démarrer : au premier appui, propose « nouveau parcours » ou « reprendre une
     // trace » au lieu de démarrer directement — s'il existe une trace à reprendre.
@@ -257,7 +262,10 @@ fun TrackingTab(
                 viewModel.lastMapCenterLng = lng
                 viewModel.lastMapZoom = zoom
             },
-            onViewportChanged = { viewModel.updateMapViewport(it) }
+            onViewportChanged = { viewModel.updateMapViewport(it) },
+            onLongPressTrack = { trackId, pointId ->
+                scope.launch { segmentToDelete = viewModel.findSegment(trackId, pointId) }
+            }
         )
 
         // --- Haut de l'écran : la carte de statistiques, à la place qu'occupait
@@ -373,6 +381,40 @@ fun TrackingTab(
         } else {
             PermissionDeniedOverlay(onGrantClick = onRequestPermission)
         }
+    }
+
+    // Appui prolongé sur un tracé de la carte : on confirme avant de retirer le morceau,
+    // en le nommant — le tracé KML d'origine quand il en a un, sinon sa longueur.
+    segmentToDelete?.let { segment ->
+        val trackName = allTracks.find { it.id == segment.trackId }?.name.orEmpty()
+        val length = FormatUtils.formatDistanceShort(segment.distanceMeters)
+        MpDialog(
+            onDismissRequest = { segmentToDelete = null },
+            icon = {
+                ShapeBadge(
+                    icon = Icons.Rounded.DeleteForever,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(22.dp)
+                )
+            },
+            title = stringResource(R.string.segment_delete_title),
+            body = segment.name?.let { stringResource(R.string.segment_delete_body_named, it, length, trackName) }
+                ?: stringResource(R.string.segment_delete_body, length, trackName),
+            dismissLabel = stringResource(R.string.common_cancel),
+            confirmLabel = stringResource(R.string.common_delete),
+            confirmContainerColor = MaterialTheme.colorScheme.error,
+            confirmContentColor = MaterialTheme.colorScheme.onError,
+            confirmTestTag = "segment_delete_confirm",
+            onConfirm = {
+                segmentToDelete = null
+                viewModel.removeSegment(
+                    segment,
+                    onSuccess = { messenger.show(context.getString(R.string.segment_deleted), Icons.Rounded.DeleteForever) },
+                    onError = { messenger.show(it, Icons.Rounded.DeleteForever, isError = true) }
+                )
+            }
+        )
     }
 
     if (showResumePicker) {

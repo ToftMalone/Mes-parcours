@@ -1043,6 +1043,97 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     // ------------------------------------------------------------------
+    // Supprimer un tronçon d'un appui prolongé sur la carte
+    // ------------------------------------------------------------------
+
+    /**
+     * Un tronçon d'un parcours : les points d'une rupture (`isDiscontinuous`) à la
+     * suivante. Pour un KML importé, c'est un tracé de Google Earth — un pays, une
+     * étape ; pour un enregistrement, ce qui sépare deux pauses.
+     */
+    data class TrackSegment(
+        val trackId: Long,
+        val first: TrackPoint,
+        val last: TrackPoint,
+        /** Dernier point du tronçon précédent, null pour le premier tronçon. */
+        val before: TrackPoint?,
+        /** Premier point du tronçon suivant, null pour le dernier. */
+        val after: TrackPoint?,
+        val distanceMeters: Double,
+        /** Nom du tracé KML d'origine, quand le fichier en donnait un. */
+        val name: String?
+    )
+
+    /** Le tronçon de [trackId] qui contient le point [pointId], ou null. */
+    suspend fun findSegment(trackId: Long, pointId: Long): TrackSegment? {
+        var first: TrackPoint? = null
+        var before: TrackPoint? = null
+        var previous: TrackPoint? = null
+        var distance = 0.0
+        var found = false
+        val result = FloatArray(1)
+        var afterId = 0L
+        while (true) {
+            val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            for (point in page) {
+                val opens = first == null || point.isDiscontinuous
+                if (opens) {
+                    if (found) return segmentOf(trackId, first!!, previous!!, before, point, distance)
+                    before = previous
+                    first = point
+                    distance = 0.0
+                } else {
+                    val last = previous!!
+                    android.location.Location.distanceBetween(
+                        last.latitude, last.longitude, point.latitude, point.longitude, result
+                    )
+                    distance += result[0]
+                }
+                if (point.id == pointId) found = true
+                previous = point
+            }
+        }
+        if (!found) return null
+        return segmentOf(trackId, first!!, previous!!, before, null, distance)
+    }
+
+    private suspend fun segmentOf(
+        trackId: Long,
+        first: TrackPoint,
+        last: TrackPoint,
+        before: TrackPoint?,
+        after: TrackPoint?,
+        distance: Double
+    ): TrackSegment {
+        val name = first.placemarkId?.let { getPlacemarks(trackId)[it]?.name }
+        return TrackSegment(trackId, first, last, before, after, distance, name)
+    }
+
+    /**
+     * Retire [segment] de son parcours. Comme le retrait d'une portion choisie sur la
+     * carte, dont c'est un cas particulier ([cutPortion]) : un parcours neuf, du même
+     * nom, et l'original à la corbeille, d'où il se restaure. Le parcours neuf reste
+     * affiché sur la carte si l'original l'était : c'est là qu'on vient de le toucher.
+     */
+    suspend fun removeSegment(segment: TrackSegment): Long {
+        if (segment.before == null && segment.after == null) {
+            throw UserFacingStateException(R.string.err_segment_only)
+        }
+        val source = trackDao.getTrackById(segment.trackId)
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
+        // Les bornes gardées par cutPortion sont les points qui encadrent le tronçon :
+        // tout le tronçon disparaît, ses voisins restent. Au bout du parcours, la borne
+        // posée sur le premier ou le dernier point ne laisse rien de ce côté.
+        val from = com.example.util.PortionBound.at(segment.before ?: segment.first)
+        val to = com.example.util.PortionBound.at(segment.after ?: segment.last)
+        val newId = cutPortion(segment.trackId, from, to, source.name, deleteSource = true).single()
+        if (source.isSelectedForMap) trackDao.setShownOnMap(listOf(newId), true)
+        return newId
+    }
+
+    // ------------------------------------------------------------------
     // Prolongement dessiné à la main
     // ------------------------------------------------------------------
 

@@ -171,6 +171,71 @@ class CutPortionTest {
         assertEquals(points[15].id, bound.point.id)
     }
 
+    /** Trois tronçons de dix points : 0–9, 10–19, 20–29, chacun ouvert par une rupture. */
+    private suspend fun createSegmentedTrack(shown: Boolean = true): Pair<Long, List<TrackPoint>> {
+        val trackId = db.trackDao.insertTrack(Track(name = "Voyage", startTime = start, isSelectedForMap = shown))
+        db.trackDao.insertTrackPoints(
+            (0 until 30).map { i ->
+                TrackPoint(
+                    trackId = trackId,
+                    latitude = 45.0 + i * 5 / 111_132.0,
+                    longitude = 5.0,
+                    timestamp = start + i * 1_000L,
+                    isDiscontinuous = i == 10 || i == 20
+                )
+            }
+        )
+        return trackId to db.trackDao.getPointsForTrack(trackId)
+    }
+
+    @Test
+    fun `un appui sur un tronçon du milieu le retire tout entier`() = runBlocking {
+        val (trackId, points) = createSegmentedTrack()
+
+        val segment = repository.findSegment(trackId, points[14].id)!!
+        assertEquals(points[10].id, segment.first.id)
+        assertEquals(points[19].id, segment.last.id)
+        assertEquals(9 * 5.0, segment.distanceMeters, 0.5)
+
+        val newId = repository.removeSegment(segment)
+        val kept = db.trackDao.getPointsForTrack(newId)
+        assertEquals(20, kept.size)
+        assertEquals(points[9].timestamp, kept[9].timestamp)
+        assertEquals(points[20].timestamp, kept[10].timestamp)
+        assertTrue("le tronçon suivant reste séparé", kept[10].isDiscontinuous)
+        assertEquals(1, kept.count { it.isDiscontinuous })
+        val track = db.trackDao.getTrackById(newId)!!
+        assertEquals("Voyage", track.name)
+        assertTrue("reste affiché sur la carte", track.isSelectedForMap)
+        assertNotNull("l'original part à la corbeille", db.trackDao.getTrackById(trackId)?.deletedAt)
+    }
+
+    @Test
+    fun `le premier et le dernier tronçon se retirent aussi`() = runBlocking {
+        val (trackId, points) = createSegmentedTrack()
+        val withoutFirst = repository.removeSegment(repository.findSegment(trackId, points[3].id)!!)
+        val kept = db.trackDao.getPointsForTrack(withoutFirst)
+        assertEquals(20, kept.size)
+        assertEquals(points[10].timestamp, kept.first().timestamp)
+        assertFalse(kept.first().isDiscontinuous)
+
+        val lastPoints = kept
+        val withoutLast = repository.removeSegment(repository.findSegment(withoutFirst, lastPoints[25 - 10].id)!!)
+        val rest = db.trackDao.getPointsForTrack(withoutLast)
+        assertEquals(10, rest.size)
+        assertEquals(points[19].timestamp, rest.last().timestamp)
+        assertEquals(0, rest.count { it.isDiscontinuous })
+    }
+
+    @Test
+    fun `le seul tronçon d'un parcours ne se retire pas`() = runBlocking {
+        val (trackId, points) = createTrack(20)
+        val segment = repository.findSegment(trackId, points[5].id)!!
+        val failure = runCatching { repository.removeSegment(segment) }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertNull(db.trackDao.getTrackById(trackId)?.deletedAt)
+    }
+
     @Test
     fun `l'aperçu reste léger et garde le dernier point`() = runBlocking {
         val (trackId, points) = createTrack(10_000)

@@ -293,6 +293,11 @@
     <string name="cut_done_title">Portion retirée</string>
     <string name="cut_delete_original_hint">L\'original part à la corbeille pendant 30 jours</string>
     <string name="cut_info">La portion en rouge est retirée ; le reste reste en un seul parcours, sans trait à travers le trou.</string>
+    <string name="err_segment_only">C\'est le seul morceau de ce parcours : supprimez plutôt le parcours entier depuis l\'historique.</string>
+    <string name="segment_delete_title">Supprimer ce morceau ?</string>
+    <string name="segment_delete_body_named">Le tracé « %1$s » (%2$s) sera retiré du parcours « %3$s ». L\'ancien parcours part à la corbeille, d\'où il se restaure.</string>
+    <string name="segment_delete_body">Le morceau touché (%1$s) sera retiré du parcours « %2$s ». L\'ancien parcours part à la corbeille, d\'où il se restaure.</string>
+    <string name="segment_deleted">Morceau supprimé</string>
     <string name="err_cut_everything">Il ne resterait pas de quoi faire un parcours : réduisez la portion à retirer.</string>
     <string name="cut_done_body_kept">« %1$s » est dans l\'historique, en un seul parcours. L\'original est conservé.</string>
     <string name="cut_done_body_deleted">« %1$s » est dans l\'historique, en un seul parcours. L\'original a été supprimé.</string>

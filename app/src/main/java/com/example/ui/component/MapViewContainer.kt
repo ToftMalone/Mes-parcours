@@ -413,7 +413,12 @@ fun MapViewContainer(
     bypassZoomThreshold: Boolean = false,
     onBypassZoomThresholdChanged: (Boolean) -> Unit = {},
     onMapStateChanged: (Double, Double, Double) -> Unit = { _, _, _ -> },
-    onViewportChanged: (MapViewport) -> Unit = {}
+    onViewportChanged: (MapViewport) -> Unit = {},
+    /**
+     * Appui prolongé sur un tracé superposé : le parcours touché et un point du tronçon
+     * le plus proche. Null : l'appui prolongé ne fait rien.
+     */
+    onLongPressTrack: ((trackId: Long, pointId: Long) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scheme = MaterialTheme.colorScheme
@@ -452,6 +457,18 @@ fun MapViewContainer(
         }
     }
 
+    // L'appui prolongé ne vise que ce qui est dessiné : rien quand la carte est trop
+    // dézoomée pour montrer les tracés.
+    val longPressTracks = rememberUpdatedState(
+        if (isZoomedOutTooMuch && !bypassZoomThreshold) emptyList() else overlayTracks
+    )
+    val currentOnLongPress = rememberUpdatedState(onLongPressTrack)
+    val longPressDetector = remember(mapView) {
+        trackLongPressDetector(mapView, { longPressTracks.value }) { trackId, pointId ->
+            currentOnLongPress.value?.invoke(trackId, pointId)
+        }
+    }
+
     Box(modifier = modifier) {
         AndroidView(
             factory = { mapView },
@@ -474,6 +491,7 @@ fun MapViewContainer(
                     if (event.action == android.view.MotionEvent.ACTION_DOWN) {
                         onAutoFollowChanged(false)
                     }
+                    longPressDetector(event)
                     false
                 }
                 
@@ -1353,5 +1371,61 @@ private fun MapPill(
                 Text(actionLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.tertiary)
             }
         }
+    }
+}
+
+/** Distance au tracé en deçà de laquelle un appui prolongé le désigne, en dp. */
+private const val LONG_PRESS_TOLERANCE_DP = 28f
+
+/**
+ * Reconnaît l'appui prolongé sur un tracé superposé, demandé par le père de l'auteur
+ * pour supprimer un morceau de trace directement sur la carte. Le geste ne prend la
+ * main de rien : la carte reçoit toujours le même événement, et un doigt qui bouge ou
+ * un second doigt annulent l'appui (glisser, pincer).
+ *
+ * La distance se compare en mètres, l'appui projeté sur le segment le plus proche
+ * ([com.example.util.PortionBound.nearest]) : sur un tracé dessiné dans Google Earth,
+ * les points sont parfois à des centaines de mètres, et toucher le milieu d'un segment
+ * doit compter. La tolérance en pixels est convertie en mètres à l'endroit touché, ce
+ * qui la rend indépendante de l'orientation de la carte.
+ */
+private fun trackLongPressDetector(
+    mapView: MapView,
+    tracks: () -> List<MapTrack>,
+    onLongPress: (trackId: Long, pointId: Long) -> Unit
+): (android.view.MotionEvent) -> Unit {
+    var multiTouch = false
+    val listener = object : android.view.GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: android.view.MotionEvent): Boolean {
+            multiTouch = false
+            return false
+        }
+
+        override fun onLongPress(e: android.view.MotionEvent) {
+            if (multiTouch) return
+            val projection = mapView.projection
+            val tap = projection.fromPixels(e.x.toInt(), e.y.toInt()) as GeoPoint
+            val tolerancePx = (LONG_PRESS_TOLERANCE_DP * mapView.resources.displayMetrics.density).toInt()
+            val edge = projection.fromPixels(e.x.toInt() + tolerancePx, e.y.toInt()) as GeoPoint
+            val toleranceMeters = tap.distanceToAsDouble(edge)
+            var best: Pair<Long, Long>? = null
+            var bestMeters = toleranceMeters
+            for (track in tracks()) {
+                val bound = com.example.util.PortionBound.nearest(track.points, tap.latitude, tap.longitude) ?: continue
+                val meters = tap.distanceToAsDouble(GeoPoint(bound.point.latitude, bound.point.longitude))
+                if (meters <= bestMeters) {
+                    bestMeters = meters
+                    best = bound.point.trackId to bound.beforeId
+                }
+            }
+            val (trackId, pointId) = best ?: return
+            mapView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            onLongPress(trackId, pointId)
+        }
+    }
+    val detector = android.view.GestureDetector(mapView.context, listener)
+    return { event ->
+        if (event.pointerCount > 1) multiTouch = true
+        detector.onTouchEvent(event)
     }
 }
