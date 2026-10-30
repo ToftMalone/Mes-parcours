@@ -37,7 +37,8 @@ import org.osmdroid.views.overlay.Polyline
  * [points] est le détail de la zone visible, que l'appelant recharge à chaque
  * déplacement signalé par [onViewportChange] : une carte zoomée sur un virage doit en
  * montrer les points, pas la silhouette de tout le parcours. [fitPoints] ne sert qu'à
- * cadrer la carte une fois, à l'ouverture.
+ * cadrer la carte une fois, à l'ouverture — sauf si [initialBox] donne la zone où l'on
+ * regardait en quittant l'outil, que la carte retrouve alors telle quelle.
  *
  * Sert aussi à l'outil « Prolonger » : avec [onTapGeo], un appui renvoie l'endroit
  * touché tel quel, et [sketch] — le tracé dessiné à la main — est dessiné depuis [start]
@@ -63,7 +64,8 @@ fun PortionPickerMap(
     modifier: Modifier = Modifier,
     sketch: List<GeoPoint> = emptyList(),
     onTapGeo: ((GeoPoint) -> Unit)? = null,
-    cut: Pair<PortionBound, PortionBound>? = null
+    cut: Pair<PortionBound, PortionBound>? = null,
+    initialBox: BoundingBox? = null
 ) {
     val context = LocalContext.current
     val isDark = LocalIsDarkTheme.current
@@ -125,13 +127,18 @@ fun PortionPickerMap(
         }
     }
 
-    // Cadrage unique, sur le parcours entier.
+    // Cadrage unique : la zone quittée s'il y en a une, sinon le parcours entier.
     LaunchedEffect(mapView, fitPoints) {
         if (fitPoints.isEmpty()) return@LaunchedEffect
         val box = BoundingBox.fromGeoPointsSafe(fitPoints.map { GeoPoint(it.latitude, it.longitude) })
         val frame = {
-            val margin = (32 * density).toInt()
-            mapView.zoomToBoundingBox(box.increaseByScale(1.15f), false, margin)
+            val resumed = initialBox
+            if (resumed != null) {
+                mapView.zoomToBoundingBox(resumed, false, 0)
+            } else {
+                val margin = (32 * density).toInt()
+                mapView.zoomToBoundingBox(box.increaseByScale(1.15f), false, margin)
+            }
             currentOnViewport.value(mapView.boundingBox)
         }
         if (mapView.width > 0) frame() else mapView.addOnFirstLayoutListener { _, _, _, _, _ -> frame() }

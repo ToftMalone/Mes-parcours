@@ -1191,7 +1191,10 @@ private fun SplitTrackTool(
                 end = cutEnd,
                 onStartChange = { cutStart = it },
                 onEndChange = { cutEnd = it },
-                onViewportChange = { viewport = it },
+                onViewportChange = {
+                    viewport = it
+                    viewModel.pickerViewports[track.id] = it
+                },
                 viewModel = viewModel
             )
         } else if (mode == TrackRepository.SplitMode.SEGMENT_BREAKS) {
@@ -1294,13 +1297,20 @@ private fun CutOnMapSection(
     points: List<TrackPoint>?,
     start: PortionBound?,
     end: PortionBound?,
-    onStartChange: (PortionBound) -> Unit,
-    onEndChange: (PortionBound) -> Unit,
+    onStartChange: (PortionBound?) -> Unit,
+    onEndChange: (PortionBound?) -> Unit,
     onViewportChange: (org.osmdroid.util.BoundingBox) -> Unit,
     viewModel: TrackViewModel
 ) {
     // Vrai tant que le prochain appui doit poser le début ; il passe tout seul à la fin.
     var placingStart by remember(trackId) { mutableStateOf(true) }
+    // Chaque borne posée, avec celle qu'elle remplaçait : « Annuler le point » revient
+    // en arrière sans quitter la carte, donc sans perdre le zoom. Demandé par le père
+    // de l'auteur, qui devait ressortir de l'outil pour reprendre un point mal placé.
+    val placed = remember(trackId) { androidx.compose.runtime.mutableStateListOf<Pair<Boolean, PortionBound?>>() }
+    // La zone regardée la dernière fois sur ce parcours : ressortir de l'outil ne fait
+    // pas perdre le zoom.
+    val resumedBox = remember(trackId) { viewModel.pickerViewports[trackId] }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val none = stringResource(R.string.cut_unset)
     Column(modifier = Modifier.padding(top = 12.dp)) {
@@ -1328,6 +1338,17 @@ private fun CutOnMapSection(
                 modifier = Modifier.weight(1f)
             )
         }
+        SegmentButton(
+            stringResource(R.string.cut_undo), Icons.AutoMirrored.Rounded.Undo,
+            selected = false,
+            onClick = {
+                val (wasStart, previous) = placed.removeLastOrNull() ?: return@SegmentButton
+                if (wasStart) onStartChange(previous) else onEndChange(previous)
+                placingStart = wasStart
+            },
+            testTag = "cut_undo",
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+        )
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -1344,6 +1365,7 @@ private fun CutOnMapSection(
                     fitPoints = fitPoints,
                     start = start?.point,
                     end = end?.point,
+                    initialBox = resumedBox,
                     cut = if (start != null && end != null && start.compareTo(end) != 0) {
                         if (start < end) start to end else end to start
                     } else null,
@@ -1355,6 +1377,7 @@ private fun CutOnMapSection(
                         scope.launch {
                             val bound = viewModel.findPortionBound(trackId, lowId, highId, tap.latitude, tap.longitude)
                                 ?: return@launch
+                            placed += placing to (if (placing) start else end)
                             if (placing) onStartChange(bound) else onEndChange(bound)
                         }
                     },

@@ -546,6 +546,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             repository.getPickerPoints(trackId, minLat, maxLat, minLon, maxLon)
         }
 
+    /**
+     * Zone de carte regardée en dernier dans « Découper » > « Sur la carte », par parcours.
+     * Gardée tant que l'application vit : rouvrir l'outil retrouve le même zoom.
+     */
+    val pickerViewports = HashMap<Long, org.osmdroid.util.BoundingBox>()
+
     /** Distance de la portion comprise entre deux bornes d'un parcours. */
     suspend fun measurePortion(
         trackId: Long,

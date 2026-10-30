@@ -283,7 +283,7 @@
     <string name="split_gap_title">Couper après une pause d\'au moins</string>
     <string name="split_gap_note">Sans effet sur un KML, ou sur un GPX sans horodatage : leurs points sont régulièrement espacés, il n\'y a aucune pause à trouver.</string>
     <string name="split_mode_map">Sur la carte</string>
-    <string name="cut_hint">Zoomez sur la carte, puis touchez le début de la portion à retirer, et enfin sa fin : ce qui est entre les deux apparaît en rouge. Les boutons permettent de reprendre l\'une des deux bornes.</string>
+    <string name="cut_hint">Zoomez sur la carte, puis touchez le début de la portion à retirer, et enfin sa fin : ce qui est entre les deux apparaît en rouge. Les boutons permettent de reprendre l\'une des deux bornes, ou d\'annuler le dernier point posé.</string>
     <string name="cut_unset">—</string>
     <string name="cut_start_label">Début %1$s</string>
     <string name="cut_end_label">Fin %1$s</string>
@@ -407,6 +407,7 @@
     <string name="extend_side_end">À la fin</string>
     <string name="extend_side_start">Au début</string>
     <string name="extend_hint">Zoomez sur la carte, puis touchez-la point après point le long du chemin manquant : chaque appui est relié au précédent, et le premier part du bout du parcours (le rond).</string>
+    <string name="cut_undo">Annuler le point</string>
     <string name="extend_undo">Annuler le point</string>
     <string name="extend_clear">Tout effacer</string>
     <plurals name="extend_summary">

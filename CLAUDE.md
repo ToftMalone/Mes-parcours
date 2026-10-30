@@ -359,7 +359,11 @@ Le parcours s'affiche sur une carte dédiée (`ui/component/PortionPickerMap`, e
 `MapViewContainer`, qui reconstruit ses calques d'elle-même), zoomable jusqu'au niveau
 21. On touche le début, puis la fin : deux boutons « Début hh:mm » / « Fin hh:mm » disent
 quelle borne le prochain appui pose (il passe tout seul de l'une à l'autre) et permettent
-d'en reprendre une ; un repère rond marque chaque borne, la portion est en rouge. **Plus
+d'en reprendre une ; « Annuler le point » rend la borne qu'un appui vient de remplacer
+(pile des appuis), sans quitter la carte — le père de l'auteur devait ressortir de l'outil
+et perdait son zoom. La zone regardée est aussi gardée par parcours tant que
+l'application vit (`TrackViewModel.pickerViewports`, `initialBox` de la carte) : rouvrir
+l'outil y revient. Un repère rond marque chaque borne, la portion est en rouge. **Plus
 de double curseur** : le père de l'auteur le trouvait impossible à manier au doigt sur
 300 m de tracé, et il se cachait derrière le bouton d'action. La carte vit dans un écran
 qui défile : elle se réserve chaque geste commencé sur elle
@@ -803,9 +807,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 225 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 227 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (10), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (12), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (11), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
