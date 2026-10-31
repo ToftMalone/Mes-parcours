@@ -116,6 +116,7 @@ object Exporter {
         private var trackWidth: Float? = null
         private var placemarkColor: Int? = null
         private var placemarkKey: Long? = null
+        private var coordinatesWritten = false
         private val openFolders = ArrayList<String>()
 
         fun start(track: Track) {
@@ -155,8 +156,15 @@ object Exporter {
             if (!lineOpen) {
                 openLine()
             }
-            // Format des coordonnées KML : longitude,latitude,altitude
-            out.append("${indent()}          ${pt.longitude},${pt.latitude},${pt.altitude}\n")
+            // Format des coordonnées KML : longitude,latitude,altitude, séparées d'une
+            // espace sur une seule ligne, comme les écrit Google Earth. Un point par ligne,
+            // indenté, pesait près d'une fois et demie le fichier d'origine : un KML de
+            // 71 Mo ressortait à 108 Mo, sans un point de plus.
+            if (coordinatesWritten) out.append(' ')
+            out.append(coordinate(pt.longitude)).append(',')
+                .append(coordinate(pt.latitude)).append(',')
+                .append(coordinate(pt.altitude))
+            coordinatesWritten = true
         }
 
         fun finish() {
@@ -217,14 +225,27 @@ object Exporter {
             out.append("$pad          <extrude>0</extrude>\n")
             out.append("$pad          <tessellate>1</tessellate>\n")
             out.append("$pad          <altitudeMode>clampToGround</altitudeMode>\n")
-            out.append("$pad          <coordinates>\n")
+            out.append("$pad          <coordinates>")
+            coordinatesWritten = false
             lineOpen = true
         }
 
         private fun closeLine() {
-            out.append("${indent()}          </coordinates>\n")
+            out.append("</coordinates>\n")
             out.append("${indent()}        </LineString>\n")
             lineOpen = false
+        }
+
+        /**
+         * Un nombre tel que le fichier l'a donné : la représentation la plus courte qui
+         * le relise à l'identique, sans « .0 » inutile — l'altitude nulle de Google Earth
+         * ressort « 0 » — et jamais en notation scientifique (« 1.0E-4 »), que KML ne
+         * prévoit pas.
+         */
+        private fun coordinate(value: Double): String {
+            if (value == Math.rint(value) && kotlin.math.abs(value) < 1e15) return value.toLong().toString()
+            val text = value.toString()
+            return if ('E' in text) java.math.BigDecimal(text).stripTrailingZeros().toPlainString() else text
         }
 
         private fun formatWidth(width: Float): String =

@@ -582,6 +582,12 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     /** Au-delà, la zone du sélecteur de portion est trop chargée pour être lue d'un coup. */
     private val maxPickerScan = 40_000
 
+    /** Points proches d'un appui dont on va chercher les voisins, au plus. */
+    private val neighbourLookupLimit = 300
+
+    /** Passages dans la zone dont on va chercher les voisins hors zone, au plus. */
+    private val maxPickerRuns = 300
+
     /** Points relus au plus pour placer une borne : de quoi couvrir l'écart entre deux points affichés. */
     private val maxBoundScan = 20_000
 
@@ -729,9 +735,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                         // l'habitude de trouver son parent.
                         isImported = source.isImported,
                         isMerged = source.isMerged,
-                        // Jamais affiché d'office : un découpage en trente morceaux
-                        // les allumerait tous d'un coup sur la carte.
-                        isSelectedForMap = false,
+                        // Affiché si l'original l'était et qu'il disparaît : les morceaux
+                        // le remplacent à l'écran, sans rien allumer de plus. Gardé, il
+                        // reste seul affiché, sans doublon superposé.
+                        isSelectedForMap = source.isSelectedForMap && deleteSource,
                         // Les morceaux gardent l'apparence du parent, y compris la
                         // couleur choisie à la main s'il en avait une.
                         sourceColor = source.sourceColor,
@@ -827,10 +834,44 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         maxLon: Double,
         maxPoints: Int = 4_000
     ): List<TrackPoint> {
-        val inside = trackDao.countPointsInBounds(trackId, minLat, maxLat, minLon, maxLon)
+        // La zone lue déborde l'écran d'une moitié de chaque côté, comme sur la carte
+        // principale : un trait qui sort de l'écran doit rester dessiné jusqu'au bord.
+        var latPad = (maxLat - minLat) / 2
+        var lonPad = (maxLon - minLon) / 2
+        var inside = trackDao.countPointsInBounds(trackId, minLat - latPad, maxLat + latPad, minLon - lonPad, maxLon + lonPad)
+        // Zoomé au milieu d'un long segment — deux points de Google Earth à des centaines
+        // de mètres l'un de l'autre —, la zone ne contient parfois aucun point alors que
+        // le trait la traverse : le tracé disparaissait. On élargit jusqu'à trouver de
+        // quoi le dessiner ; les voisins ajoutés plus bas font le reste.
+        var widenings = 0
+        while (inside == 0 && widenings < 6) {
+            latPad = latPad * 3 + (maxLat - minLat)
+            lonPad = lonPad * 3 + (maxLon - minLon)
+            inside = trackDao.countPointsInBounds(trackId, minLat - latPad, maxLat + latPad, minLon - lonPad, maxLon + lonPad)
+            widenings++
+        }
         if (inside == 0) return emptyList()
         if (inside > maxPickerScan) return getPreviewPoints(trackId)
-        val raw = trackDao.getDetailPointsInBounds(trackId, 0L, 1L, minLat, maxLat, minLon, maxLon)
+        val found = trackDao.getDetailPointsInBounds(
+            trackId, 0L, 1L, minLat - latPad, maxLat + latPad, minLon - lonPad, maxLon + lonPad
+        )
+        // Chaque passage dans la zone reçoit le point qui le précède et celui qui le suit,
+        // même hors zone : sans eux, le segment qui entre dans la zone ou en sort n'était
+        // pas dessiné, et le tracé s'arrêtait net avant le bord.
+        val byId = java.util.TreeMap<Long, TrackPoint>()
+        found.forEach { byId[it.id] = it }
+        var runs = 0
+        for ((i, point) in found.withIndex()) {
+            if (runs >= maxPickerRuns) break
+            val opensRun = i == 0 || point.id != found[i - 1].id + 1
+            val closesRun = i == found.lastIndex || found[i + 1].id != point.id + 1
+            if (opensRun) {
+                trackDao.getPointBefore(trackId, point.id)?.let { byId[it.id] = it }
+                runs++
+            }
+            if (closesRun) trackDao.getPointsPage(trackId, point.id, 1).firstOrNull()?.let { byId[it.id] = it }
+        }
+        val raw = byId.values.toList()
         val marked = ArrayList<TrackPoint>(raw.size)
         for ((i, point) in raw.withIndex()) {
             val previous = raw.getOrNull(i - 1)
@@ -854,24 +895,82 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     /**
      * La borne exacte d'un appui en ([lat], [lon]) sur le tracé, cherchée parmi les vrais
-     * points de [trackId] d'identifiant compris entre [lowId] et [highId] : la carte
-     * n'en montre parfois qu'un sur dix, et c'est sur le tracé réel que l'on coupe.
+     * points de [trackId] — la carte n'en montre parfois qu'un sur dix, et c'est sur le
+     * tracé réel que l'on coupe. Null si le tracé passe à plus de [radiusMeters] de
+     * l'appui : un appui à côté ne pose rien, plutôt qu'un repère au loin.
+     *
+     * Deux recherches, la plus proche l'emporte. Les vrais points autour de l'appui,
+     * d'abord : c'est elle qui vise juste, même quand l'affichage, pas encore rechargé
+     * après un zoom, ne montre qu'une silhouette — la borne « atterrissait ailleurs »,
+     * sur le seul segment affiché. Puis les points compris entre [lowId] et [highId],
+     * qui encadrent le segment affiché le plus proche : elle seule trouve un long
+     * segment qui traverse l'appui sans qu'aucun de ses deux points en soit proche.
      */
-    suspend fun findPortionBound(trackId: Long, lowId: Long, highId: Long, lat: Double, lon: Double): com.example.util.PortionBound? {
-        val real = ArrayList<TrackPoint>()
-        var afterId = minOf(lowId, highId) - 1
-        val last = maxOf(lowId, highId)
-        while (real.size < maxBoundScan) {
-            val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
-            if (page.isEmpty()) break
-            afterId = page.last().id
-            for (point in page) {
-                if (point.id > last) return com.example.util.PortionBound.nearest(real, lat, lon)
-                real += point
+    suspend fun findPortionBound(
+        trackId: Long,
+        lowId: Long?,
+        highId: Long?,
+        lat: Double,
+        lon: Double,
+        radiusMeters: Double
+    ): com.example.util.PortionBound? {
+        val candidates = ArrayList<com.example.util.PortionBound>(2)
+
+        val latPad = radiusMeters / 111_320.0
+        val lonPad = radiusMeters / (111_320.0 * kotlin.math.cos(Math.toRadians(lat)).coerceAtLeast(0.01))
+        val near = trackDao.getDetailPointsInBounds(trackId, 0L, 1L, lat - latPad, lat + latPad, lon - lonPad, lon + lonPad)
+        if (near.size <= maxBoundScan) {
+            // Chaque point proche avec ses deux voisins, pour que les segments qui partent
+            // de la zone comptent ; deux points qui ne se suivent pas ne forment pas un
+            // segment, d'où la rupture posée entre eux.
+            // Au-delà de quelques centaines de points proches (carte dézoomée), les voisins
+            // ne changent plus rien à la visée : on s'épargne leurs lectures.
+            val withNeighbours = near.size <= neighbourLookupLimit
+            val byId = java.util.TreeMap<Long, TrackPoint>()
+            for (point in near) {
+                byId[point.id] = point
+                if (withNeighbours) {
+                    trackDao.getPointBefore(trackId, point.id)?.let { byId[it.id] = it }
+                    trackDao.getPointsPage(trackId, point.id, 1).firstOrNull()?.let { byId[it.id] = it }
+                }
             }
+            val ordered = ArrayList<TrackPoint>(byId.size)
+            var previous: TrackPoint? = null
+            for (point in byId.values) {
+                val adjacent = previous != null && (point.id == previous.id + 1 ||
+                    (withNeighbours && nextIdAfter(trackId, previous.id) == point.id))
+                ordered += if (previous != null && !adjacent) point.copy(isDiscontinuous = true) else point
+                previous = point
+            }
+            com.example.util.PortionBound.nearest(ordered, lat, lon)?.let { candidates += it }
         }
-        return com.example.util.PortionBound.nearest(real, lat, lon)
+
+        if (lowId != null && highId != null) {
+            val real = ArrayList<TrackPoint>()
+            var afterId = minOf(lowId, highId) - 1
+            val last = maxOf(lowId, highId)
+            scan@ while (real.size < maxBoundScan) {
+                val page = trackDao.getPointsPage(trackId, afterId, splitScanPageSize)
+                if (page.isEmpty()) break
+                afterId = page.last().id
+                for (point in page) {
+                    if (point.id > last) break@scan
+                    real += point
+                }
+            }
+            com.example.util.PortionBound.nearest(real, lat, lon)?.let { candidates += it }
+        }
+
+        val distance = FloatArray(1)
+        fun metersTo(bound: com.example.util.PortionBound): Double {
+            android.location.Location.distanceBetween(lat, lon, bound.point.latitude, bound.point.longitude, distance)
+            return distance[0].toDouble()
+        }
+        return candidates.minByOrNull(::metersTo)?.takeIf { metersTo(it) <= radiusMeters }
     }
+
+    private suspend fun nextIdAfter(trackId: Long, id: Long): Long? =
+        trackDao.getPointsPage(trackId, id, 1).firstOrNull()?.id
 
     /** Distance parcourue entre deux bornes d'un parcours, ruptures de tronçon exclues. */
     suspend fun measurePortion(
@@ -1003,11 +1102,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                     elevationGain = result.elevationGain,
                     elevationLoss = result.elevationLoss,
                     isRecording = false,
-                    // Même héritage que le découpage : provenance et apparence, mais
-                    // jamais l'affichage sur la carte.
+                    // Même héritage que le découpage, affichage sur la carte compris :
+                    // le parcours qui remplace l'original reste visible comme lui.
                     isImported = source.isImported,
                     isMerged = source.isMerged,
-                    isSelectedForMap = false,
+                    isSelectedForMap = source.isSelectedForMap && deleteSource,
                     sourceColor = source.sourceColor,
                     displayColor = source.displayColor,
                     displayWidthDp = source.displayWidthDp
@@ -1128,9 +1227,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         // posée sur le premier ou le dernier point ne laisse rien de ce côté.
         val from = com.example.util.PortionBound.at(segment.before ?: segment.first)
         val to = com.example.util.PortionBound.at(segment.after ?: segment.last)
-        val newId = cutPortion(segment.trackId, from, to, source.name, deleteSource = true).single()
-        if (source.isSelectedForMap) trackDao.setShownOnMap(listOf(newId), true)
-        return newId
+        return cutPortion(segment.trackId, from, to, source.name, deleteSource = true).single()
     }
 
     // ------------------------------------------------------------------
@@ -1211,11 +1308,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                     elevationGain = result.elevationGain,
                     elevationLoss = result.elevationLoss,
                     isRecording = false,
-                    // Même héritage que le découpage : provenance et apparence, mais
-                    // jamais l'affichage sur la carte.
+                    // Même héritage que le découpage, affichage sur la carte compris.
                     isImported = source.isImported,
                     isMerged = source.isMerged,
-                    isSelectedForMap = false,
+                    isSelectedForMap = source.isSelectedForMap && deleteSource,
                     sourceColor = source.sourceColor,
                     displayColor = source.displayColor,
                     displayWidthDp = source.displayWidthDp
@@ -1353,7 +1449,10 @@ class TrackRepository private constructor(private val database: AppDatabase) {
                         maxSpeed = stats.maxSpeedMps,
                         avgSpeed = stats.avgSpeedMps,
                         elevationGain = stats.elevationGain,
-                        elevationLoss = stats.elevationLoss
+                        elevationLoss = stats.elevationLoss,
+                        // Affiché seulement une fois complet, et seulement s'il remplace
+                        // un original qui l'était (voir le découpage).
+                        isSelectedForMap = source.isSelectedForMap && deleteSource
                     )
                 )
                 // Le premier point gardé ouvrait peut-être un tronçon dans le parcours

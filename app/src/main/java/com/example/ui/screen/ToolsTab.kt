@@ -1381,14 +1381,16 @@ private fun CutOnMapSection(
                     cut = if (start != null && end != null && start.compareTo(end) != 0) {
                         if (start < end) start to end else end to start
                     } else null,
-                    onTapTrack = { lowId, highId, tap ->
+                    onTapTrack = { lowId, highId, tap, radius ->
                         // La borne exacte se cherche parmi les vrais points : la carte
                         // n'en montre parfois qu'une partie.
                         val placing = placingStart
-                        placingStart = !placingStart
                         scope.launch {
-                            val bound = viewModel.findPortionBound(trackId, lowId, highId, tap.latitude, tap.longitude)
+                            // Un appui à côté du tracé ne pose rien, et ne fait pas passer
+                            // à l'autre borne.
+                            val bound = viewModel.findPortionBound(trackId, lowId, highId, tap.latitude, tap.longitude, radius)
                                 ?: return@launch
+                            placingStart = !placing
                             placed += placing to (if (placing) start else end)
                             if (placing) onStartChange(bound) else onEndChange(bound)
                         }
@@ -1790,7 +1792,7 @@ private fun ExtendTrackTool(
                     fitPoints = fit,
                     start = anchor,
                     end = null,
-                    onTapTrack = { _, _, _ -> },
+                    onTapTrack = { _, _, _, _ -> },
                     onViewportChange = { viewport = it },
                     sketch = taps.toList(),
                     onTapGeo = { taps.add(it) },

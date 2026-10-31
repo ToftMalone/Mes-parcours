@@ -152,6 +152,10 @@ interface TrackDao {
     )
     suspend fun clearFirstPointAfterDiscontinuity(trackId: Long, afterId: Long)
 
+    /** Le point qui précède [beforeId] dans [trackId], ou null s'il n'y en a pas. */
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId AND id < :beforeId ORDER BY id DESC LIMIT 1")
+    suspend fun getPointBefore(trackId: Long, beforeId: Long): TrackPoint?
+
     @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY id ASC LIMIT 1")
     suspend fun getFirstPoint(trackId: Long): TrackPoint?
 

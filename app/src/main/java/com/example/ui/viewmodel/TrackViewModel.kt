@@ -565,13 +565,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     /** La borne exacte d'un appui sur le tracé (voir [TrackRepository.findPortionBound]). */
     suspend fun findPortionBound(
         trackId: Long,
-        lowId: Long,
-        highId: Long,
+        lowId: Long?,
+        highId: Long?,
         lat: Double,
-        lon: Double
+        lon: Double,
+        radiusMeters: Double
     ): com.example.util.PortionBound? =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            repository.findPortionBound(trackId, lowId, highId, lat, lon)
+            repository.findPortionBound(trackId, lowId, highId, lat, lon, radiusMeters)
         }
 
     /** Le tronçon touché d'un appui prolongé sur la carte (voir [TrackRepository.findSegment]). */

@@ -4,6 +4,7 @@ import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.util.Exporter
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -107,7 +108,17 @@ class KmlExportTest {
         // KML, et l'intervertir enverrait les tracés à l'autre bout du monde.
         val kml = export(listOf(point(0)))
 
-        assertTrue(kml.contains("6.0,45.0,100.0"))
+        assertTrue(kml.contains("6,45,100"))
+    }
+
+    @Test
+    fun `les coordonnees tiennent sur une ligne, sans notation scientifique`() {
+        // Un point par ligne, indenté, gonflait le fichier de moitié par rapport à celui
+        // de Google Earth ; 1.0E-4 n'est pas un nombre que KML prévoit.
+        val kml = export(listOf(point(0), point(1)).map { it.copy(longitude = 0.0001, latitude = 45.123456789012, altitude = 0.0) })
+
+        assertTrue(kml.contains("<coordinates>0.0001,45.123456789012,0 0.0001,45.123456789012,0</coordinates>"))
+        assertFalse(kml.contains("E-"))
     }
 
     @Test

@@ -59,7 +59,7 @@ fun PortionPickerMap(
     fitPoints: List<TrackPoint>,
     start: TrackPoint?,
     end: TrackPoint?,
-    onTapTrack: (lowId: Long, highId: Long, tap: GeoPoint) -> Unit,
+    onTapTrack: (lowId: Long?, highId: Long?, tap: GeoPoint, radiusMeters: Double) -> Unit,
     onViewportChange: (BoundingBox) -> Unit,
     modifier: Modifier = Modifier,
     sketch: List<GeoPoint> = emptyList(),
@@ -152,7 +152,13 @@ fun PortionPickerMap(
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                 val raw = currentOnTapGeo.value
                 if (raw != null) raw(p)
-                else tapRange(currentPoints.value, p)?.let { (low, high) -> currentOnTap.value(low, high, p) }
+                else {
+                    // Un appui compte jusqu'à 40 dp du tracé, quel que soit le zoom.
+                    val radius = TAP_TOLERANCE_DP * density *
+                        org.osmdroid.util.TileSystem.GroundResolution(p.latitude, mapView.zoomLevelDouble)
+                    val range = tapRange(currentPoints.value, p)
+                    currentOnTap.value(range?.first, range?.second, p, radius)
+                }
                 return true
             }
 
@@ -308,3 +314,6 @@ private fun tapRange(points: List<TrackPoint>, target: GeoPoint): Pair<Long, Lon
     if (first < 0 || last < 0) return null
     return points[maxOf(first - 1, 0)].id to points[minOf(last + 1, points.lastIndex)].id
 }
+
+/** Distance au tracé en deçà de laquelle un appui y pose une borne, en dp. */
+private const val TAP_TOLERANCE_DP = 40.0

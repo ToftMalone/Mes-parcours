@@ -140,8 +140,8 @@ class CutPortionTest {
         val step = 5 / 111_132.0
 
         // Deux appuis à mi-chemin entre deux points, un peu à côté du tracé.
-        val from = repository.findPortionBound(trackId, points[38].id, points[45].id, 45.0 + 40.5 * step, 5.00002)!!
-        val to = repository.findPortionBound(trackId, points[55].id, points[62].id, 45.0 + 58.5 * step, 4.99998)!!
+        val from = repository.findPortionBound(trackId, points[38].id, points[45].id, 45.0 + 40.5 * step, 5.00002, 30.0)!!
+        val to = repository.findPortionBound(trackId, points[55].id, points[62].id, 45.0 + 58.5 * step, 4.99998, 30.0)!!
 
         assertEquals(points[40].id, from.beforeId)
         assertEquals(points[41].id, from.afterId)
@@ -165,7 +165,7 @@ class CutPortionTest {
         val (trackId, points) = createTrack()
         val step = 5 / 111_132.0
 
-        val bound = repository.findPortionBound(trackId, points[10].id, points[20].id, 45.0 + 15.05 * step, 5.0)!!
+        val bound = repository.findPortionBound(trackId, points[10].id, points[20].id, 45.0 + 15.05 * step, 5.0, 30.0)!!
 
         assertTrue(bound.isVertex)
         assertEquals(points[15].id, bound.point.id)
@@ -285,9 +285,65 @@ class CutPortionTest {
             trackId, zone.first().latitude, zone.last().latitude, 4.99, 5.01
         )
 
-        assertEquals(100, detail.size)
-        assertEquals(zone.first().id, detail.first().id)
+        // La zone, plus une moitié de marge de chaque côté et le voisin de chaque bout.
+        assertTrue(detail.map { it.id }.containsAll(zone.map { it.id }))
+        assertTrue(detail.size in 200..202)
         assertFalse(detail.drop(1).any { it.isDiscontinuous })
+    }
+
+    @Test
+    fun `zoomé au milieu d'un long segment, le trait reste dessiné`() = runBlocking {
+        val trackId = db.trackDao.insertTrack(Track(name = "Earth", startTime = start))
+        // Deux points à un kilomètre l'un de l'autre, comme un tracé dessiné dans Earth.
+        db.trackDao.insertTrackPoints(
+            listOf(45.0, 45.009).mapIndexed { i, lat ->
+                TrackPoint(trackId = trackId, latitude = lat, longitude = 5.0, timestamp = start + i * 1_000L)
+            }
+        )
+
+        val detail = repository.getPickerPoints(trackId, 45.0045, 45.0046, 4.9999, 5.0001)
+
+        assertEquals(2, detail.size)
+        assertFalse(detail[1].isDiscontinuous)
+    }
+
+    @Test
+    fun `un appui loin du tracé ne pose rien, un appui sur un long segment s'y pose`() = runBlocking {
+        val trackId = db.trackDao.insertTrack(Track(name = "Earth", startTime = start))
+        db.trackDao.insertTrackPoints(
+            listOf(45.0, 45.009).mapIndexed { i, lat ->
+                TrackPoint(trackId = trackId, latitude = lat, longitude = 5.0, timestamp = start + i * 1_000L)
+            }
+        )
+        val points = db.trackDao.getPointsForTrack(trackId)
+
+        assertNull(repository.findPortionBound(trackId, points[0].id, points[1].id, 45.0045, 5.01, 30.0))
+        val bound = repository.findPortionBound(trackId, points[0].id, points[1].id, 45.0045, 5.0001, 30.0)!!
+        assertEquals(0.5, bound.fraction, 0.01)
+    }
+
+    @Test
+    fun `sans segment affiché, l'appui trouve quand même le tracé tout près`() = runBlocking {
+        val (trackId, _) = createTrack()
+        val step = 5 / 111_132.0
+
+        val bound = repository.findPortionBound(trackId, null, null, 45.0 + 70.5 * step, 5.00001, 30.0)!!
+
+        assertEquals(0.5, bound.fraction, 0.1)
+    }
+
+    @Test
+    fun `découper un parcours affiché le laisse affiché`() = runBlocking {
+        val trackId = db.trackDao.insertTrack(Track(name = "Vu", startTime = start, isSelectedForMap = true))
+        db.trackDao.insertTrackPoints((0 until 20).map { i ->
+            TrackPoint(trackId = trackId, latitude = 45.0 + i * 5 / 111_132.0, longitude = 5.0, timestamp = start + i * 1_000L)
+        })
+        val points = db.trackDao.getPointsForTrack(trackId)
+
+        val replaced = repository.cutPortion(trackId, at(points[5]), at(points[9]), "Vu", true).single()
+        assertTrue(db.trackDao.getTrackById(replaced)!!.isSelectedForMap)
+        val kept = repository.cutPortion(replaced, at(db.trackDao.getPointsForTrack(replaced)[2]), at(db.trackDao.getPointsForTrack(replaced)[4]), "Vu", false).single()
+        assertFalse("l'original gardé reste seul affiché", db.trackDao.getTrackById(kept)!!.isSelectedForMap)
     }
 
     @Test
@@ -306,7 +362,8 @@ class CutPortionTest {
 
         val detail = repository.getPickerPoints(trackId, 44.99, 45.01, 4.99, 5.01)
 
-        assertEquals(60, detail.size)
+        // Les deux passages, chacun avec le point par lequel il quitte ou rejoint la zone.
+        assertEquals(62, detail.size)
         assertEquals("le premier point de la reprise ouvre un tronçon", 1, detail.count { it.isDiscontinuous })
     }
 
