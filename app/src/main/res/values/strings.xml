@@ -196,8 +196,20 @@
     <string name="delete_dialog_body">« %1$s » ira à la corbeille, d\'où vous pourrez le restaurer pendant 30 jours.</string>
     <string name="trash_button">Corbeille (%1$d)</string>
     <string name="trash_title">Corbeille</string>
-    <string name="trash_subtitle">Les parcours supprimés restent ici 30 jours, puis sont effacés d\'eux-mêmes.</string>
+    <string name="trash_subtitle">Les parcours supprimés restent ici 30 jours, puis sont effacés d\'eux-mêmes, à moins de vider la corbeille avant.</string>
     <string name="trash_restore">Restaurer</string>
+    <string name="trash_empty">Vider la corbeille</string>
+    <string name="trash_empty_title">Vider la corbeille ?</string>
+    <plurals name="trash_empty_body">
+        <item quantity="one">Le parcours de la corbeille sera effacé pour de bon, points compris. Il ne pourra plus jamais être récupéré.</item>
+        <item quantity="other">Les %1$d parcours de la corbeille seront effacés pour de bon, points compris. Ils ne pourront plus jamais être récupérés.</item>
+    </plurals>
+    <string name="trash_empty_confirm_wait">Vider (%1$d)</string>
+    <string name="trash_empty_confirm">Vider</string>
+    <plurals name="trash_emptied">
+        <item quantity="one">%1$d parcours effacé pour de bon</item>
+        <item quantity="other">%1$d parcours effacés pour de bon</item>
+    </plurals>
     <string name="trash_restored">« %1$s » est de retour dans l\'historique.</string>
     <plurals name="trash_item_subtitle">
         <item quantity="one">%1$s · effacé dans %2$d jour</item>

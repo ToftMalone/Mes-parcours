@@ -445,6 +445,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
+    /** Efface pour de bon tout le contenu de la corbeille (voir [TrackRepository.emptyTrash]). */
+    fun emptyTrash(onDone: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val count = repository.emptyTrash()
+            onDone(count)
+        }
+    }
+
     /** Vrai pour le parcours qu'un enregistrement alimente : ni fusion ni suppression. */
     fun isBeingRecorded(track: Track): Boolean = repository.isBeingRecorded(track)
 

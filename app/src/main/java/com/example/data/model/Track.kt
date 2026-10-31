@@ -66,8 +66,9 @@ data class Track(
      * 10→11). Demandé par le père de l'auteur après une suppression regrettée :
      * supprimer met à la corbeille, d'où l'on peut restaurer pendant
      * [TRASH_RETENTION_MS] ; passé ce délai le parcours est effacé pour de bon au
-     * démarrage suivant (`TrackRepository.purgeTrash`). Pas de bouton pour vider la
-     * corbeille, à sa demande : c'est le temps qui la vide.
+     * démarrage suivant (`TrackRepository.purgeTrash`). D'abord sans bouton pour la
+     * vider, à sa demande ; l'auteur l'a ajouté ensuite (`emptyTrash`), derrière un
+     * avertissement de trois secondes.
      */
     val deletedAt: Long? = null
 ) {

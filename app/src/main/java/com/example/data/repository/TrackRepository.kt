@@ -1656,6 +1656,20 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         return purged
     }
 
+    /**
+     * Vide la corbeille d'un coup : tous ses parcours, points compris, sans attendre
+     * leurs trente jours. Ajouté après coup à la demande de l'auteur ; l'écran ne le
+     * propose qu'après un avertissement qu'on ne peut valider avant trois secondes.
+     */
+    suspend fun emptyTrash(): Int {
+        val purged = database.withTransaction {
+            trackDao.deleteExpiredTrashPoints(Long.MAX_VALUE)
+            trackDao.deleteExpiredTrash(Long.MAX_VALUE)
+        }
+        if (purged > 0) trackDao.deleteOrphanPlacemarks()
+        return purged
+    }
+
     /** Les tracés KML d'origine d'un parcours, par identifiant, pour l'export. */
     suspend fun getPlacemarks(trackId: Long): Map<Long, com.example.data.model.TrackPlacemark> =
         trackDao.getPlacemarksForTrack(trackId).associateBy { it.id }

@@ -14,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -103,5 +104,22 @@ class TrashTest {
 
         assertEquals(10, db.trackDao.getPointsForTrack(kept).size)
         assertNull(db.trackDao.getTrackById(trashed))
+    }
+
+    @Test
+    fun `vider la corbeille efface tout son contenu, et rien d'autre`() = runBlocking {
+        val kept = createTrack("Gardé")
+        val first = createTrack("Supprimé 1")
+        val second = createTrack("Supprimé 2")
+        repository.deleteTrack(first)
+        repository.deleteTrack(second)
+
+        assertEquals(2, repository.emptyTrash())
+
+        assertNull(db.trackDao.getTrackById(first))
+        assertNull(db.trackDao.getTrackById(second))
+        assertTrue("points effacés", db.trackDao.getPointsForTrack(first).isEmpty())
+        assertNotNull(db.trackDao.getTrackById(kept))
+        assertFalse(db.trackDao.getPointsForTrack(kept).isEmpty())
     }
 }

@@ -438,6 +438,11 @@ fun HistoryTab(
                     messenger.show(context.getString(R.string.trash_restored, track.name), Icons.Rounded.RestoreFromTrash)
                 }
             },
+            onEmpty = {
+                viewModel.emptyTrash { count ->
+                    messenger.show(context.resources.getQuantityString(R.plurals.trash_emptied, count, count), Icons.Rounded.DeleteForever)
+                }
+            },
             onDismiss = { showTrash = false }
         )
     }
@@ -1304,12 +1309,14 @@ fun ResumeRefusedDialog(trackName: String, onDismiss: () -> Unit, onOpenRecordin
 
 /**
  * La corbeille : les parcours supprimés, chacun avec ce qu'il lui reste de jours avant
- * l'effacement définitif et un bouton pour le restaurer. **Pas de bouton pour la
- * vider**, à la demande du père de l'auteur : c'est le temps qui la vide (voir
- * `Track.deletedAt`).
+ * l'effacement définitif et un bouton pour le restaurer. Le temps la vide (voir
+ * `Track.deletedAt`) ; « Vider la corbeille », ajouté ensuite à la demande de l'auteur,
+ * passe par un avertissement qu'on ne peut valider qu'au bout de trois secondes : ce
+ * qui part de là ne revient plus, et la corbeille est née d'une suppression regrettée.
  */
 @Composable
-private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onDismiss: () -> Unit) {
+private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onEmpty: () -> Unit, onDismiss: () -> Unit) {
+    var confirmEmpty by remember { mutableStateOf(false) }
     // Plus rien à montrer après la dernière restauration : la feuille se range.
     LaunchedEffect(tracks.isEmpty()) { if (tracks.isEmpty()) onDismiss() }
     MpSheet(onDismissRequest = onDismiss) {
@@ -1357,5 +1364,54 @@ private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onDismis
                 }
             }
         }
+        Spacer(modifier = Modifier.height(12.dp))
+        TextButton(
+            onClick = { confirmEmpty = true },
+            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("trash_empty")
+        ) {
+            Icon(Icons.Rounded.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(stringResource(R.string.trash_empty), style = MaterialTheme.typography.labelLarge)
+        }
+    }
+
+    if (confirmEmpty) {
+        // Trois secondes avant de pouvoir confirmer : le temps de lire.
+        var secondsLeft by remember { mutableIntStateOf(EMPTY_TRASH_DELAY_SECONDS) }
+        LaunchedEffect(Unit) {
+            while (secondsLeft > 0) {
+                kotlinx.coroutines.delay(1_000)
+                secondsLeft--
+            }
+        }
+        MpDialog(
+            onDismissRequest = { confirmEmpty = false },
+            icon = {
+                ShapeBadge(
+                    icon = Icons.Rounded.DeleteForever,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(22.dp)
+                )
+            },
+            title = stringResource(R.string.trash_empty_title),
+            body = pluralStringResource(R.plurals.trash_empty_body, tracks.size, tracks.size),
+            dismissLabel = stringResource(R.string.common_cancel),
+            confirmLabel = if (secondsLeft > 0) stringResource(R.string.trash_empty_confirm_wait, secondsLeft)
+            else stringResource(R.string.trash_empty_confirm),
+            confirmEnabled = secondsLeft == 0,
+            confirmContainerColor = MaterialTheme.colorScheme.error,
+            confirmContentColor = MaterialTheme.colorScheme.onError,
+            confirmTestTag = "trash_empty_confirm",
+            onConfirm = {
+                confirmEmpty = false
+                onEmpty()
+            }
+        )
     }
 }
+
+private const val EMPTY_TRASH_DELAY_SECONDS = 3

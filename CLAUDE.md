@@ -147,8 +147,11 @@ supprimer un parcours (à l'unité, en mode sélection, ou l'original qu'un outi
 le **met à la corbeille** (`Track.deletedAt`, migration 10→11) au lieu de l'effacer. Il
 quitte l'historique et la carte, mais garde ses points ; un bouton « Corbeille (n) »,
 au-dessus de la liste (même quand l'onglet n'a plus aucun parcours) et seulement quand elle n'est pas vide, ouvre une feuille où
-chaque parcours se restaure. **Pas de bouton pour la vider**, à sa demande : c'est le
-temps qui la vide. `TrackRepository.purgeTrash`, appelé au démarrage depuis
+chaque parcours se restaure. D'abord sans bouton pour la vider, à sa demande ;
+l'auteur a ensuite ajouté « Vider la corbeille » (`TrackRepository.emptyTrash`), au bas
+de la feuille, derrière un avertissement dont le bouton reste grisé trois secondes
+(« Vider (3) », « (2) »… : le temps de lire que rien ne sera récupérable). Sinon, c'est
+le temps qui la vide. `TrackRepository.purgeTrash`, appelé au démarrage depuis
 `TrackApplication`, efface pour de bon (points compris) ce qui y a passé plus de
 30 jours (`Track.TRASH_RETENTION_MS`). Restent des effacements immédiats, voulus : les
 parcours absorbés par une fusion (leurs points sont recopiés dans le plus ancien), la
@@ -851,9 +854,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 237 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 238 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (4), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (5), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
