@@ -215,7 +215,9 @@ de la catégorie ; épaisseur dans le même ordre : `displayWidthDp` du parcours
 celle du tracé d'origine (`TrackPlacemark.width`), sinon l'épaisseur générale
 (`getThicknessDp`, celle de l'écran — c'était 5 d'office, le père de l'auteur voulait 2). Il écrivait tout en rouge
 d'office : le père de l'auteur, qui avait colorié chaque pays d'un voyage, a retrouvé
-un fichier d'une seule couleur après un découpage. Un `<Style>` vaut pour tout un
+un fichier d'une seule couleur après un découpage. Coordonnées sur une ligne, séparées d'une espace, nombres au
+plus court (`coordinate` : « 0 » plutôt que « 0.0 », jamais de « 1.0E-4 ») : un point
+par ligne indenté faisait ressortir à 108 Mo un fichier Google Earth de 71 Mo. Un `<Style>` vaut pour tout un
 Placemark : chaque changement de couleur en ouvre un nouveau, style écrit dedans
 (écriture en flux), et un parcours d'une seule couleur reste une seule entrée.
 `KmlColor.format` écrit l'AABBGGRR.
@@ -299,8 +301,10 @@ Quatre points structurent l'implémentation, et chacun a sa raison :
 Le parcours d'origine n'est **jamais modifié**, et n'est supprimé que si l'utilisateur
 coche la case — les morceaux contiennent alors exactement les mêmes points. Chacun
 hérite de la provenance (`isImported`, `isMerged`) et de l'apparence (`sourceColor`,
-`displayColor`) du parent, mais jamais de `isSelectedForMap` : un découpage en trente
-morceaux les allumerait tous d'un coup sur la carte.
+`displayColor`) du parent, et de `isSelectedForMap` **seulement si l'original
+disparaît** (`source.isSelectedForMap && deleteSource`), règle commune à tous les outils
+qui remplacent un parcours : à la demande du père de l'auteur, le tracé affiché le
+reste après une modification ; l'original gardé reste seul affiché, sans doublon.
 
 Découper en un seul morceau ne ferait qu'un doublon : c'est refusé, avec un message
 qui dit lequel des deux modes n'a rien trouvé.
@@ -374,10 +378,18 @@ de double curseur** : le père de l'auteur le trouvait impossible à manier au d
 qui défile : elle se réserve chaque geste commencé sur elle
 (`requestDisallowInterceptTouchEvent`).
 
+**Recherche d'un lieu** (`ui/component/MapSearchBar`), en haut des cartes des outils :
+on tape une ville, la carte s'y rend (zoom 13) et republie sa zone. `Geocoder` d'Android :
+seul le texte tapé part vers le service du téléphone, jamais la position. Pas sur la carte
+principale (à la demande de l'auteur), ni sur celle de la fiche détail, qui ne se manipule pas.
+
 **Le détail suit le zoom.** Un aperçu fixe (3 000 points au plus) coupait les virages en
 lignes droites dès qu'on zoomait. `TrackRepository.getPickerPoints` relit donc les points
 de la zone visible (signalée par la carte 250 ms après chaque geste) : tous les points
-tant qu'il y en a moins de 4 000, sinon à pas régulier ; l'aperçu entier
+tant qu'il y en a moins de 4 000, sinon à pas régulier, dans une zone qui **déborde
+l'écran d'une moitié de chaque côté**, avec le **voisin hors zone de chaque passage**
+(`getPointBefore`) et, si elle ne contient aucun point, élargie jusqu'à en trouver :
+zoomé au milieu d'un long segment de Google Earth, le trait disparaissait ; l'aperçu entier
 (`getPreviewPoints`) ne sert qu'à cadrer la carte à l'ouverture, et de repli quand la zone
 contient plus de 40 000 points. **Aucun trait ne relie deux points que rien ne relie** :
 le point qui suit une sortie de zone (identifiants non contigus), un trou de plus de
@@ -388,7 +400,10 @@ point le plus proche : sur un tracé dessiné dans Google Earth, deux points son
 exactement là où j'ai mis les points ». La carte repère le segment affiché le plus
 proche (`tapRange`, élargi d'un voisin de chaque côté, l'affichage pouvant être à pas
 régulier) ; `TrackRepository.findPortionBound` relit les **vrais** points de cet
-intervalle et y projette l'appui. Une borne est soit un point existant (`isVertex`, à
+intervalle et y projette l'appui — et cherche aussi les vrais points autour de l'appui
+(avec leurs voisins), la plus proche des deux l'emportant : sur un affichage pas encore
+rechargé après un zoom, la borne « atterrissait ailleurs ». Un appui à plus de 40 dp du
+tracé ne pose rien et ne fait pas passer à l'autre borne. Une borne est soit un point existant (`isVertex`, à
 moins d'un mètre), soit un point fabriqué entre deux identifiants, à une fraction
 donnée. Jamais d'indices : elles survivent au rechargement du détail. `measurePortion`
 additionne la distance de borne à borne, page par page.
@@ -432,8 +447,13 @@ Demandé par le père de l'auteur : « si j'ai arrêté ma trace trop tôt, cré
 manuellement sur la carte pour compléter la partie qui manque, comme dans Earth ».
 `ExtendTrackTool` reprend la carte de « Sur la carte » (`PortionPickerMap`, avec
 `onTapGeo` : l'appui renvoie l'endroit touché, et `sketch`, le tracé dessiné en
-pointillés). On choisit le bout (« À la fin » ou « Au début », repère rond), puis chaque
-appui ajoute un point relié au précédent ; « Annuler le point » et « Tout effacer ».
+pointillés). On choisit le bout (« À la fin » ou « Au début », repère rond), ou « Ailleurs » : un
+premier appui choisit alors un point du tracé, même en plein milieu
+(`findPortionBound`). Puis chaque appui ajoute un point relié au précédent ; « Annuler
+le point » et « Tout effacer » (qui, sans rien de dessiné, libère le point choisi).
+Depuis un point qui n'est pas un bout, `extendFromPoint` ajoute une **branche** : un
+tronçon neuf en fin de parcours, qui part d'une copie du point choisi (rupture comprise)
+et dont les heures suivent la fin du parcours ; le reste est intact.
 
 `util/TrackExtender` fabrique les points : lignes droites d'un appui à l'autre, à
 l'allure moyenne du parcours (1,2 m/s à défaut), **redécoupées toutes les 5 s au plus**
@@ -829,10 +849,10 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 230 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 237 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (15), `ExtendTrackTest` (3), `TrashTest` (4), `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (11), `KmlRoundTripTest` (2),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (4), `BearingTest` (10),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
   `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),

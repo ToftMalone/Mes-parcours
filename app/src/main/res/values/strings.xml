@@ -416,10 +416,14 @@
     <string name="extend_side_label">Où ajouter</string>
     <string name="extend_side_end">À la fin</string>
     <string name="extend_side_start">Au début</string>
-    <string name="extend_side_point">Depuis un point</string>
+    <string name="extend_side_point">Ailleurs</string>
     <string name="extend_hint_pick_point">Touchez le tracé à l\'endroit d\'où partir : n\'importe où, même en plein milieu. Le prolongement y fera une branche, le reste du parcours ne bouge pas.</string>
     <string name="extend_hint_from_point">Touchez maintenant la carte point après point le long du chemin à ajouter : le premier part du rond. « Tout effacer » sans rien de dessiné permet de choisir un autre point.</string>
     <string name="extend_hint">Zoomez sur la carte, puis touchez-la point après point le long du chemin manquant : chaque appui est relié au précédent, et le premier part du bout du parcours (le rond).</string>
+    <string name="map_search_hint">Rechercher une ville…</string>
+    <string name="map_search_not_found">Aucun lieu trouvé pour « %1$s »</string>
+    <string name="map_search_failed">Recherche impossible : le téléphone est-il connecté ?</string>
+    <string name="map_search_unavailable">La recherche de lieux n\'est pas disponible sur ce téléphone</string>
     <string name="cut_undo">Annuler le point</string>
     <string name="extend_undo">Annuler le point</string>
     <string name="extend_clear">Tout effacer</string>

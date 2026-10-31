@@ -14,6 +14,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import com.example.data.model.TrackPoint
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.util.OsmConfig
@@ -218,7 +221,20 @@ fun PortionPickerMap(
         }
     }
 
-    AndroidView(factory = { mapView }, modifier = modifier.testTag("portion_picker_map"))
+    androidx.compose.foundation.layout.Box(modifier = modifier) {
+        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize().testTag("portion_picker_map"))
+        // Taper une ville pour s'y rendre, plutôt que de faire glisser la carte jusque-là.
+        MapSearchBar(
+            onFound = { lat, lon ->
+                mapView.controller.setZoom(SEARCH_ZOOM)
+                mapView.controller.setCenter(GeoPoint(lat, lon))
+                // Un déplacement programmé doit republier la zone visible (invariant 3) :
+                // le détail du tracé y serait sinon resté celui de l'ancienne zone.
+                mapView.post { currentOnViewport.value(mapView.boundingBox) }
+            },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(10.dp)
+        )
+    }
 }
 
 /** Un rond plein, cerclé de blanc, posé sur la borne [point]. */
@@ -317,3 +333,6 @@ private fun tapRange(points: List<TrackPoint>, target: GeoPoint): Pair<Long, Lon
 
 /** Distance au tracé en deçà de laquelle un appui y pose une borne, en dp. */
 private const val TAP_TOLERANCE_DP = 40.0
+
+/** Zoom d'arrivée sur un lieu cherché : une ville entière, ses rues lisibles. */
+private const val SEARCH_ZOOM = 13.0
