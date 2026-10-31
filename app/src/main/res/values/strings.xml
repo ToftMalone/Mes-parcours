@@ -363,6 +363,11 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_3_6_a">Prolonger : touchez le tracé n\'importe où, même en plein milieu, puis dessinez la suite</string>
+    <string name="rel_2_3_6_b">Découper s\'ouvre sur la carte, sans le mode « Par tronçon » ; la portion se pose plus précisément et le tracé ne disparaît plus en zoomant</string>
+    <string name="rel_2_3_6_c">Recherche d\'une ville sur les cartes des outils</string>
+    <string name="rel_2_3_6_d">Un parcours modifié par un outil reste affiché sur la carte</string>
+    <string name="rel_2_3_6_e">L\'export KML est bien plus léger, comme celui de Google Earth</string>
     <string name="rel_2_3_5_a">Appui prolongé sur un tracé de la carte pour supprimer ce morceau (l\'ancien parcours va à la corbeille)</string>
     <string name="rel_2_3_5_b">Découper s\'ouvre directement sur « Sur la carte »</string>
     <string name="rel_2_3_5_c">La carte du découpage garde les couleurs d\'origine des tracés</string>
