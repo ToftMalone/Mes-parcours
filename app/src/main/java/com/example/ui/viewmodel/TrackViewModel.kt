@@ -517,6 +517,8 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         trackId: Long,
         taps: List<Pair<Double, Double>>,
         atEnd: Boolean,
+        /** Le point choisi sur le tracé, quand on prolonge depuis un point ; [atEnd] est alors ignoré. */
+        from: com.example.util.PortionBound? = null,
         newName: String,
         deleteSource: Boolean,
         onSuccess: (Long) -> Unit,
@@ -524,7 +526,8 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     ) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val id = repository.extendTrack(trackId, taps, atEnd, newName, deleteSource)
+                val id = if (from != null) repository.extendFromPoint(trackId, from, taps, newName, deleteSource)
+                else repository.extendTrack(trackId, taps, atEnd, newName, deleteSource)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(id) }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {

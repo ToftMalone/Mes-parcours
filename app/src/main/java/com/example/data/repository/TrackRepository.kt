@@ -1234,6 +1234,88 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     // Prolongement dessiné à la main
     // ------------------------------------------------------------------
 
+    /**
+     * Prolonge [sourceTrackId] depuis un point choisi sur le tracé, même en plein milieu
+     * — demandé par le père de l'auteur. Posé sur le premier ou le dernier point, c'est
+     * un prolongement ordinaire ([extendTrack]).
+     *
+     * Ailleurs, le tracé dessiné est une **branche** : un tronçon neuf, ajouté à la fin du
+     * parcours, qui part du point choisi (recopié, rupture comprise : aucun trait ne le
+     * relie au dernier point). Le reste du parcours ne bouge pas. Ses heures suivent la
+     * fin du parcours, pour que le temps ne recule jamais d'un point au suivant.
+     */
+    suspend fun extendFromPoint(
+        sourceTrackId: Long,
+        from: com.example.util.PortionBound,
+        taps: List<Pair<Double, Double>>,
+        newName: String,
+        deleteSource: Boolean
+    ): Long {
+        val first = trackDao.getFirstPoint(sourceTrackId)
+        val last = trackDao.getLastPoint(sourceTrackId)
+            ?: throw UserFacingStateException(R.string.err_extend_empty_track)
+        if (from.isVertex && from.point.id == last.id) return extendTrack(sourceTrackId, taps, true, newName, deleteSource)
+        if (from.isVertex && from.point.id == first?.id) return extendTrack(sourceTrackId, taps, false, newName, deleteSource)
+        val source = trackDao.getTrackById(sourceTrackId)
+            ?: throw UserFacingArgumentException(R.string.err_track_not_found)
+        if (isBeingRecorded(source)) {
+            throw UserFacingArgumentException(R.string.err_track_is_recording)
+        }
+        if (taps.isEmpty()) throw UserFacingArgumentException(R.string.err_extend_empty)
+
+        val branchStart = from.point.copy(id = 0, isDiscontinuous = true, timestamp = last.timestamp + 1_000L)
+        val added = TrackExtender.build(
+            anchor = branchStart,
+            taps = taps,
+            speedMps = TrackExtender.speedFor(source.avgSpeed),
+            forward = true,
+            trackId = 0L
+        )
+        val stats = TrackStatsAccumulator()
+        var afterId = 0L
+        while (true) {
+            val page = trackDao.getPointsPage(sourceTrackId, afterId, splitScanPageSize)
+            if (page.isEmpty()) break
+            afterId = page.last().id
+            page.forEach(stats::add)
+        }
+        stats.add(branchStart)
+        added.forEach(stats::add)
+        val result = stats.result()
+
+        return database.withTransaction {
+            val newTrackId = trackDao.insertTrack(
+                Track(
+                    name = newName,
+                    activityType = source.activityType,
+                    startTime = source.startTime,
+                    endTime = added.last().timestamp,
+                    totalDistance = result.distanceMeters,
+                    duration = result.durationSec,
+                    maxSpeed = result.maxSpeedMps,
+                    avgSpeed = result.avgSpeedMps,
+                    elevationGain = result.elevationGain,
+                    elevationLoss = result.elevationLoss,
+                    isRecording = false,
+                    isImported = source.isImported,
+                    isMerged = source.isMerged,
+                    isSelectedForMap = source.isSelectedForMap && deleteSource,
+                    sourceColor = source.sourceColor,
+                    displayColor = source.displayColor,
+                    displayWidthDp = source.displayWidthDp
+                )
+            )
+            trackDao.copyPointRangeInto(newTrackId, sourceTrackId, 0L, Long.MAX_VALUE)
+            trackDao.insertTrackPoints((listOf(branchStart) + added).map { it.copy(trackId = newTrackId) })
+            trackDao.clearFirstPointDiscontinuity(newTrackId)
+            if (deleteSource) {
+                trackDao.moveToTrash(sourceTrackId, System.currentTimeMillis())
+            }
+            invalidatePointCaches(sourceTrackId)
+            newTrackId
+        }
+    }
+
     /** Le point par lequel [trackId] se prolonge : son dernier, ou son premier. */
     suspend fun getEndPoint(trackId: Long, atEnd: Boolean): TrackPoint? =
         if (atEnd) trackDao.getLastPoint(trackId) else trackDao.getFirstPoint(trackId)

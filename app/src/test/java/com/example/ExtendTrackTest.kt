@@ -129,4 +129,40 @@ class ExtendTrackTest {
         assertTrue(failure is IllegalArgumentException)
         assertEquals("aucun point ajouté à l'original", 100, db.trackDao.getPointsForTrack(trackId).size)
     }
+
+    @Test
+    fun `prolonger depuis un point du milieu ajoute une branche, sans toucher au reste`() = runBlocking {
+        val trackId = createTrack()
+        val points = db.trackDao.getPointsForTrack(trackId)
+        val middle = points[50]
+        // 150 m vers l'est depuis le milieu.
+        val east = 5.0 + 150 / (111_320.0 * kotlin.math.cos(Math.toRadians(middle.latitude)))
+
+        val newId = repository.extendFromPoint(
+            trackId, com.example.util.PortionBound.at(middle), listOf(middle.latitude to east), "Branche", true
+        )
+
+        val result = db.trackDao.getPointsForTrack(newId)
+        assertEquals("le parcours d'origine, intact", points.map { it.timestamp }, result.take(100).map { it.timestamp })
+        val branch = result.drop(100)
+        assertTrue("la branche part du point choisi, en rupture", branch.first().isDiscontinuous)
+        assertEquals(middle.latitude, branch.first().latitude, 1e-9)
+        assertEquals(east, branch.last().longitude, 1e-7)
+        assertEquals("une seule rupture : celle de la branche", 1, result.count { it.isDiscontinuous })
+        result.zipWithNext().forEach { (a, b) -> assertTrue("heures croissantes", b.timestamp > a.timestamp) }
+        assertEquals(99 * 1.5 + 150.0, db.trackDao.getTrackById(newId)!!.totalDistance, 2.0)
+    }
+
+    @Test
+    fun `depuis le dernier point, c'est un prolongement ordinaire`() = runBlocking {
+        val trackId = createTrack()
+        val points = db.trackDao.getPointsForTrack(trackId)
+        val last = points.last()
+
+        val newId = repository.extendFromPoint(
+            trackId, com.example.util.PortionBound.at(last), listOf(last.latitude + 100 / metersPerDegLat to 5.0), "Suite", true
+        )
+
+        assertNoVisibleGap(db.trackDao.getPointsForTrack(newId).drop(1))
+    }
 }

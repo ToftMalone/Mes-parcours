@@ -1633,6 +1633,9 @@ private fun CleanTrackTool(
  * compléter la partie qui manque, comme dans Earth ». Chaque appui sur la carte ajoute
  * un point, relié au précédent ; le premier part du bout du parcours.
  */
+/** D'où part le tracé dessiné par « Prolonger ». */
+private enum class ExtendSide { END, START, POINT }
+
 @Composable
 private fun ExtendTrackTool(
     viewModel: TrackViewModel,
@@ -1648,7 +1651,11 @@ private fun ExtendTrackTool(
     var selectedTrackId by remember { mutableStateOf<Long?>(null) }
     val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
 
-    var atEnd by remember(selectedTrack?.id) { mutableStateOf(true) }
+    var side by remember(selectedTrack?.id) { mutableStateOf(ExtendSide.END) }
+    val atEnd = side != ExtendSide.START
+    // « Depuis un point » : le point du tracé choisi d'un appui, n'importe où sur lui.
+    var pointAnchor by remember(selectedTrack?.id, side) { mutableStateOf<PortionBound?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var newName by remember { mutableStateOf("") }
     // Comme le retrait d'une portion : on veut une seule trace à la fin.
     var deleteSource by remember { mutableStateOf(true) }
@@ -1662,9 +1669,10 @@ private fun ExtendTrackTool(
     var preview by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
     var detail by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
     var viewport by remember(selectedTrack?.id) { mutableStateOf<org.osmdroid.util.BoundingBox?>(null) }
-    var anchor by remember(selectedTrack?.id, atEnd) { mutableStateOf<TrackPoint?>(null) }
-    // Les appuis, du plus proche du bout au plus éloigné ; changer de bout les efface.
-    val taps = remember(selectedTrack?.id, atEnd) { mutableStateListOf<org.osmdroid.util.GeoPoint>() }
+    var endAnchor by remember(selectedTrack?.id, atEnd) { mutableStateOf<TrackPoint?>(null) }
+    val anchor = if (side == ExtendSide.POINT) pointAnchor?.point else endAnchor
+    // Les appuis, du plus proche du départ au plus éloigné ; changer de départ les efface.
+    val taps = remember(selectedTrack?.id, side, pointAnchor) { mutableStateListOf<org.osmdroid.util.GeoPoint>() }
     LaunchedEffect(selectedTrack?.id) {
         val id = selectedTrack?.id ?: return@LaunchedEffect
         val loaded = viewModel.loadPreviewPoints(id)
@@ -1673,7 +1681,7 @@ private fun ExtendTrackTool(
     }
     LaunchedEffect(selectedTrack?.id, atEnd) {
         val id = selectedTrack?.id ?: return@LaunchedEffect
-        anchor = viewModel.loadEndPoint(id, atEnd)
+        endAnchor = viewModel.loadEndPoint(id, atEnd)
     }
     LaunchedEffect(selectedTrack?.id, viewport) {
         val id = selectedTrack?.id ?: return@LaunchedEffect
@@ -1723,6 +1731,7 @@ private fun ExtendTrackTool(
                         trackId = track.id,
                         taps = taps.map { it.latitude to it.longitude },
                         atEnd = atEnd,
+                        from = if (side == ExtendSide.POINT) pointAnchor else null,
                         newName = name,
                         deleteSource = deleting,
                         onSuccess = { id ->
@@ -1755,21 +1764,34 @@ private fun ExtendTrackTool(
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             SegmentButton(
                 stringResource(R.string.extend_side_end), Icons.Rounded.Flag,
-                selected = atEnd,
-                onClick = { atEnd = true },
+                selected = side == ExtendSide.END,
+                onClick = { side = ExtendSide.END },
                 testTag = "extend_side_end",
                 modifier = Modifier.weight(1f)
             )
             SegmentButton(
                 stringResource(R.string.extend_side_start), Icons.Rounded.Flag,
-                selected = !atEnd,
-                onClick = { atEnd = false },
+                selected = side == ExtendSide.START,
+                onClick = { side = ExtendSide.START },
                 testTag = "extend_side_start",
+                modifier = Modifier.weight(1f)
+            )
+            SegmentButton(
+                stringResource(R.string.extend_side_point), Icons.Rounded.Flag,
+                selected = side == ExtendSide.POINT,
+                onClick = { side = ExtendSide.POINT },
+                testTag = "extend_side_point",
                 modifier = Modifier.weight(1f)
             )
         }
         Text(
-            stringResource(R.string.extend_hint),
+            stringResource(
+                when {
+                    side != ExtendSide.POINT -> R.string.extend_hint
+                    pointAnchor == null -> R.string.extend_hint_pick_point
+                    else -> R.string.extend_hint_from_point
+                }
+            ),
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)
@@ -1792,10 +1814,18 @@ private fun ExtendTrackTool(
                     fitPoints = fit,
                     start = anchor,
                     end = null,
-                    onTapTrack = { _, _, _, _ -> },
+                    // Depuis un point : le premier appui choisit ce point sur le tracé,
+                    // comme une borne de découpage ; les suivants dessinent.
+                    onTapTrack = { lowId, highId, tap, radius ->
+                        val trackId = selectedTrack?.id
+                        if (trackId != null) scope.launch {
+                            pointAnchor = viewModel.findPortionBound(trackId, lowId, highId, tap.latitude, tap.longitude, radius)
+                                ?: return@launch
+                        }
+                    },
                     onViewportChange = { viewport = it },
                     sketch = taps.toList(),
-                    onTapGeo = { taps.add(it) },
+                    onTapGeo = if (side == ExtendSide.POINT && pointAnchor == null) null else { geo -> taps.add(geo) },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -1814,7 +1844,10 @@ private fun ExtendTrackTool(
             SegmentButton(
                 stringResource(R.string.extend_clear), Icons.Rounded.Delete,
                 selected = false,
-                onClick = { taps.clear() },
+                onClick = {
+                    // Sans rien de dessiné, « Tout effacer » libère aussi le point choisi.
+                    if (taps.isEmpty()) pointAnchor = null else taps.clear()
+                },
                 testTag = "extend_clear",
                 modifier = Modifier.weight(1f)
             )
