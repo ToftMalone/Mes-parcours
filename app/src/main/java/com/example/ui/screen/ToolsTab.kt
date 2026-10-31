@@ -57,7 +57,6 @@ import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Merge
 import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material.icons.rounded.TimerOff
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.UnfoldMore
@@ -1024,9 +1023,11 @@ private fun SplitTrackTool(
     var selectedTrackId by remember { mutableStateOf<Long?>(null) }
     val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
 
-    var mode by remember { mutableStateOf(TrackRepository.SplitMode.SEGMENT_BREAKS) }
-    // Troisième mode, demandé par le père de l'auteur : désigner sur la carte la
-    // portion à retirer. Les deux autres coupent sans rien perdre ; celui-ci retire.
+    // « Par tronçon » a été retiré à la demande de l'auteur : on découpe sur la carte, ou
+    // à chaque pause. Le mode reste celui de `splitTrack`, qui sait toujours les deux.
+    val mode = TrackRepository.SplitMode.TIME_GAP
+    // Demandé par le père de l'auteur : désigner sur la carte la portion à retirer.
+    // Le découpage par pause coupe sans rien perdre ; celui-ci retire.
     // C'est le mode ouvert d'office, à sa demande : c'est celui dont il se sert.
     var onMap by remember { mutableStateOf(true) }
     var pauseIndex by remember { mutableIntStateOf(PAUSE_STEPS_MINUTES.indexOf(30)) }
@@ -1079,8 +1080,7 @@ private fun SplitTrackTool(
         busySubtitle = stringResource(
             when {
                 onMap -> R.string.cut_busy
-                mode == TrackRepository.SplitMode.TIME_GAP -> R.string.split_busy_gap
-                else -> R.string.split_busy_segments
+                else -> R.string.split_busy_gap
             }
         ),
         doneActions = {
@@ -1161,26 +1161,19 @@ private fun SplitTrackTool(
         SectionLabel(stringResource(R.string.split_mode_label))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             SegmentButton(
-                stringResource(R.string.split_mode_segments), Icons.Rounded.Splitscreen,
-                selected = !onMap && mode == TrackRepository.SplitMode.SEGMENT_BREAKS,
-                onClick = { if (onMap) deleteSource = false; onMap = false; mode = TrackRepository.SplitMode.SEGMENT_BREAKS },
-                testTag = "split_mode_segments",
-                modifier = Modifier.weight(1f)
-            )
-            SegmentButton(
-                stringResource(R.string.split_mode_gap), Icons.Rounded.Coffee,
-                selected = !onMap && mode == TrackRepository.SplitMode.TIME_GAP,
-                onClick = { if (onMap) deleteSource = false; onMap = false; mode = TrackRepository.SplitMode.TIME_GAP },
-                testTag = "split_mode_gap",
-                modifier = Modifier.weight(1f)
-            )
-            SegmentButton(
                 stringResource(R.string.split_mode_map), Icons.Rounded.Map,
                 selected = onMap,
                 // Retirer une portion remplace le parcours : l'original est supprimé d'office,
                 // la case reste là pour le garder.
                 onClick = { if (!onMap) deleteSource = true; onMap = true },
                 testTag = "split_mode_map",
+                modifier = Modifier.weight(1f)
+            )
+            SegmentButton(
+                stringResource(R.string.split_mode_gap), Icons.Rounded.Coffee,
+                selected = !onMap,
+                onClick = { if (onMap) deleteSource = false; onMap = false },
+                testTag = "split_mode_gap",
                 modifier = Modifier.weight(1f)
             )
         }
@@ -1206,13 +1199,6 @@ private fun SplitTrackTool(
                     resolve
                 },
                 viewModel = viewModel
-            )
-        } else if (mode == TrackRepository.SplitMode.SEGMENT_BREAKS) {
-            Text(
-                stringResource(R.string.split_hint_segments),
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 10.dp)
             )
         } else {
             Column(
@@ -1633,9 +1619,6 @@ private fun CleanTrackTool(
  * compléter la partie qui manque, comme dans Earth ». Chaque appui sur la carte ajoute
  * un point, relié au précédent ; le premier part du bout du parcours.
  */
-/** D'où part le tracé dessiné par « Prolonger ». */
-private enum class ExtendSide { END, START, POINT }
-
 @Composable
 private fun ExtendTrackTool(
     viewModel: TrackViewModel,
@@ -1651,10 +1634,10 @@ private fun ExtendTrackTool(
     var selectedTrackId by remember { mutableStateOf<Long?>(null) }
     val selectedTrack = eligibleTracks.find { it.id == selectedTrackId } ?: eligibleTracks.firstOrNull()
 
-    var side by remember(selectedTrack?.id) { mutableStateOf(ExtendSide.END) }
-    val atEnd = side != ExtendSide.START
-    // « Depuis un point » : le point du tracé choisi d'un appui, n'importe où sur lui.
-    var pointAnchor by remember(selectedTrack?.id, side) { mutableStateOf<PortionBound?>(null) }
+    // Le point d'où l'on prolonge, choisi d'un appui n'importe où sur le tracé : plus de
+    // choix « au début » ou « à la fin », à la demande de l'auteur ; toucher un bout
+    // revient au même.
+    var pointAnchor by remember(selectedTrack?.id) { mutableStateOf<PortionBound?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var newName by remember { mutableStateOf("") }
     // Comme le retrait d'une portion : on veut une seule trace à la fin.
@@ -1669,19 +1652,14 @@ private fun ExtendTrackTool(
     var preview by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
     var detail by remember(selectedTrack?.id) { mutableStateOf<List<TrackPoint>?>(null) }
     var viewport by remember(selectedTrack?.id) { mutableStateOf<org.osmdroid.util.BoundingBox?>(null) }
-    var endAnchor by remember(selectedTrack?.id, atEnd) { mutableStateOf<TrackPoint?>(null) }
-    val anchor = if (side == ExtendSide.POINT) pointAnchor?.point else endAnchor
+    val anchor = pointAnchor?.point
     // Les appuis, du plus proche du départ au plus éloigné ; changer de départ les efface.
-    val taps = remember(selectedTrack?.id, side, pointAnchor) { mutableStateListOf<org.osmdroid.util.GeoPoint>() }
+    val taps = remember(selectedTrack?.id, pointAnchor) { mutableStateListOf<org.osmdroid.util.GeoPoint>() }
     LaunchedEffect(selectedTrack?.id) {
         val id = selectedTrack?.id ?: return@LaunchedEffect
         val loaded = viewModel.loadPreviewPoints(id)
         preview = loaded
         if (detail == null) detail = loaded
-    }
-    LaunchedEffect(selectedTrack?.id, atEnd) {
-        val id = selectedTrack?.id ?: return@LaunchedEffect
-        endAnchor = viewModel.loadEndPoint(id, atEnd)
     }
     LaunchedEffect(selectedTrack?.id, viewport) {
         val id = selectedTrack?.id ?: return@LaunchedEffect
@@ -1730,8 +1708,8 @@ private fun ExtendTrackTool(
                     viewModel.extendTrack(
                         trackId = track.id,
                         taps = taps.map { it.latitude to it.longitude },
-                        atEnd = atEnd,
-                        from = if (side == ExtendSide.POINT) pointAnchor else null,
+                        atEnd = true,
+                        from = pointAnchor,
                         newName = name,
                         deleteSource = deleting,
                         onSuccess = { id ->
@@ -1760,37 +1738,9 @@ private fun ExtendTrackTool(
             onClick = { picking = true }
         )
 
-        SectionLabel(stringResource(R.string.extend_side_label))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            SegmentButton(
-                stringResource(R.string.extend_side_end), Icons.Rounded.Flag,
-                selected = side == ExtendSide.END,
-                onClick = { side = ExtendSide.END },
-                testTag = "extend_side_end",
-                modifier = Modifier.weight(1f)
-            )
-            SegmentButton(
-                stringResource(R.string.extend_side_start), Icons.Rounded.Flag,
-                selected = side == ExtendSide.START,
-                onClick = { side = ExtendSide.START },
-                testTag = "extend_side_start",
-                modifier = Modifier.weight(1f)
-            )
-            SegmentButton(
-                stringResource(R.string.extend_side_point), Icons.Rounded.Flag,
-                selected = side == ExtendSide.POINT,
-                onClick = { side = ExtendSide.POINT },
-                testTag = "extend_side_point",
-                modifier = Modifier.weight(1f)
-            )
-        }
         Text(
             stringResource(
-                when {
-                    side != ExtendSide.POINT -> R.string.extend_hint
-                    pointAnchor == null -> R.string.extend_hint_pick_point
-                    else -> R.string.extend_hint_from_point
-                }
+                if (pointAnchor == null) R.string.extend_hint_pick_point else R.string.extend_hint_from_point
             ),
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1825,7 +1775,7 @@ private fun ExtendTrackTool(
                     },
                     onViewportChange = { viewport = it },
                     sketch = taps.toList(),
-                    onTapGeo = if (side == ExtendSide.POINT && pointAnchor == null) null else { geo -> taps.add(geo) },
+                    onTapGeo = if (pointAnchor == null) null else { geo -> taps.add(geo) },
                     modifier = Modifier.fillMaxSize()
                 )
             }

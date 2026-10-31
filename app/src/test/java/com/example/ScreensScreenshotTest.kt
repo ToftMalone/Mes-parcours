@@ -344,7 +344,7 @@ class ScreensScreenshotTest {
     @Test fun outils_prolonger() {
         seed(); tools(true); waitForTag("tools_tab")
         compose.onNodeWithTag("open_extend_tool_button").performScrollTo().performClick()
-        waitForTag("extend_side_end")
+        waitForTag("extend_undo")
         shoot("outils_prolonger", true)
     }
 

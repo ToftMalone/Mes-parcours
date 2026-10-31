@@ -358,8 +358,10 @@ enregistrement oublié) et l'absence de trou visible.
 
 ### Retirer une portion choisie sur la carte
 
-Troisième mode de « Découper », demandé par le père de l'auteur : « Sur la carte ».
-C'est le mode ouvert d'office (« Supprimer l'original » coché avec lui), à sa demande.
+Mode de « Découper » demandé par le père de l'auteur : « Sur la carte ». C'est le mode
+ouvert d'office (« Supprimer l'original » coché avec lui), le premier des deux ; **« Par
+tronçon » a été retiré de l'interface** à la demande de l'auteur (`SplitMode.SEGMENT_BREAKS`
+reste dans le dépôt, testé, mais plus aucun écran ne le propose), « Par pause » demeure.
 Le tracé y garde ses couleurs, résolues comme sur la carte principale (`colorOf` de
 `PortionPickerMap` : `displayColor`, sinon `segmentColor`, sinon la couleur du
 parcours) ; la portion rouge porte un liseré blanc pour rester visible sur un tracé
@@ -447,9 +449,9 @@ Demandé par le père de l'auteur : « si j'ai arrêté ma trace trop tôt, cré
 manuellement sur la carte pour compléter la partie qui manque, comme dans Earth ».
 `ExtendTrackTool` reprend la carte de « Sur la carte » (`PortionPickerMap`, avec
 `onTapGeo` : l'appui renvoie l'endroit touché, et `sketch`, le tracé dessiné en
-pointillés). On choisit le bout (« À la fin » ou « Au début », repère rond), ou « Ailleurs » : un
-premier appui choisit alors un point du tracé, même en plein milieu
-(`findPortionBound`). Puis chaque appui ajoute un point relié au précédent ; « Annuler
+pointillés). **Plus de choix « Au début » / « À la fin »**, retirés à la demande de l'auteur : un
+premier appui choisit le point de départ n'importe où sur le tracé, bout ou milieu
+(`findPortionBound`, repère rond). Puis chaque appui ajoute un point relié au précédent ; « Annuler
 le point » et « Tout effacer » (qui, sans rien de dessiné, libère le point choisi).
 Depuis un point qui n'est pas un bout, `extendFromPoint` ajoute une **branche** : un
 tronçon neuf en fin de parcours, qui part d'une copie du point choisi (rupture comprise)

@@ -506,12 +506,6 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             repository.getPreviewPoints(trackId)
         }
 
-    /** Le point par lequel un parcours se prolonge (voir [TrackRepository.extendTrack]). */
-    suspend fun loadEndPoint(trackId: Long, atEnd: Boolean): com.example.data.model.TrackPoint? =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            repository.getEndPoint(trackId, atEnd)
-        }
-
     /** Prolonge un parcours d'un tracé dessiné sur la carte. */
     fun extendTrack(
         trackId: Long,
