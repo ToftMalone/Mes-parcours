@@ -37,6 +37,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddLocationAlt
 import androidx.compose.material.icons.rounded.Close
@@ -47,6 +48,9 @@ import androidx.compose.material.icons.rounded.LocationDisabled
 import androidx.compose.material.icons.rounded.LocationOff
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Route
@@ -97,7 +101,9 @@ import com.example.data.model.LiveStats
 import com.example.data.model.Track
 import com.example.ui.component.CookieShape
 import com.example.ui.component.LocalAppMessenger
+import com.example.ui.component.GoToRequest
 import com.example.ui.component.MapViewContainer
+import com.example.ui.component.PlaceSearchDialog
 import com.example.ui.component.MpDialog
 import kotlinx.coroutines.launch
 import com.example.ui.component.MpSheet
@@ -151,6 +157,9 @@ fun TrackingTab(
     var showResumePicker by remember { mutableStateOf(false) }
 
     var recenterTrigger by remember { mutableIntStateOf(0) }
+    var goTo by remember { mutableStateOf<GoToRequest?>(null) }
+    var toolsExpanded by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     var isAutoFollowActive by remember { mutableStateOf(viewModel.isAutoFollowActiveMap) }
     LaunchedEffect(isAutoFollowActive) {
         viewModel.isAutoFollowActiveMap = isAutoFollowActive
@@ -265,7 +274,8 @@ fun TrackingTab(
             onViewportChanged = { viewModel.updateMapViewport(it) },
             onLongPressTrack = { trackId, pointId ->
                 scope.launch { segmentToDelete = viewModel.findSegment(trackId, pointId) }
-            }
+            },
+            goTo = goTo
         )
 
         // --- Haut de l'écran : la carte de statistiques, à la place qu'occupait
@@ -344,6 +354,30 @@ fun TrackingTab(
                     .navigationBarsPadding()
                     .padding(end = 20.dp, bottom = 108.dp)
             ) {
+                // Outils de la carte, repliés par défaut : la flèche déploie la liste, qui ne
+                // contient pour l'instant que la recherche d'un lieu.
+                AnimatedVisibility(visible = toolsExpanded) {
+                    RoundButton(
+                        icon = Icons.Rounded.Search,
+                        description = stringResource(R.string.action_search_place),
+                        size = 48.dp,
+                        iconSize = 22.dp,
+                        container = MaterialTheme.colorScheme.surfaceContainerLow,
+                        content = MaterialTheme.colorScheme.primary,
+                        testTag = "map_search_button",
+                        onClick = { showSearch = true }
+                    )
+                }
+                RoundButton(
+                    icon = if (toolsExpanded) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.KeyboardArrowUp,
+                    description = stringResource(if (toolsExpanded) R.string.action_map_tools_hide else R.string.action_map_tools_show),
+                    size = 40.dp,
+                    iconSize = 24.dp,
+                    container = MaterialTheme.colorScheme.surfaceContainerLow,
+                    content = MaterialTheme.colorScheme.onSurfaceVariant,
+                    testTag = "map_tools_toggle",
+                    onClick = { toolsExpanded = !toolsExpanded }
+                )
                 if (currentUserLocation != null || livePoints.isNotEmpty()) {
                     RoundButton(
                         icon = Icons.Rounded.MyLocation,
@@ -381,6 +415,18 @@ fun TrackingTab(
         } else {
             PermissionDeniedOverlay(onGrantClick = onRequestPermission)
         }
+    }
+
+    if (showSearch) {
+        PlaceSearchDialog(
+            onDismiss = { showSearch = false },
+            onFound = { lat, lon ->
+                showSearch = false
+                isAutoFollowActive = false
+                toolsExpanded = false
+                goTo = GoToRequest(lat, lon)
+            }
+        )
     }
 
     // Appui prolongé sur un tracé de la carte : on confirme avant de retirer le morceau,

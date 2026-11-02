@@ -418,7 +418,8 @@ fun MapViewContainer(
      * Appui prolongé sur un tracé superposé : le parcours touché et un point du tronçon
      * le plus proche. Null : l'appui prolongé ne fait rien.
      */
-    onLongPressTrack: ((trackId: Long, pointId: Long) -> Unit)? = null
+    onLongPressTrack: ((trackId: Long, pointId: Long) -> Unit)? = null,
+    goTo: GoToRequest? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scheme = MaterialTheme.colorScheme
@@ -708,6 +709,18 @@ fun MapViewContainer(
     // changerait pas), mais la garde ne porte que sur `isAutoFollowActive` : sinon
     // l'effet se rejouait aussi au moment où le mode focus s'éteint, donc juste après le
     // geste manuel qui vient de le désengager.
+    // Recherche d'un lieu : la carte s'y rend, au zoom de la recherche. Piloté par un effet
+    // (jamais par `update`, qui rejouerait le déplacement à chaque recomposition) ; la zone
+    // visible est republiée, un déplacement programmatique n'en produisant pas (invariant 3).
+    LaunchedEffect(goTo) {
+        if (goTo == null) return@LaunchedEffect
+        mapView.controller.setZoom(GO_TO_ZOOM)
+        mapView.controller.setCenter(GeoPoint(goTo.latitude, goTo.longitude))
+        kotlinx.coroutines.delay(RECENTER_SETTLE_MS)
+        reportViewport(mapView, onViewportChanged)
+        onMapStateChanged(mapView.mapCenter.latitude, mapView.mapCenter.longitude, mapView.zoomLevelDouble)
+    }
+
     LaunchedEffect(recenterTrigger, isAutoFollowActive) {
         if (isAutoFollowActive) {
             if (mapView.zoomLevelDouble < ZOOM_THRESHOLD) {
@@ -1445,3 +1458,8 @@ private fun trackLongPressDetector(
         detector.onTouchEvent(event)
     }
 }
+
+/** Demande d'aller à un lieu ; [id] distingue deux demandes vers le même endroit. */
+data class GoToRequest(val latitude: Double, val longitude: Double, val id: Long = System.nanoTime())
+
+private const val GO_TO_ZOOM = 13.0

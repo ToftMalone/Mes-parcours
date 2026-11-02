@@ -439,6 +439,13 @@
     <string name="extend_background_subtitle">Pour se repérer : elles s\'affichent en fond, et seule la trace choisie est prolongée.</string>
     <string name="extend_hint_pick_point">Touchez le tracé à l\'endroit d\'où partir : un bout, ou n\'importe où, même en plein milieu (le prolongement y fera une branche, le reste du parcours ne bouge pas).</string>
     <string name="extend_hint_from_point">Touchez maintenant la carte point après point le long du chemin à ajouter : le premier part du rond. « Tout effacer » sans rien de dessiné permet de choisir un autre point.</string>
+    <string name="action_search_place">Rechercher un lieu</string>
+    <string name="action_map_tools_show">Afficher les outils de la carte</string>
+    <string name="action_map_tools_hide">Replier les outils de la carte</string>
+    <string name="place_search_title">Rechercher un lieu</string>
+    <string name="place_search_hint">Adresse, ville, lieu…</string>
+    <string name="place_search_go">Aller</string>
+    <string name="place_search_running">Recherche…</string>
     <string name="map_search_hint">Rechercher une ville…</string>
     <string name="map_search_not_found">Aucun lieu trouvé pour « %1$s »</string>
     <string name="map_search_failed">Recherche impossible : le téléphone est-il connecté ?</string>

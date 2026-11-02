@@ -391,8 +391,13 @@ qui défile : elle se réserve chaque geste commencé sur elle
 
 **Recherche d'un lieu** (`ui/component/MapSearchBar`), en haut des cartes des outils :
 on tape une ville, la carte s'y rend (zoom 13) et republie sa zone. `Geocoder` d'Android :
-seul le texte tapé part vers le service du téléphone, jamais la position. Pas sur la carte
-principale (à la demande de l'auteur), ni sur celle de la fiche détail, qui ne se manipule pas.
+seul le texte tapé part vers le service du téléphone, jamais la position. Pas de champ affiché sur la carte
+principale, ni sur celle de la fiche détail, qui ne se manipule pas. La carte principale
+a la même recherche **derrière un bouton déployable** (demandé par l'auteur) : une petite
+flèche (40 dp) au-dessus de Recentrer déploie une liste (pour l'instant la seule loupe,
+48 dp) qui ouvre `PlaceSearchDialog` ; le lieu trouvé coupe le suivi et la carte s'y rend
+(`GoToRequest`, effet de `MapViewContainer` qui republie la zone visible). `searchPlace`
+(`MapSearchBar.kt`) porte le `Geocoder` pour les deux.
 
 **Le détail suit le zoom.** Un aperçu fixe (3 000 points au plus) coupait les virages en
 lignes droites dès qu'on zoomait. `TrackRepository.getPickerPoints` relit donc les points

@@ -66,26 +66,12 @@ fun MapSearchBar(
     val search: () -> Unit = search@{
         val text = query.trim()
         if (text.isEmpty() || searching) return@search
-        if (!Geocoder.isPresent()) {
-            messenger.show(context.getString(R.string.map_search_unavailable), Icons.Rounded.SearchOff, isError = true)
-            return@search
-        }
         focus.clearFocus()
         searching = true
         scope.launch {
-            val found = withContext(Dispatchers.IO) {
-                runCatching {
-                    @Suppress("DEPRECATION")
-                    Geocoder(context, Locale.FRANCE).getFromLocationName(text, 1)?.firstOrNull()
-                }
-            }
+            val address = searchPlace(context, messenger, text)
             searching = false
-            val address = found.getOrNull()
-            when {
-                found.isFailure -> messenger.show(context.getString(R.string.map_search_failed), Icons.Rounded.SearchOff, isError = true)
-                address == null -> messenger.show(context.getString(R.string.map_search_not_found, text), Icons.Rounded.SearchOff, isError = true)
-                else -> onFound(address.latitude, address.longitude)
-            }
+            if (address != null) onFound(address.latitude, address.longitude)
         }
     }
 
@@ -123,4 +109,29 @@ fun MapSearchBar(
                 .testTag("map_search_field")
         )
     }
+}
+
+/**
+ * Cherche [text] auprès du `Geocoder` d'Android et renvoie le premier lieu trouvé. Les
+ * échecs (service absent, pas de réseau, rien de trouvé) sont dits à l'utilisateur ici même
+ * et donnent null : la barre des outils et la fenêtre de la carte principale partagent ainsi
+ * le même comportement.
+ */
+suspend fun searchPlace(context: android.content.Context, messenger: AppMessenger, text: String): android.location.Address? {
+    if (!Geocoder.isPresent()) {
+        messenger.show(context.getString(R.string.map_search_unavailable), Icons.Rounded.SearchOff, isError = true)
+        return null
+    }
+    val found = withContext(Dispatchers.IO) {
+        runCatching {
+            @Suppress("DEPRECATION")
+            Geocoder(context, Locale.FRANCE).getFromLocationName(text, 1)?.firstOrNull()
+        }
+    }
+    val address = found.getOrNull()
+    when {
+        found.isFailure -> messenger.show(context.getString(R.string.map_search_failed), Icons.Rounded.SearchOff, isError = true)
+        address == null -> messenger.show(context.getString(R.string.map_search_not_found, text), Icons.Rounded.SearchOff, isError = true)
+    }
+    return address
 }
