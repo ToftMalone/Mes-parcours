@@ -1199,6 +1199,7 @@ private fun SplitTrackTool(
                     val resolve: (TrackPoint) -> Int = { forced ?: it.segmentColor ?: base }
                     resolve
                 },
+                allTracks = tracks,
                 viewModel = viewModel
             )
         } else {
@@ -1298,8 +1299,28 @@ private fun CutOnMapSection(
     onEndChange: (PortionBound?) -> Unit,
     onViewportChange: (org.osmdroid.util.BoundingBox) -> Unit,
     colorOf: (TrackPoint) -> Int,
+    allTracks: List<com.example.data.model.Track>,
     viewModel: TrackViewModel
 ) {
+    // D'autres parcours en fond pour se repérer, comme dans « Prolonger » (même choix,
+    // gardé par le ViewModel) : les appuis les ignorent, seul le parcours choisi est coupé.
+    var choosingBackground by remember { mutableStateOf(false) }
+    var viewport by remember { mutableStateOf<org.osmdroid.util.BoundingBox?>(null) }
+    val backgroundIds = viewModel.extendBackgroundIds.filter { it != trackId }
+    var backgroundPoints by remember { mutableStateOf<Map<Long, List<TrackPoint>>>(emptyMap()) }
+    LaunchedEffect(backgroundIds, viewport) {
+        val box = viewport ?: return@LaunchedEffect
+        backgroundPoints = backgroundIds.associateWith { id ->
+            viewModel.loadPickerPoints(id, box.latSouth, box.latNorth, box.lonWest, box.lonEast)
+        }
+    }
+    val backgroundTracks = backgroundIds.mapNotNull { id ->
+        val other = allTracks.find { it.id == id } ?: return@mapNotNull null
+        val shown = backgroundPoints[id] ?: return@mapNotNull null
+        val base = TrackStylePreferences.resolveTrackColor(null, other.sourceColor, other.isImported, other.isMerged)
+        val forced = other.displayColor
+        com.example.ui.component.BackgroundTrack(shown) { forced ?: it.segmentColor ?: base }
+    }
     // Vrai tant que le prochain appui doit poser le début ; il passe tout seul à la fin.
     var placingStart by remember(trackId) { mutableStateOf(true) }
     // Chaque borne posée, avec celle qu'elle remplaçait : « Annuler le point » revient
@@ -1383,9 +1404,36 @@ private fun CutOnMapSection(
                             if (placing) onStartChange(bound) else onEndChange(bound)
                         }
                     },
-                    onViewportChange = onViewportChange,
+                    onViewportChange = { viewport = it; onViewportChange(it) },
+                    backgroundTracks = backgroundTracks,
                     modifier = Modifier.fillMaxSize()
                 )
+            }
+        }
+        SegmentButton(
+            if (backgroundIds.isEmpty()) stringResource(R.string.extend_background_none)
+            else pluralStringResource(R.plurals.extend_background_some, backgroundIds.size, backgroundIds.size),
+            Icons.Rounded.Layers,
+            selected = backgroundIds.isNotEmpty(),
+            onClick = { choosingBackground = true },
+            testTag = "cut_background",
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+        )
+        if (choosingBackground) {
+            MpSheet(onDismissRequest = { choosingBackground = false }) {
+                SheetHeader(stringResource(R.string.extend_background_title), stringResource(R.string.cut_background_subtitle))
+                Spacer(modifier = Modifier.height(14.dp))
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())
+                ) {
+                    allTracks.filter { it.id != trackId && !it.isRecording }.sortedByDescending { it.startTime }.forEach { other ->
+                        val chosen = other.id in viewModel.extendBackgroundIds
+                        MergeTrackRow(other, chosen) {
+                            if (chosen) viewModel.extendBackgroundIds.remove(other.id) else viewModel.extendBackgroundIds.add(other.id)
+                        }
+                    }
+                }
             }
         }
         if (start != null && end != null && start.compareTo(end) != 0) {

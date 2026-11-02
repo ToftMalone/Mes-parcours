@@ -435,6 +435,7 @@
         <item quantity="one">%1$d autre trace affichée</item>
         <item quantity="other">%1$d autres traces affichées</item>
     </plurals>
+    <string name="cut_background_subtitle">Pour se repérer : elles s\'affichent en fond, et seule la trace choisie est coupée.</string>
     <string name="extend_background_title">Autres traces à afficher</string>
     <string name="extend_background_subtitle">Pour se repérer : elles s\'affichent en fond, et seule la trace choisie est prolongée.</string>
     <string name="extend_hint_pick_point">Touchez le tracé à l\'endroit d\'où partir : un bout, ou n\'importe où, même en plein milieu (le prolongement y fera une branche, le reste du parcours ne bouge pas).</string>

@@ -465,7 +465,7 @@ manuellement sur la carte pour compléter la partie qui manque, comme dans Earth
 `onTapGeo` : l'appui renvoie l'endroit touché, et `sketch`, le tracé dessiné en
 pointillés). **Plus de choix « Au début » / « À la fin »**, retirés à la demande de l'auteur : un
 premier appui choisit le point de départ n'importe où sur le tracé, bout ou milieu
-(`findPortionBound`, repère rond). « Afficher d'autres traces » ouvre une liste à cocher :
+(`findPortionBound`, repère rond). « Afficher d'autres traces » (le même choix, et le même bouton, sous la carte de « Découper > Sur la carte ») ouvre une liste à cocher :
 ces parcours sont dessinés en fond, fins et en transparence (`backgroundTracks`), pour se
 repérer ; les appuis les ignorent et seul le parcours choisi est prolongé. Le choix est
 gardé tant que l'application vit (`TrackViewModel.extendBackgroundIds`).
