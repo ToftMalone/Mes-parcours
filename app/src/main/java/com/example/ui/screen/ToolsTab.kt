@@ -1061,16 +1061,13 @@ private fun SplitTrackTool(
             viewModel.loadPickerPoints(id, box.latSouth, box.latNorth, box.lonWest, box.lonEast)
         }
     }
-    // Gardée tant que ni les points ni les parcours ne changent : une liste neuve à chaque
-    // recomposition (ses couleurs sont des lambdas, jamais égales entre deux passages)
-    // faisait redessiner tous les tracés de la carte à chaque fois, d'où des à-coups au zoom.
-    val backgroundTracks = remember(backgroundIds, backgroundPoints, tracks) { backgroundIds.mapNotNull { id ->
+    val backgroundTracks = backgroundIds.mapNotNull { id ->
         val other = tracks.find { it.id == id } ?: return@mapNotNull null
         val shown = backgroundPoints[id] ?: return@mapNotNull null
         val base = TrackStylePreferences.resolveTrackColor(null, other.sourceColor, other.isImported, other.isMerged)
         val forced = other.displayColor
         com.example.ui.component.BackgroundTrack(shown) { forced ?: it.segmentColor ?: base }
-    } }
+    }
     var cutStart by remember(selectedTrack?.id) { mutableStateOf<PortionBound?>(null) }
     var cutEnd by remember(selectedTrack?.id) { mutableStateOf<PortionBound?>(null) }
     LaunchedEffect(selectedTrack?.id, onMap) {
@@ -1733,16 +1730,13 @@ private fun ExtendTrackTool(
             viewModel.loadPickerPoints(id, box.latSouth, box.latNorth, box.lonWest, box.lonEast)
         }
     }
-    // Gardée tant que ni les points ni les parcours ne changent : une liste neuve à chaque
-    // recomposition (ses couleurs sont des lambdas, jamais égales entre deux passages)
-    // faisait redessiner tous les tracés de la carte à chaque fois, d'où des à-coups au zoom.
-    val backgroundTracks = remember(backgroundIds, backgroundPoints, tracks) { backgroundIds.mapNotNull { id ->
+    val backgroundTracks = backgroundIds.mapNotNull { id ->
         val other = tracks.find { it.id == id } ?: return@mapNotNull null
         val shown = backgroundPoints[id] ?: return@mapNotNull null
         val base = TrackStylePreferences.resolveTrackColor(null, other.sourceColor, other.isImported, other.isMerged)
         val forced = other.displayColor
         com.example.ui.component.BackgroundTrack(shown) { forced ?: it.segmentColor ?: base }
-    } }
+    }
 
     val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
         ToolPhase.Need(stringResource(R.string.extend_need_title), stringResource(R.string.extend_need_body))
