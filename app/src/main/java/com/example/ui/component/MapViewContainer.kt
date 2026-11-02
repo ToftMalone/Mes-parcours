@@ -895,12 +895,28 @@ fun rememberMapViewWithLifecycle(
              */
             private var lastPersistedAt = 0L
 
-            private fun persistMapStateThrottled() {
-                val now = android.os.SystemClock.elapsedRealtime()
-                if (now - lastPersistedAt < MAP_STATE_PERSIST_MS) return
-                lastPersistedAt = now
+            /**
+             * Le rattrapage de la dernière position : sans lui, la position retenue était
+             * celle du milieu du dernier geste, jamais celle où l'on s'arrête. Ça ne se
+             * voyait qu'au lancement suivant ; depuis que les cartes des outils s'ouvrent
+             * là où regardait la carte principale, ça se verrait à chaque fois.
+             */
+            private val persistLast = Runnable { persistNow() }
+
+            private fun persistNow() {
+                lastPersistedAt = android.os.SystemClock.elapsedRealtime()
                 val centerPt = map.mapCenter
                 onMapStateChanged(centerPt.latitude, centerPt.longitude, map.zoomLevelDouble)
+            }
+
+            private fun persistMapStateThrottled() {
+                map.removeCallbacks(persistLast)
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastPersistedAt < MAP_STATE_PERSIST_MS) {
+                    map.postDelayed(persistLast, MAP_STATE_PERSIST_MS)
+                    return
+                }
+                persistNow()
             }
 
             override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {

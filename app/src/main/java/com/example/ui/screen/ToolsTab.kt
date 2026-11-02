@@ -37,6 +37,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.Icons
 import com.example.data.model.TrackPoint
 import com.example.ui.component.PortionPickerMap
@@ -1188,7 +1190,6 @@ private fun SplitTrackTool(
                 onEndChange = { cutEnd = it },
                 onViewportChange = {
                     viewport = it
-                    viewModel.pickerViewports[track.id] = it
                 },
                 colorOf = remember(track.displayColor, track.sourceColor, track.isImported, track.isMerged) {
                     // Même résolution qu'au dessin de la carte principale : la couleur
@@ -1305,9 +1306,9 @@ private fun CutOnMapSection(
     // en arrière sans quitter la carte, donc sans perdre le zoom. Demandé par le père
     // de l'auteur, qui devait ressortir de l'outil pour reprendre un point mal placé.
     val placed = remember(trackId) { androidx.compose.runtime.mutableStateListOf<Pair<Boolean, PortionBound?>>() }
-    // La zone regardée la dernière fois sur ce parcours : ressortir de l'outil ne fait
-    // pas perdre le zoom.
-    val resumedBox = remember(trackId) { viewModel.pickerViewports[trackId] }
+    // La carte s'ouvre là où regardait la dernière carte (principale comprise), et
+    // mémorise à son tour où l'on va : ressortir de l'outil ne fait pas perdre le zoom.
+    val camera = remember(trackId) { viewModel.mapCamera }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val none = stringResource(R.string.cut_unset)
     Column(modifier = Modifier.padding(top = 12.dp)) {
@@ -1362,7 +1363,8 @@ private fun CutOnMapSection(
                     fitPoints = fitPoints,
                     start = start?.point,
                     end = end?.point,
-                    initialBox = resumedBox,
+                    initialCamera = camera,
+                    onCameraChange = { viewModel.mapCamera = it },
                     colorOf = colorOf,
                     cut = if (start != null && end != null && start.compareTo(end) != 0) {
                         if (start < end) start to end else end to start
@@ -1666,6 +1668,25 @@ private fun ExtendTrackTool(
         val box = viewport ?: return@LaunchedEffect
         detail = viewModel.loadPickerPoints(id, box.latSouth, box.latNorth, box.lonWest, box.lonEast)
     }
+    // D'autres parcours affichés en fond pour se repérer, sans qu'on y touche : demandé
+    // par l'auteur. Seul le parcours choisi est prolongé ; les appuis ignorent ceux-là.
+    val camera = remember(selectedTrack?.id) { viewModel.mapCamera }
+    var choosingBackground by remember { mutableStateOf(false) }
+    val backgroundIds = viewModel.extendBackgroundIds.filter { it != selectedTrack?.id }
+    var backgroundPoints by remember { mutableStateOf<Map<Long, List<TrackPoint>>>(emptyMap()) }
+    LaunchedEffect(backgroundIds, viewport) {
+        val box = viewport ?: return@LaunchedEffect
+        backgroundPoints = backgroundIds.associateWith { id ->
+            viewModel.loadPickerPoints(id, box.latSouth, box.latNorth, box.lonWest, box.lonEast)
+        }
+    }
+    val backgroundTracks = backgroundIds.mapNotNull { id ->
+        val other = tracks.find { it.id == id } ?: return@mapNotNull null
+        val shown = backgroundPoints[id] ?: return@mapNotNull null
+        val base = TrackStylePreferences.resolveTrackColor(null, other.sourceColor, other.isImported, other.isMerged)
+        val forced = other.displayColor
+        com.example.ui.component.BackgroundTrack(shown) { forced ?: it.segmentColor ?: base }
+    }
 
     val shownPhase = if (phase == ToolPhase.Form && selectedTrack == null) {
         ToolPhase.Need(stringResource(R.string.extend_need_title), stringResource(R.string.extend_need_body))
@@ -1738,6 +1759,15 @@ private fun ExtendTrackTool(
             onClick = { picking = true }
         )
 
+        SegmentButton(
+            if (backgroundIds.isEmpty()) stringResource(R.string.extend_background_none)
+            else pluralStringResource(R.plurals.extend_background_some, backgroundIds.size, backgroundIds.size),
+            Icons.Rounded.Layers,
+            selected = backgroundIds.isNotEmpty(),
+            onClick = { choosingBackground = true },
+            testTag = "extend_background",
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+        )
         Text(
             stringResource(
                 if (pointAnchor == null) R.string.extend_hint_pick_point else R.string.extend_hint_from_point
@@ -1776,6 +1806,9 @@ private fun ExtendTrackTool(
                     onViewportChange = { viewport = it },
                     sketch = taps.toList(),
                     onTapGeo = if (pointAnchor == null) null else { geo -> taps.add(geo) },
+                    initialCamera = camera,
+                    onCameraChange = { viewModel.mapCamera = it },
+                    backgroundTracks = backgroundTracks,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -1837,6 +1870,24 @@ private fun ExtendTrackTool(
         )
         Spacer(modifier = Modifier.height(14.dp))
         InfoLine(Icons.Rounded.Verified, stringResource(R.string.extend_info))
+    }
+
+    if (choosingBackground) {
+        MpSheet(onDismissRequest = { choosingBackground = false }) {
+            SheetHeader(stringResource(R.string.extend_background_title), stringResource(R.string.extend_background_subtitle))
+            Spacer(modifier = Modifier.height(14.dp))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())
+            ) {
+                tracks.filter { it.id != selectedTrack?.id }.sortedByDescending { it.startTime }.forEach { other ->
+                    val chosen = other.id in viewModel.extendBackgroundIds
+                    MergeTrackRow(other, chosen) {
+                        if (chosen) viewModel.extendBackgroundIds.remove(other.id) else viewModel.extendBackgroundIds.add(other.id)
+                    }
+                }
+            }
+        }
     }
 
     if (picking) {

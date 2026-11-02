@@ -375,9 +375,15 @@ Le parcours s'affiche sur une carte dédiée (`ui/component/PortionPickerMap`, e
 quelle borne le prochain appui pose (il passe tout seul de l'une à l'autre) et permettent
 d'en reprendre une ; « Annuler le point » rend la borne qu'un appui vient de remplacer
 (pile des appuis), sans quitter la carte — le père de l'auteur devait ressortir de l'outil
-et perdait son zoom. La zone regardée est aussi gardée par parcours tant que
-l'application vit (`TrackViewModel.pickerViewports`, `initialBox` de la carte) : rouvrir
-l'outil y revient. Un repère rond marque chaque borne, la portion est en rouge. **Plus
+et perdait son zoom. **Toutes les cartes sont synchronisées**, à la demande de l'auteur
+(« si je suis à Paris sur la carte principale, l'outil s'ouvre sur Paris, au même
+zoom ») : les cartes des outils s'ouvrent sur `TrackViewModel.mapCamera` (les
+préférences `pref_last_lat` / `pref_last_lng` / `pref_last_zoom` de la carte
+principale) et y écrivent leur position après chaque geste (`initialCamera`,
+`onCameraChange` de `PortionPickerMap`) ; la carte principale, recréée au retour sur
+son onglet, repart de là. Changer de parcours dans l'outil ne recadre pas. Corollaire :
+`persistMapStateThrottled` rattrape désormais la dernière position d'un geste
+(`persistLast`), sans quoi l'outil s'ouvrait là où était la carte au milieu du geste. Un repère rond marque chaque borne, la portion est en rouge. **Plus
 de double curseur** : le père de l'auteur le trouvait impossible à manier au doigt sur
 300 m de tracé, et il se cachait derrière le bouton d'action. La carte vit dans un écran
 qui défile : elle se réserve chaque geste commencé sur elle
@@ -454,7 +460,11 @@ manuellement sur la carte pour compléter la partie qui manque, comme dans Earth
 `onTapGeo` : l'appui renvoie l'endroit touché, et `sketch`, le tracé dessiné en
 pointillés). **Plus de choix « Au début » / « À la fin »**, retirés à la demande de l'auteur : un
 premier appui choisit le point de départ n'importe où sur le tracé, bout ou milieu
-(`findPortionBound`, repère rond). Puis chaque appui ajoute un point relié au précédent ; « Annuler
+(`findPortionBound`, repère rond). « Afficher d'autres traces » ouvre une liste à cocher :
+ces parcours sont dessinés en fond, fins et en transparence (`backgroundTracks`), pour se
+repérer ; les appuis les ignorent et seul le parcours choisi est prolongé. Le choix est
+gardé tant que l'application vit (`TrackViewModel.extendBackgroundIds`).
+Puis chaque appui ajoute un point relié au précédent ; « Annuler
 le point » et « Tout effacer » (qui, sans rien de dessiné, libère le point choisi).
 Depuis un point qui n'est pas un bout, `extendFromPoint` ajoute une **branche** : un
 tronçon neuf en fin de parcours, qui part d'une copie du point choisi (rupture comprise)

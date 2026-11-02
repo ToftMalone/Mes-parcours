@@ -40,8 +40,13 @@ import org.osmdroid.views.overlay.Polyline
  * [points] est le détail de la zone visible, que l'appelant recharge à chaque
  * déplacement signalé par [onViewportChange] : une carte zoomée sur un virage doit en
  * montrer les points, pas la silhouette de tout le parcours. [fitPoints] ne sert qu'à
- * cadrer la carte une fois, à l'ouverture — sauf si [initialBox] donne la zone où l'on
- * regardait en quittant l'outil, que la carte retrouve alors telle quelle.
+ * cadrer la carte quand on n'a encore regardé aucune carte. Sinon elle s'ouvre sur
+ * [initialCamera] — l'endroit et le zoom de la dernière carte regardée dans
+ * l'application, carte principale comprise — et signale les siens par [onCameraChange] :
+ * toutes les cartes restent synchronisées, à la demande de l'auteur.
+ *
+ * [backgroundTracks] : d'autres parcours, dessinés en fond pour se repérer, plus fins et
+ * en transparence, que les appuis ignorent.
  *
  * Sert aussi à l'outil « Prolonger » : avec [onTapGeo], un appui renvoie l'endroit
  * touché tel quel, et [sketch] — le tracé dessiné à la main — est dessiné depuis [start]
@@ -68,8 +73,10 @@ fun PortionPickerMap(
     sketch: List<GeoPoint> = emptyList(),
     onTapGeo: ((GeoPoint) -> Unit)? = null,
     cut: Pair<PortionBound, PortionBound>? = null,
-    initialBox: BoundingBox? = null,
-    colorOf: ((TrackPoint) -> Int)? = null
+    initialCamera: MapCamera? = null,
+    onCameraChange: ((MapCamera) -> Unit)? = null,
+    colorOf: ((TrackPoint) -> Int)? = null,
+    backgroundTracks: List<BackgroundTrack> = emptyList()
 ) {
     val context = LocalContext.current
     val isDark = LocalIsDarkTheme.current
@@ -79,6 +86,7 @@ fun PortionPickerMap(
     val currentOnTapGeo = rememberUpdatedState(onTapGeo)
     val sketchColor = MaterialTheme.colorScheme.tertiary.toArgb()
     val currentOnViewport = rememberUpdatedState(onViewportChange)
+    val currentOnCamera = rememberUpdatedState(onCameraChange)
     val currentPoints = rememberUpdatedState(points)
     val density = context.resources.displayMetrics.density
 
@@ -107,7 +115,11 @@ fun PortionPickerMap(
     DisposableEffect(mapView) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         val report = Runnable {
-            if (mapView.width > 0) currentOnViewport.value(mapView.boundingBox)
+            if (mapView.width > 0) {
+                currentOnViewport.value(mapView.boundingBox)
+                val center = mapView.mapCenter
+                currentOnCamera.value?.invoke(MapCamera(center.latitude, center.longitude, mapView.zoomLevelDouble))
+            }
         }
         val schedule = {
             handler.removeCallbacks(report)
@@ -131,14 +143,16 @@ fun PortionPickerMap(
         }
     }
 
-    // Cadrage unique : la zone quittée s'il y en a une, sinon le parcours entier.
-    LaunchedEffect(mapView, fitPoints) {
+    // Cadrage unique, à l'ouverture : là où regardait la dernière carte, sinon le
+    // parcours entier. Changer de parcours ne recadre pas : la carte reste où l'on est.
+    LaunchedEffect(mapView, fitPoints.isEmpty()) {
         if (fitPoints.isEmpty()) return@LaunchedEffect
         val box = BoundingBox.fromGeoPointsSafe(fitPoints.map { GeoPoint(it.latitude, it.longitude) })
         val frame = {
-            val resumed = initialBox
-            if (resumed != null) {
-                mapView.zoomToBoundingBox(resumed, false, 0)
+            val camera = initialCamera
+            if (camera != null) {
+                mapView.controller.setZoom(camera.zoom)
+                mapView.controller.setCenter(GeoPoint(camera.latitude, camera.longitude))
             } else {
                 val margin = (32 * density).toInt()
                 mapView.zoomToBoundingBox(box.increaseByScale(1.15f), false, margin)
@@ -149,7 +163,7 @@ fun PortionPickerMap(
     }
 
     // Le tracé, la portion en rouge et les deux repères suivent le détail et les bornes.
-    LaunchedEffect(mapView, points, start, end, cut, trackColor, cutColor, sketch, colorOf) {
+    LaunchedEffect(mapView, points, start, end, cut, trackColor, cutColor, sketch, colorOf, backgroundTracks) {
         mapView.overlays.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
@@ -167,6 +181,16 @@ fun PortionPickerMap(
 
             override fun longPressHelper(p: GeoPoint): Boolean = false
         }))
+        // Les autres parcours d'abord, donc dessous, fins et en transparence.
+        for (other in backgroundTracks) {
+            for (range in segmentRanges(other.points)) {
+                for ((color, run) in colorRuns(other.points.subList(range.first, range.last + 1), other.colorOf, trackColor)) {
+                    val line = styledLine(mapView, (color and 0x00FFFFFF) or (0xA0 shl 24), 3f * density)
+                    line.setPoints(run.map { GeoPoint(it.latitude, it.longitude) })
+                    mapView.overlays.add(line)
+                }
+            }
+        }
         for (range in segmentRanges(points)) {
             // Les couleurs du parcours, comme sur la carte principale : le père de
             // l'auteur reconnaît ses pays à leur couleur.
@@ -336,3 +360,9 @@ private const val TAP_TOLERANCE_DP = 40.0
 
 /** Zoom d'arrivée sur un lieu cherché : une ville entière, ses rues lisibles. */
 private const val SEARCH_ZOOM = 13.0
+
+/** Où regarde une carte : son centre et son niveau de zoom. */
+data class MapCamera(val latitude: Double, val longitude: Double, val zoom: Double)
+
+/** Un parcours dessiné en fond, pour se repérer : ses points et sa couleur point par point. */
+data class BackgroundTrack(val points: List<TrackPoint>, val colorOf: (TrackPoint) -> Int)

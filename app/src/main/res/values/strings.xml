@@ -428,6 +428,13 @@
     <string name="err_clean_none">Aucun arrêt assez long dans ce parcours : il n\'y a rien à nettoyer.</string>
     <string name="tool_extend">Prolonger</string>
     <string name="tool_extend_subtitle">Compléter un parcours arrêté trop tôt en dessinant la suite sur la carte.</string>
+    <string name="extend_background_none">Afficher d\'autres traces</string>
+    <plurals name="extend_background_some">
+        <item quantity="one">%1$d autre trace affichée</item>
+        <item quantity="other">%1$d autres traces affichées</item>
+    </plurals>
+    <string name="extend_background_title">Autres traces à afficher</string>
+    <string name="extend_background_subtitle">Pour se repérer : elles s\'affichent en fond, et seule la trace choisie est prolongée.</string>
     <string name="extend_hint_pick_point">Touchez le tracé à l\'endroit d\'où partir : un bout, ou n\'importe où, même en plein milieu (le prolongement y fera une branche, le reste du parcours ne bouge pas).</string>
     <string name="extend_hint_from_point">Touchez maintenant la carte point après point le long du chemin à ajouter : le premier part du rond. « Tout effacer » sans rien de dessiné permet de choisir un autre point.</string>
     <string name="map_search_hint">Rechercher une ville…</string>

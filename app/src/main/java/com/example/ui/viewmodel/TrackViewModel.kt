@@ -552,10 +552,26 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
 
     /**
-     * Zone de carte regardée en dernier dans « Découper » > « Sur la carte », par parcours.
-     * Gardée tant que l'application vit : rouvrir l'outil retrouve le même zoom.
+     * Où regarde la dernière carte, quelle qu'elle soit : les cartes des outils s'ouvrent
+     * là, et la leur, en bougeant, la mémorise pour la carte principale. Demandé par
+     * l'auteur : « si je suis à Paris sur la carte principale, l'outil s'ouvre sur Paris,
+     * au même zoom ». Mêmes préférences que la carte principale.
      */
-    val pickerViewports = HashMap<Long, org.osmdroid.util.BoundingBox>()
+    var mapCamera: com.example.ui.component.MapCamera?
+        get() {
+            val lat = lastMapCenterLat ?: return null
+            val lon = lastMapCenterLng ?: return null
+            return com.example.ui.component.MapCamera(lat, lon, lastMapZoom ?: 16.5)
+        }
+        set(value) {
+            if (value == null) return
+            lastMapCenterLat = value.latitude
+            lastMapCenterLng = value.longitude
+            lastMapZoom = value.zoom
+        }
+
+    /** Les parcours affichés en fond dans « Prolonger », gardés tant que l'application vit. */
+    val extendBackgroundIds = androidx.compose.runtime.mutableStateListOf<Long>()
 
     /** Distance de la portion comprise entre deux bornes d'un parcours. */
     suspend fun measurePortion(
