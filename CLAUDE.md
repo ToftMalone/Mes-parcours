@@ -371,7 +371,7 @@ parcours) ; la portion rouge porte un liseré blanc pour rester visible sur un t
 déjà rouge.
 Le parcours s'affiche sur une carte dédiée (`ui/component/PortionPickerMap`, et non
 `MapViewContainer`, qui reconstruit ses calques d'elle-même), zoomable jusqu'au niveau
-21. On touche le début, puis la fin : deux boutons « Début hh:mm » / « Fin hh:mm » disent
+21, comme la carte principale (`MAX_MAP_ZOOM`, une seule constante pour toutes les cartes). On touche le début, puis la fin : deux boutons « Début hh:mm » / « Fin hh:mm » disent
 quelle borne le prochain appui pose (il passe tout seul de l'une à l'autre) et permettent
 d'en reprendre une ; « Annuler le point » rend la borne qu'un appui vient de remplacer
 (pile des appuis), sans quitter la carte — le père de l'auteur devait ressortir de l'outil

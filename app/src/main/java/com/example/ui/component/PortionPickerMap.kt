@@ -99,8 +99,8 @@ fun PortionPickerMap(
                 else TileSourceFactory.MAPNIK
             )
             setMultiTouchControls(true)
-            // Assez de zoom pour poser une borne au mètre près.
-            maxZoomLevel = 21.0
+            // Assez de zoom pour poser une borne au mètre près, comme la carte principale.
+            maxZoomLevel = MAX_MAP_ZOOM
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setOnTouchListener { view, event ->
                 if (event.action == android.view.MotionEvent.ACTION_DOWN) {

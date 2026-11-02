@@ -879,6 +879,9 @@ fun rememberMapViewWithLifecycle(
 
         val map = MapView(context).apply {
             setTileSource(tileSource)
+            // Le même zoom maximal que les cartes des outils : sans cela la carte principale
+            // s'arrêtait au zoom natif des tuiles, plus tôt qu'elles.
+            maxZoomLevel = MAX_MAP_ZOOM
             controller.setZoom(defaultZoom)
             if (initialCenterLat != null && initialCenterLng != null) {
                 controller.setCenter(GeoPoint(initialCenterLat, initialCenterLng))
@@ -1463,3 +1466,6 @@ private fun trackLongPressDetector(
 data class GoToRequest(val latitude: Double, val longitude: Double, val id: Long = System.nanoTime())
 
 private const val GO_TO_ZOOM = 13.0
+
+/** Zoom maximal de toutes les cartes de l'application, au-delà du zoom natif des tuiles. */
+internal const val MAX_MAP_ZOOM = 21.0
