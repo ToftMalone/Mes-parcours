@@ -405,6 +405,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     fun deleteTrack(trackId: Long, onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val deleted = repository.deleteTrack(trackId)
+            if (deleted) trimTrash()
             if (deleted && _selectedTrackId.value == trackId) {
                 _selectedTrackId.value = null
             }
@@ -429,6 +430,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     refused++
                 }
             }
+            if (deleted > 0) trimTrash()
             onResult(deleted, refused)
         }
     }
@@ -445,11 +447,27 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         }
     }
 
-    /** Efface pour de bon tout le contenu de la corbeille (voir [TrackRepository.emptyTrash]). */
-    fun emptyTrash(onDone: (Int) -> Unit = {}) {
+    /**
+     * Efface pour de bon tout le contenu de la corbeille (voir [TrackRepository.emptyTrash]).
+     * Un échec (téléphone plein…) n'est plus avalé : il fermait l'application ou laissait
+     * croire la corbeille vidée.
+     */
+    fun emptyTrash(onDone: (Int) -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            val count = repository.emptyTrash()
-            onDone(count)
+            runCatching { repository.emptyTrash() }
+                .onSuccess(onDone)
+                .onFailure { onError(it.userMessage(appContext, R.string.err_trash_empty_failed)) }
+        }
+    }
+
+    /**
+     * Borne la corbeille après une mise à la corbeille (voir
+     * [TrackRepository.enforceTrashLimit]). En arrière-plan et sans bruit : l'opération
+     * demandée a déjà réussi, et un échec ici sera rattrapé au prochain démarrage.
+     */
+    private fun trimTrash() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { repository.enforceTrashLimit() }
         }
     }
 
@@ -530,6 +548,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
             try {
                 val id = if (from != null) repository.extendFromPoint(trackId, from, taps, newName, deleteSource)
                 else repository.extendTrack(trackId, taps, atEnd, newName, deleteSource)
+                if (deleteSource) trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(id) }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -611,6 +630,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 repository.removeSegment(segment)
+                trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -633,6 +653,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val newTrackIds = repository.cutPortion(trackId, from, to, baseName, deleteSource)
+                if (deleteSource) trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(newTrackIds) }
             } catch (e: Exception) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -660,6 +681,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     baseName = baseName,
                     deleteSource = deleteSource
                 )
+                if (deleteSource) trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onSuccess(newTrackIds)
                 }
@@ -695,6 +717,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     newName = newName,
                     deleteSource = deleteSource
                 )
+                if (deleteSource) trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onSuccess(result)
                 }

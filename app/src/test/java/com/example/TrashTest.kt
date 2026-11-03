@@ -122,4 +122,85 @@ class TrashTest {
         assertNotNull(db.trackDao.getTrackById(kept))
         assertFalse(db.trackDao.getPointsForTrack(kept).isEmpty())
     }
+
+    @Test
+    fun `la corbeille trop lourde efface ses plus anciens, jamais le dernier`() = runBlocking {
+        repository.trashPointLimit = 25
+        val kept = createTrack("Gardé")
+        val oldest = createTrack("Ancien")
+        val middle = createTrack("Moyen")
+        val newest = createTrack("Récent")
+        // Des dates de suppression distinctes, de la plus ancienne à la plus récente.
+        db.trackDao.moveToTrash(oldest, 1_000L)
+        db.trackDao.moveToTrash(middle, 2_000L)
+        db.trackDao.moveToTrash(newest, 3_000L)
+
+        // 10 points chacun : récent + moyen = 20 tiennent sous 25, l'ancien déborde.
+        assertEquals(1, repository.enforceTrashLimit())
+
+        assertNull(db.trackDao.getTrackById(oldest))
+        assertTrue("points effacés", db.trackDao.getPointsForTrack(oldest).isEmpty())
+        assertNotNull(db.trackDao.getTrackById(middle))
+        assertNotNull(db.trackDao.getTrackById(newest))
+        assertNotNull(db.trackDao.getTrackById(kept))
+
+        // Même seul au-dessus de la borne, le plus récent reste rattrapable.
+        repository.trashPointLimit = 1
+        assertEquals(1, repository.enforceTrashLimit())
+        assertNotNull(db.trackDao.getTrackById(newest))
+        assertNull(db.trackDao.getTrackById(middle))
+    }
+
+    @Test
+    fun `un gros parcours s'efface par paquets, jusqu'au dernier point`() = runBlocking {
+        val big = db.trackDao.insertTrack(Track(name = "Gros", startTime = 1_000_000L))
+        (0 until 5).forEach { batch ->
+            db.trackDao.insertTrackPoints(
+                (0 until 10_000).map {
+                    TrackPoint(trackId = big, latitude = 45.0, longitude = 5.0, timestamp = (batch * 10_000L + it) * 1_000L)
+                }
+            )
+        }
+        val kept = createTrack("Gardé")
+        repository.deleteTrack(big)
+
+        assertEquals(1, repository.emptyTrash())
+
+        assertNull(db.trackDao.getTrackById(big))
+        assertTrue(db.trackDao.getPointsForTrack(big).isEmpty())
+        assertEquals(10, db.trackDao.getPointsForTrack(kept).size)
+    }
+
+    @Test
+    fun `vider la corbeille rend la place au téléphone`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase("corbeille_test.db")
+        val fileDb = Room.databaseBuilder(context, AppDatabase::class.java, "corbeille_test.db")
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val repo = TrackRepository.createForTesting(fileDb)
+            val big = fileDb.trackDao.insertTrack(Track(name = "Gros", startTime = 1_000_000L))
+            (0 until 30).forEach { batch ->
+                fileDb.trackDao.insertTrackPoints(
+                    (0 until 10_000).map {
+                        val n = batch * 10_000 + it
+                        TrackPoint(trackId = big, latitude = 45.0 + n * 1e-6, longitude = 5.0 + n * 1e-6, altitude = n.toDouble(), timestamp = n * 1_000L)
+                    }
+                )
+            }
+            fileDb.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+            val file = context.getDatabasePath("corbeille_test.db")
+            val before = file.length()
+
+            repo.deleteTrack(big)
+            assertEquals(1, repo.emptyTrash())
+
+            val after = file.length()
+            assertTrue("base de $before octets ramenée à $after", after < before / 4)
+        } finally {
+            fileDb.close()
+            context.deleteDatabase("corbeille_test.db")
+        }
+    }
 }

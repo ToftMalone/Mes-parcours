@@ -56,6 +56,14 @@ class TrackApplication : Application() {
             runCatching {
                 TrackRepository.getInstance(this@TrackApplication).purgeTrash()
             }
+            // Puis la borne de place, et la place libérée rendue au téléphone même quand
+            // rien n'a expiré : une base gonflée par une version d'avant la borne (ou un
+            // effacement fait téléphone plein) se rétrécit ainsi au lancement suivant.
+            runCatching {
+                val repository = TrackRepository.getInstance(this@TrackApplication)
+                repository.enforceTrashLimit()
+                repository.compactDatabase()
+            }
         }
     }
 }

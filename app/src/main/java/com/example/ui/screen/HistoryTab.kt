@@ -439,9 +439,12 @@ fun HistoryTab(
                 }
             },
             onEmpty = {
-                viewModel.emptyTrash { count ->
-                    messenger.show(context.resources.getQuantityString(R.plurals.trash_emptied, count, count), Icons.Rounded.DeleteForever)
-                }
+                viewModel.emptyTrash(
+                    onDone = { count ->
+                        messenger.show(context.resources.getQuantityString(R.plurals.trash_emptied, count, count), Icons.Rounded.DeleteForever)
+                    },
+                    onError = { message -> messenger.show(message, Icons.Rounded.DeleteForever, isError = true) }
+                )
             },
             onDismiss = { showTrash = false }
         )

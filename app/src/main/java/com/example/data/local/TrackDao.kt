@@ -319,14 +319,29 @@ interface TrackDao {
     @Query("UPDATE tracks SET deletedAt = NULL WHERE id = :trackId")
     suspend fun restoreFromTrash(trackId: Long)
 
-    @Query("DELETE FROM track_points WHERE trackId IN (SELECT id FROM tracks WHERE deletedAt IS NOT NULL AND deletedAt < :before)")
-    suspend fun deleteExpiredTrashPoints(before: Long)
-
-    @Query("DELETE FROM tracks WHERE deletedAt IS NOT NULL AND deletedAt < :before")
-    suspend fun deleteExpiredTrash(before: Long): Int
-
     @Query("DELETE FROM track_points WHERE trackId = :trackId")
     suspend fun deletePointsForTrack(trackId: Long)
+
+    /**
+     * Efface au plus [limit] points d'un parcours, et dit combien. Appelé en boucle pour
+     * effacer un gros parcours par petites écritures : un seul `DELETE` de plusieurs
+     * millions de lignes écrit autant de pages dans le journal WAL, ce qui échoue sur
+     * un téléphone presque plein — précisément quand on vide la corbeille pour faire
+     * de la place.
+     */
+    @Query("DELETE FROM track_points WHERE id IN (SELECT id FROM track_points WHERE trackId = :trackId LIMIT :limit)")
+    suspend fun deletePointChunk(trackId: Long, limit: Int): Int
+
+    /** Les parcours de la corbeille et leur nombre de points, du plus récent au plus ancien. */
+    @Query(
+        "SELECT t.id AS trackId, (SELECT COUNT(*) FROM track_points p WHERE p.trackId = t.id) AS pointCount " +
+            "FROM tracks t WHERE t.deletedAt IS NOT NULL ORDER BY t.deletedAt DESC, t.id DESC"
+    )
+    suspend fun getTrashedPointCounts(): List<TrashedPointCount>
+
+    /** Les parcours de la corbeille mis à la corbeille avant [before]. */
+    @Query("SELECT id FROM tracks WHERE deletedAt IS NOT NULL AND deletedAt < :before")
+    suspend fun getTrashedIdsBefore(before: Long): List<Long>
 
     /** Mémorise la pause d'un enregistrement, sans réécrire le reste de la ligne. */
     @Query("UPDATE tracks SET isPaused = :paused WHERE id = :trackId")
@@ -339,3 +354,6 @@ interface TrackDao {
     @Query("DELETE FROM tracks WHERE startTime = ${Track.IMPORT_PLACEHOLDER_START_TIME}")
     fun deleteImportPlaceholdersBlocking()
 }
+
+/** Un parcours de la corbeille et son nombre de points (voir [TrackDao.getTrashedPointCounts]). */
+data class TrashedPointCount(val trackId: Long, val pointCount: Long)

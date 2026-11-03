@@ -22,6 +22,7 @@
     <string name="err_import_failed">Erreur d\'importation : %1$s</string>
     <string name="err_merge_failed">Erreur de fusion : %1$s</string>
     <string name="err_split_failed">Erreur de découpage</string>
+    <string name="err_trash_empty_failed">La corbeille n\'a pas pu être vidée</string>
     <string name="err_export_failed">Erreur de sauvegarde</string>
     <string name="err_export_open">Impossible d\'ouvrir le fichier de destination</string>
     <string name="gps_lost_channel_name">Perte de signal GPS</string>

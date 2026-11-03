@@ -153,7 +153,28 @@ de la feuille, derrière un avertissement dont le bouton reste grisé trois seco
 (« Vider (3) », « (2) »… : le temps de lire que rien ne sera récupérable). Sinon, c'est
 le temps qui la vide. `TrackRepository.purgeTrash`, appelé au démarrage depuis
 `TrackApplication`, efface pour de bon (points compris) ce qui y a passé plus de
-30 jours (`Track.TRASH_RETENTION_MS`). Restent des effacements immédiats, voulus : les
+30 jours (`Track.TRASH_RETENTION_MS`).
+
+**La corbeille a une borne de place** (`TrackRepository.enforceTrashLimit`,
+`trashPointLimit` : 5 millions de points, environ 500 Mo). Le père de l'auteur, à force
+de découper un gros KML Google Earth, a eu 217 parcours en corbeille et **54 Go** de
+stockage, téléphone plein : chaque outil copie tout le parcours et met l'original, points
+compris, à la corbeille (une coupe = ~250 Mo de plus sur ce fichier). Au-delà de la borne,
+les plus anciennement supprimés partent pour de bon ; le plus récent est toujours gardé.
+Appelée après chaque mise à la corbeille (`TrackViewModel.trimTrash`) et au démarrage.
+Choix de l'auteur, parmi : ne garder que la dernière version, ne plus passer les outils
+par la corbeille, ne rien changer.
+
+**Effacer ne suffisait pas à libérer la place**, deux défauts que corrige
+`eraseForGood` (vidage, expiration, borne) : un seul `DELETE` géant en transaction
+écrivait autant dans le journal WAL qu'il effaçait, et échouait téléphone plein — l'échec
+n'était même pas rattrapé ; et SQLite garde les pages libérées dans son fichier, qui ne
+rétrécit jamais sans `VACUUM`. Désormais : effacement par paquets de 20 000 points
+(`deletePointChunk`), puis `compactDatabase` (`VACUUM` + `wal_checkpoint(TRUNCATE)`)
+dès que plus de 16 Mo sont libres, jamais pendant un enregistrement, et aussi au
+démarrage. `TrashTest` vérifie sur une vraie base sur disque que le fichier rétrécit.
+
+Restent des effacements immédiats, voulus : les
 parcours absorbés par une fusion (leurs points sont recopiés dans le plus ancien), la
 ligne d'un import ou d'un nettoyage qui échoue. **Toute nouvelle requête qui liste des
 parcours doit exclure `deletedAt IS NOT NULL`**, comme `getAllTracks` et
@@ -869,9 +890,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 238 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 241 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (5), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (8), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

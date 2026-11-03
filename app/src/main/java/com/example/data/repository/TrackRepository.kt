@@ -74,6 +74,14 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     /** Nombre de points récents conservés en mémoire pour l'affichage en direct. */
     private val liveTailLimit = 20_000
 
+    /**
+     * Points gardés au plus dans la corbeille ([enforceTrashLimit]). Un point coûte
+     * une centaine d'octets en base, index compris : environ 500 Mo. Modifiable par
+     * les tests.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal var trashPointLimit = 5_000_000L
+
 
     /**
      * Prépare la reprise d'une trace sans jamais charger en mémoire une trace
@@ -1644,30 +1652,88 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * minuteur n'est nécessaire, un parcours expiré attend simplement le lancement
      * suivant. Renvoie le nombre de parcours effacés.
      */
-    suspend fun purgeTrash(now: Long = System.currentTimeMillis()): Int {
-        val before = now - Track.TRASH_RETENTION_MS
-        val purged = database.withTransaction {
-            trackDao.deleteExpiredTrashPoints(before)
-            trackDao.deleteExpiredTrash(before)
-        }
-        // Les tracés KML auxquels plus aucun point ne renvoie partent avec eux. Le
-        // ménage relit toute la table des points : seulement quand il y a eu effacement.
-        if (purged > 0) trackDao.deleteOrphanPlacemarks()
-        return purged
-    }
+    suspend fun purgeTrash(now: Long = System.currentTimeMillis()): Int =
+        eraseForGood(trackDao.getTrashedIdsBefore(now - Track.TRASH_RETENTION_MS))
 
     /**
      * Vide la corbeille d'un coup : tous ses parcours, points compris, sans attendre
      * leurs trente jours. Ajouté après coup à la demande de l'auteur ; l'écran ne le
      * propose qu'après un avertissement qu'on ne peut valider avant trois secondes.
      */
-    suspend fun emptyTrash(): Int {
-        val purged = database.withTransaction {
-            trackDao.deleteExpiredTrashPoints(Long.MAX_VALUE)
-            trackDao.deleteExpiredTrash(Long.MAX_VALUE)
+    suspend fun emptyTrash(): Int = eraseForGood(trackDao.getTrashedIdsBefore(Long.MAX_VALUE))
+
+    /**
+     * Borne la place que prend la corbeille : au-delà de [trashPointLimit] points, les
+     * parcours les plus anciennement supprimés sont effacés pour de bon, sans attendre
+     * leurs trente jours. Le plus récent est toujours gardé, quelle que soit sa taille :
+     * la dernière opération reste rattrapable.
+     *
+     * Rapporté par le père de l'auteur : à force de découper un gros KML de Google
+     * Earth, 217 parcours en corbeille et 54 Go de stockage, téléphone plein. Chaque
+     * outil crée une copie complète du parcours et met l'original à la corbeille avec
+     * tous ses points : sur un fichier de 250 Mo en base, chaque coupe en coûtait autant.
+     * Appelé après chaque mise à la corbeille et au démarrage. Renvoie le nombre de
+     * parcours effacés.
+     */
+    suspend fun enforceTrashLimit(): Int {
+        var total = 0L
+        val excess = trackDao.getTrashedPointCounts().filterIndexed { index, entry ->
+            total += entry.pointCount
+            index > 0 && total > trashPointLimit
         }
-        if (purged > 0) trackDao.deleteOrphanPlacemarks()
-        return purged
+        return eraseForGood(excess.map { it.trackId })
+    }
+
+    /**
+     * Efface des parcours pour de bon, points compris, **par petites écritures** puis
+     * rend la place au téléphone.
+     *
+     * Deux défauts réunis rendaient la corbeille impossible à vider :
+     * - un seul `DELETE` pour toute la corbeille, dans une transaction : SQLite écrit
+     *   chaque page modifiée dans le journal WAL avant de la libérer, soit autant que ce
+     *   qu'on efface. Téléphone plein, l'écriture échouait et rien n'était effacé ;
+     * - même réussi, l'effacement ne rendait rien : SQLite garde les pages libérées dans
+     *   son fichier pour les réutiliser, qui ne rétrécit jamais sans `VACUUM`. Le
+     *   stockage de l'application ne baissait donc pas d'un octet.
+     */
+    private suspend fun eraseForGood(trackIds: List<Long>): Int {
+        if (trackIds.isEmpty()) return 0
+        var erased = 0
+        trackIds.forEach { id ->
+            while (trackDao.deletePointChunk(id, ERASE_CHUNK_POINTS) > 0) Unit
+            trackDao.deleteTrack(id)
+            invalidatePointCaches(id)
+            erased++
+        }
+        // Les tracés KML auxquels plus aucun point ne renvoie partent avec eux. Le
+        // ménage relit toute la table des points : seulement quand il y a eu effacement.
+        trackDao.deleteOrphanPlacemarks()
+        compactDatabase()
+        return erased
+    }
+
+    /**
+     * Rend au téléphone la place libérée dans la base (`VACUUM`), si elle en vaut la
+     * peine ([COMPACT_MIN_FREE_BYTES]). Jamais pendant un enregistrement : `VACUUM`
+     * réécrit toute la base et bloque les écritures, le temps de quelques secondes sur
+     * une grosse base. La place est alors rendue au prochain démarrage.
+     *
+     * `VACUUM` a besoin d'un espace temporaire de la taille des données gardées (pas de
+     * celles effacées) ; s'il manque, l'échec est sans conséquence : les pages libres
+     * restent réutilisées par les écritures suivantes, la base cesse au moins de grossir.
+     * Le point de contrôle `TRUNCATE` ramène ensuite le journal WAL à zéro.
+     */
+    suspend fun compactDatabase(): Boolean = withContext(Dispatchers.IO) {
+        if (_isTracking.value) return@withContext false
+        runCatching {
+            val db = database.openHelper.writableDatabase
+            val pageSize = db.query("PRAGMA page_size").use { if (it.moveToFirst()) it.getLong(0) else 4096L }
+            val freePages = db.query("PRAGMA freelist_count").use { if (it.moveToFirst()) it.getLong(0) else 0L }
+            if (freePages * pageSize < COMPACT_MIN_FREE_BYTES) return@runCatching false
+            db.execSQL("VACUUM")
+            db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+            true
+        }.getOrDefault(false)
     }
 
     /** Les tracés KML d'origine d'un parcours, par identifiant, pour l'export. */
@@ -1804,6 +1870,12 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     companion object {
+        /** Points effacés par écriture quand un parcours part pour de bon ([eraseForGood]). */
+        private const val ERASE_CHUNK_POINTS = 20_000
+
+        /** Place libre en dessous de laquelle `VACUUM` ne vaut pas sa réécriture de la base. */
+        private const val COMPACT_MIN_FREE_BYTES = 16L * 1024 * 1024
+
         @Volatile
         private var INSTANCE: TrackRepository? = null
 
