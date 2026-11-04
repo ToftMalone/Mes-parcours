@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Les langues de l'application, proposées par Android 13+ dans « Langue de l'application »
+  (Réglages du téléphone). Le français reste la langue par défaut (res/values) ; voir
+  AppLocale pour la règle appliquée aux dates et aux nombres.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="fr" />
+    <locale android:name="en" />
+    <locale android:name="de" />
+</locale-config>

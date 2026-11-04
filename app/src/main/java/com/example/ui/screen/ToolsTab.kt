@@ -1578,7 +1578,7 @@ private fun CleanTrackTool(
                                 body = context.getString(
                                     if (deleting) R.string.clean_done_body_deleted else R.string.clean_done_body_kept,
                                     result.stops,
-                                    java.text.NumberFormat.getIntegerInstance(Locale.FRANCE).format(result.removedPoints),
+                                    java.text.NumberFormat.getIntegerInstance(com.example.util.AppLocale.current).format(result.removedPoints),
                                     name
                                 ),
                                 resultTrackId = result.newTrackId

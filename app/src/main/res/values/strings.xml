@@ -22,6 +22,7 @@
     <string name="err_import_failed">Erreur d\'importation : %1$s</string>
     <string name="err_merge_failed">Erreur de fusion : %1$s</string>
     <string name="err_split_failed">Erreur de découpage</string>
+    <string name="size_megabytes">%1$s Mo</string>
     <string name="settings_debug_log">Journal de débogage</string>
     <string name="settings_debug_log_subtitle">%1$s · à envoyer en cas de problème</string>
     <string name="debug_log_title">Journal de débogage</string>

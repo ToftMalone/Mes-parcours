@@ -13,10 +13,11 @@ object FormatUtils {
     var isMetric: Boolean = true
 
     /**
-     * L'application n'existe qu'en français : dates et nombres suivent l'usage
-     * français quelle que soit la langue du téléphone, comme le reste de l'interface.
+     * Dates et nombres suivent la langue de l'application (voir [AppLocale]) : « 4,4 km/h »
+     * en français et en allemand, « 4.4 km/h » en anglais. Lu à chaque appel : la langue
+     * peut changer pendant que l'application tourne.
      */
-    private val LOCALE: Locale = Locale.FRANCE
+    private val LOCALE: Locale get() = AppLocale.current
 
     private var appContext: Context? = null
 
@@ -32,7 +33,7 @@ object FormatUtils {
     private fun string(@StringRes id: Int, fallback: String, vararg args: Any): String =
         appContext?.getString(id, *args) ?: String.format(LOCALE, fallback, *args)
 
-    /** Motif de date à la française, tiré d'un squelette (« 27 sept. », « 27/09/2026 »). */
+    /** Motif de date dans la langue de l'application, tiré d'un squelette (« 27 sept. », « 27/09/2026 »). */
     private fun localizedFormat(skeleton: String): SimpleDateFormat {
         return SimpleDateFormat(DateFormat.getBestDateTimePattern(LOCALE, skeleton), LOCALE)
     }

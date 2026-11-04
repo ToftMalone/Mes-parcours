@@ -1732,14 +1732,26 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         if (trackIds.isEmpty()) return 0
         var erased = 0
         trackIds.forEach { id ->
-            while (trackDao.deletePointChunk(id, ERASE_CHUNK_POINTS) > 0) Unit
+            // Début, fin et durée de chaque étape au journal : sans elles, un effacement
+            // encore en cours ne se distinguait pas d'un effacement resté en panne.
+            val start = System.nanoTime()
+            var points = 0
+            while (true) {
+                val n = trackDao.deletePointChunk(id, ERASE_CHUNK_POINTS)
+                if (n <= 0) break
+                points += n
+            }
             trackDao.deleteTrack(id)
             invalidatePointCaches(id)
             erased++
+            com.example.util.DebugLog.i(
+                "Base",
+                "parcours #$id effacé pour de bon : $points points, ${(System.nanoTime() - start) / 1_000_000} ms"
+            )
         }
         // Les tracés KML auxquels plus aucun point ne renvoie partent avec eux. Le
         // ménage relit toute la table des points : seulement quand il y a eu effacement.
-        trackDao.deleteOrphanPlacemarks()
+        com.example.util.DebugLog.timed("Base", "tracés KML orphelins retirés") { trackDao.deleteOrphanPlacemarks() }
         compactDatabase()
         return erased
     }
@@ -1761,11 +1773,16 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             val db = database.openHelper.writableDatabase
             val pageSize = db.query("PRAGMA page_size").use { if (it.moveToFirst()) it.getLong(0) else 4096L }
             val freePages = db.query("PRAGMA freelist_count").use { if (it.moveToFirst()) it.getLong(0) else 0L }
+            val pages = db.query("PRAGMA page_count").use { if (it.moveToFirst()) it.getLong(0) else 0L }
+            com.example.util.DebugLog.i(
+                "Base",
+                "base : ${pages * pageSize / 1024} Kio, dont ${freePages * pageSize / 1024} Kio libres"
+            )
             if (freePages * pageSize < COMPACT_MIN_FREE_BYTES) return@runCatching false
-            db.execSQL("VACUUM")
+            com.example.util.DebugLog.timed("Base", "VACUUM") { db.execSQL("VACUUM") }
             db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
             true
-        }.getOrDefault(false)
+        }.onFailure { com.example.util.DebugLog.e("Base", "compactage impossible", it) }.getOrDefault(false)
     }
 
     /**

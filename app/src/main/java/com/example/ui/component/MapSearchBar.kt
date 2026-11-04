@@ -125,7 +125,7 @@ suspend fun searchPlace(context: android.content.Context, messenger: AppMessenge
     val found = withContext(Dispatchers.IO) {
         runCatching {
             @Suppress("DEPRECATION")
-            Geocoder(context, Locale.FRANCE).getFromLocationName(text, 1)?.firstOrNull()
+            Geocoder(context, com.example.util.AppLocale.current).getFromLocationName(text, 1)?.firstOrNull()
         }
     }
     val address = found.getOrNull()

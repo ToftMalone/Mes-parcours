@@ -504,6 +504,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     private fun trimTrash() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             runCatching { repository.enforceTrashLimit() }
+                .onFailure { DebugLog.e("Action", "borne de la corbeille : échec", it) }
         }
     }
 

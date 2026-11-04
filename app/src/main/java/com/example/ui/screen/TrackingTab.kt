@@ -581,9 +581,9 @@ private fun GpsDot(found: Boolean) {
 
 // ------------------------------------------------------------------ Statistiques
 
-private fun kmValue(meters: Double) = String.format(Locale.FRANCE, "%.2f", meters / 1000.0)
+private fun kmValue(meters: Double) = String.format(com.example.util.AppLocale.current, "%.2f", meters / 1000.0)
 
-private fun speedValue(mps: Double) = String.format(Locale.FRANCE, "%.1f", (mps * 3.6).coerceAtLeast(0.0))
+private fun speedValue(mps: Double) = String.format(com.example.util.AppLocale.current, "%.1f", (mps * 3.6).coerceAtLeast(0.0))
 
 private fun altitudeValue(meters: Double?) = meters?.let { Math.round(it).toString() } ?: "—"
 

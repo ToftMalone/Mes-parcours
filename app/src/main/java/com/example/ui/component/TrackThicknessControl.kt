@@ -58,7 +58,7 @@ import java.util.Locale
 private fun formatThicknessDp(value: Float): String {
     val rounded = Math.round(value * 10) / 10f
     return if (rounded % 1f == 0f) rounded.toInt().toString()
-    else String.format(Locale.FRANCE, "%.1f", rounded)
+    else String.format(com.example.util.AppLocale.current, "%.1f", rounded)
 }
 
 /** Pas du bouton « − / + » : un demi-dp, la plus petite différence visible. */

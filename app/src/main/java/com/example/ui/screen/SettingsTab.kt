@@ -250,7 +250,10 @@ private fun DebugLogRow() {
     LaunchedEffect(open) {
         size = withContext(Dispatchers.IO) { com.example.util.DebugLog.totalSize(context) }
     }
-    val sizeText = String.format(java.util.Locale.FRANCE, "%.1f Mo", size / (1024.0 * 1024.0))
+    val sizeText = stringResource(
+        R.string.size_megabytes,
+        String.format(com.example.util.AppLocale.current, "%.1f", size / (1024.0 * 1024.0))
+    )
 
     // L'archive, fabriquée hors du fil principal (base relue, fichiers compressés).
     suspend fun prepare(): java.io.File? = withContext(Dispatchers.IO) {
