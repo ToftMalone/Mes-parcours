@@ -392,6 +392,8 @@
     <string name="rel_1_0_a">Première version stable</string>
     <string name="rel_2_1_0_a">L\'application suit la langue du téléphone, en 11 langues</string>
     <string name="rel_2_1_0_b">Les notes de version s\'affichent dans votre langue</string>
+    <string name="rel_2_3_15_a">Corbeille : le vidage affiche son avancement en pourcentage</string>
+    <string name="rel_2_3_15_b">Corbeille : les traces ne disparaissent qu\'une fois vraiment effacées ; un vidage interrompu reprend au lancement suivant</string>
     <string name="rel_2_3_14_a">Journal de débogage plus précis sur le vidage de la corbeille</string>
     <string name="rel_2_3_13_a">Le journal de débogage prend moins de place : 50 Mo au plus</string>
     <string name="rel_2_3_12_a">Nouveau journal de débogage : il note ce qui se passe dans l\'application pour aider à trouver la cause d\'un problème (200 Mo au plus)</string>
