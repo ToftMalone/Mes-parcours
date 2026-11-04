@@ -25,7 +25,7 @@
     <string name="settings_debug_log">Journal de débogage</string>
     <string name="settings_debug_log_subtitle">%1$s · à envoyer en cas de problème</string>
     <string name="debug_log_title">Journal de débogage</string>
-    <string name="debug_log_body">L\'application note tout ce qui s\'y passe (gestes, actions, erreurs, positions) pour aider à trouver la cause d\'un problème. Le journal reste sur le téléphone tant que vous ne l\'envoyez pas, et ne dépasse jamais 200 Mo (actuellement %1$s).</string>
+    <string name="debug_log_body">L\'application note tout ce qui s\'y passe (gestes, actions, erreurs, positions) pour aider à trouver la cause d\'un problème. Le journal reste sur le téléphone tant que vous ne l\'envoyez pas, et ne dépasse jamais 50 Mo (actuellement %1$s).</string>
     <string name="debug_log_share">Partager</string>
     <string name="debug_log_save">Enregistrer</string>
     <string name="debug_log_clear">Effacer le journal</string>

@@ -16,7 +16,7 @@ import java.util.zip.ZipFile
 /**
  * Le journal de débogage : borné quoi qu'on y écrive, tournant sur plusieurs fichiers,
  * exporté en une archive complète. Bornes réduites (le principe est le même qu'à
- * 200 Mo, sans écrire 200 Mo).
+ * 50 Mo, sans écrire 50 Mo).
  */
 @RunWith(RobolectricTestRunner::class)
 class DebugLogTest {
@@ -34,7 +34,7 @@ class DebugLogTest {
 
     @After
     fun tearDown() {
-        DebugLog.maxFileBytes = 10L * 1024 * 1024
+        DebugLog.maxFileBytes = DebugLog.MAX_FILE_BYTES
         DebugLog.maxTotalBytes = DebugLog.MAX_TOTAL_BYTES
         DebugLog.clear(context)
     }

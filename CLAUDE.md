@@ -527,9 +527,9 @@ précisé : « il faut que ce journal note **TOUT** ce qui se passe dans l'appli
 l'exporte (Paramètres → Application → « Journal de débogage » → Partager ou
 Enregistrer), l'auteur le transmet à Claude, qui l'analyse.
 
-`util/DebugLog` : fichiers tournants de 10 Mo dans `filesDir/logs` (interne, jamais
-exposé), **200 Mo au plus** (`MAX_TOTAL_BYTES`, les plus anciens effacés, taille comptée
-en octets), écriture sur un fil unique qui vide par paquets, plantage écrit **avant** la
+`util/DebugLog` : fichiers tournants de 5 Mo dans `filesDir/logs` (interne, jamais
+exposé), **50 Mo au plus** (`MAX_TOTAL_BYTES`, les plus anciens effacés, taille comptée
+en octets ; 200 Mo dans la 2.3.12, ramenés à 50 Mo à la demande de l'auteur), écriture sur un fil unique qui vide par paquets, plantage écrit **avant** la
 mort du processus (`installCrashHandler`). Ligne : `date heure.ms niveau [fil] étiquette : message`,
 pile d'appels complète sous chaque erreur. L'archive (`buildExport`, `filesDir/log_export`,
 seul sous-dossier ajouté au `FileProvider`) contient `etat.txt` (appareil, mémoire, place
@@ -561,7 +561,8 @@ Ce qui est noté, sans qu'un écran ait à y penser :
 **Le journal contient des positions** : voulu (les défauts sont souvent sur la carte), et
 c'est pourquoi il reste interne tant que l'utilisateur ne l'envoie pas lui-même.
 Volume mesuré à l'estime : une dizaine de lignes par seconde en enregistrement, environ
-5 Mo par heure. `DebugLogTest` (borne, rotation, pile, archive, effacement) et
+5 Mo par heure — le journal garde donc une dizaine d'heures d'enregistrement, davantage
+d'usage ordinaire : exporter le jour même d'un problème. `DebugLogTest` (borne, rotation, pile, archive, effacement) et
 `TouchLogTest` (élément touché identifié) verrouillent.
 
 **Pour analyser un journal** : lire d'abord `etat.txt` (version, place, parcours), puis

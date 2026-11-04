@@ -26,7 +26,7 @@ import java.util.zip.ZipOutputStream
  * suppositions (voir les leçons de méthode de CLAUDE.md) ; le journal donne l'erreur
  * exacte, l'enchaînement des gestes et les durées.
  *
- * **Très verbeux par choix**, mais **borné à [MAX_TOTAL_BYTES]** (200 Mo) : des fichiers
+ * **Très verbeux par choix**, mais **borné à [MAX_TOTAL_BYTES]** (50 Mo, ramené de 200 Mo à la demande de l'auteur) : des fichiers
  * tournants de [MAX_FILE_BYTES], les plus anciens effacés dès que le total déborderait.
  *
  * - Écriture sur un fil unique, jamais sur l'appelant : une ligne ne coûte à l'écran
@@ -40,10 +40,10 @@ import java.util.zip.ZipOutputStream
  *   (le défaut à trouver est souvent sur la carte), et c'est la raison de ce confinement.
  */
 object DebugLog {
-    const val MAX_TOTAL_BYTES = 200L * 1024 * 1024
-    private const val MAX_FILE_BYTES = 10L * 1024 * 1024
+    const val MAX_TOTAL_BYTES = 50L * 1024 * 1024
+    internal const val MAX_FILE_BYTES = 5L * 1024 * 1024
 
-    /** Les bornes en vigueur ; réduites par les tests, qui n'écrivent pas 200 Mo. */
+    /** Les bornes en vigueur ; réduites par les tests, qui n'écrivent pas 50 Mo. */
     @androidx.annotation.VisibleForTesting
     internal var maxTotalBytes = MAX_TOTAL_BYTES
     @androidx.annotation.VisibleForTesting
@@ -116,7 +116,7 @@ object DebugLog {
             }
             out.write(line)
             // En octets et non en caractères : les accents comptent double, et la borne
-            // de 200 Mo est une promesse de place sur le disque.
+            // de 50 Mo est une promesse de place sur le disque.
             currentSize += line.encodeToByteArray().size
             if (level == 'E' || level == 'W') {
                 out.flush()
