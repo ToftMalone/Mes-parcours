@@ -1730,6 +1730,8 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     private suspend fun eraseForGood(trackIds: List<Long>): Int {
         com.example.util.DebugLog.d("Base", "eraseForGood(trackIds=${trackIds.size} éléments)")
         if (trackIds.isEmpty()) return 0
+        // D'abord hors de la corbeille affichée, puis effacés : voir TrackDao.markForErase.
+        trackIds.chunked(500).forEach { trackDao.markForErase(it) }
         var erased = 0
         trackIds.forEach { id ->
             // Début, fin et durée de chaque étape au journal : sans elles, un effacement

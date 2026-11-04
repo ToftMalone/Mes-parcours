@@ -174,6 +174,15 @@ rétrécit jamais sans `VACUUM`. Désormais : effacement par paquets de 20 000 p
 dès que plus de 16 Mo sont libres, jamais pendant un enregistrement, et aussi au
 démarrage. `TrashTest` vérifie sur une vraie base sur disque que le fichier rétrécit.
 
+**La trace « impossible à supprimer »** (2.3.15), trouvée dans le journal de débogage du
+père de l'auteur : effacer son fichier de 2,9 millions de points prend environ 13 s, et la
+trace restait affichée dans la corbeille tout ce temps. Il la croyait indélébile et
+quittait l'application quelques secondes après « Vider » — Android pouvait alors
+l'arrêter en plein effacement. Désormais `eraseForGood` commence par `markForErase` :
+`deletedAt = 0`, que la corbeille affichée exclut (`deletedAt > 0`) ; la trace disparaît
+à l'instant, et si l'effacement est interrompu, la purge du démarrage le reprend (0
+précède toute date d'expiration).
+
 Restent des effacements immédiats, voulus : les
 parcours absorbés par une fusion (leurs points sont recopiés dans le plus ancien), la
 ligne d'un import ou d'un nettoyage qui échoue. **Toute nouvelle requête qui liste des
@@ -940,9 +949,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 246 tests unitaires en 29 suites : `ScreensScreenshotTest` (38, captures seules —
+- 247 tests unitaires en 29 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (8), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (9), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

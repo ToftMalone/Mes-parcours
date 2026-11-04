@@ -203,4 +203,21 @@ class TrashTest {
             context.deleteDatabase("corbeille_test.db")
         }
     }
+
+    @Test
+    fun `une trace marquée pour effacement quitte la corbeille aussitôt, et le démarrage finit le travail`() = runBlocking {
+        val trashed = createTrack("Interrompu")
+        repository.deleteTrack(trashed)
+        assertEquals(1, repository.trashedTracks.first().size)
+
+        // Ce que fait le vidage avant d'effacer : l'application peut être arrêtée juste après.
+        db.trackDao.markForErase(listOf(trashed))
+        assertTrue("plus affichée dans la corbeille", repository.trashedTracks.first().isEmpty())
+        assertEquals(10, db.trackDao.getPointsForTrack(trashed).size)
+
+        // Au démarrage suivant, la purge des parcours expirés la reprend.
+        assertEquals(1, repository.purgeTrash())
+        assertNull(db.trackDao.getTrackById(trashed))
+        assertTrue(db.trackDao.getPointsForTrack(trashed).isEmpty())
+    }
 }
