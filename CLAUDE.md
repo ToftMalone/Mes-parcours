@@ -176,12 +176,16 @@ démarrage. `TrashTest` vérifie sur une vraie base sur disque que le fichier r�
 
 **La trace « impossible à supprimer »** (2.3.15), trouvée dans le journal de débogage du
 père de l'auteur : effacer son fichier de 2,9 millions de points prend environ 13 s, et la
-trace restait affichée dans la corbeille tout ce temps. Il la croyait indélébile et
-quittait l'application quelques secondes après « Vider » — Android pouvait alors
-l'arrêter en plein effacement. Désormais `eraseForGood` commence par `markForErase` :
-`deletedAt = 0`, que la corbeille affichée exclut (`deletedAt > 0`) ; la trace disparaît
-à l'instant, et si l'effacement est interrompu, la purge du démarrage le reprend (0
-précède toute date d'expiration).
+trace restait affichée dans la corbeille tout ce temps, sans signe d'activité. Il la
+croyait indélébile et quittait l'application quelques secondes après « Vider » — Android
+pouvait alors l'arrêter en plein effacement. Désormais, à la demande de l'auteur, le
+vidage **affiche son avancement en pour cent** (`TrackRepository.trashEraseProgress`,
+compté en points effacés, barre et texte dans la feuille, « Vidage… n % » à la place de
+« Corbeille (n) ») et les traces ne disparaissent **qu'une fois vraiment effacées**,
+marquées « Effacement en cours… », sans « Restaurer ». `eraseForGood` commence par
+`markForErase` (`deletedAt = 0`) : un effacement interrompu est repris par la purge du
+démarrage, 0 précédant toute date d'expiration. `TrashTest` et la capture
+`historique_corbeille_vidage` verrouillent.
 
 Restent des effacements immédiats, voulus : les
 parcours absorbés par une fusion (leurs points sont recopiés dans le plus ancien), la
@@ -949,9 +953,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 247 tests unitaires en 29 suites : `ScreensScreenshotTest` (38, captures seules —
+- 249 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (9), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (10), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

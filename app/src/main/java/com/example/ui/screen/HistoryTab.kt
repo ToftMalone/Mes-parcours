@@ -151,6 +151,7 @@ fun HistoryTab(
     var confirmBulkDelete by remember { mutableStateOf(false) }
     var showTrash by remember { mutableStateOf(false) }
     val trashed by viewModel.trashedTracks.collectAsState()
+    val trashProgress by viewModel.trashEraseProgress.collectAsState()
     var confirmBulkMerge by remember { mutableStateOf(false) }
     val exitSelection = {
         selecting = false
@@ -281,7 +282,8 @@ fun HistoryTab(
                                 Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    stringResource(R.string.trash_button, trashed.size),
+                                    trashProgress?.let { stringResource(R.string.trash_button_emptying, it) }
+                                        ?: stringResource(R.string.trash_button, trashed.size),
                                     style = MaterialTheme.typography.labelLarge
                                 )
                             }
@@ -433,6 +435,7 @@ fun HistoryTab(
     if (showTrash) {
         TrashSheet(
             tracks = trashed,
+            progress = trashProgress,
             onRestore = { track ->
                 viewModel.restoreFromTrash(track.id) {
                     messenger.show(context.getString(R.string.trash_restored, track.name), Icons.Rounded.RestoreFromTrash)
@@ -1318,7 +1321,14 @@ fun ResumeRefusedDialog(trackName: String, onDismiss: () -> Unit, onOpenRecordin
  * qui part de là ne revient plus, et la corbeille est née d'une suppression regrettée.
  */
 @Composable
-private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onEmpty: () -> Unit, onDismiss: () -> Unit) {
+private fun TrashSheet(
+    tracks: List<Track>,
+    /** Avancement du vidage en cours, en pour cent ; null hors vidage. */
+    progress: Int?,
+    onRestore: (Track) -> Unit,
+    onEmpty: () -> Unit,
+    onDismiss: () -> Unit
+) {
     var confirmEmpty by remember { mutableStateOf(false) }
     // Plus rien à montrer après la dernière restauration : la feuille se range.
     LaunchedEffect(tracks.isEmpty()) { if (tracks.isEmpty()) onDismiss() }
@@ -1333,6 +1343,8 @@ private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onEmpty:
                 .testTag("trash_list")
         ) {
             items(tracks, key = { it.id }) { track ->
+                // deletedAt = 0 : en cours d'effacement (TrackDao.markForErase).
+                val erasing = track.deletedAt == 0L
                 val deletedAt = track.deletedAt ?: now
                 val daysLeft = ((deletedAt + Track.TRASH_RETENTION_MS - now) / (24L * 60 * 60 * 1000))
                     .toInt().coerceAtLeast(0) + 1
@@ -1348,7 +1360,8 @@ private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onEmpty:
                     Column(modifier = Modifier.weight(1f)) {
                         Text(track.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            pluralStringResource(
+                            if (erasing) stringResource(R.string.trash_item_erasing)
+                            else pluralStringResource(
                                 R.plurals.trash_item_subtitle, daysLeft,
                                 FormatUtils.formatDistanceShort(track.totalDistance), daysLeft
                             ),
@@ -1356,7 +1369,7 @@ private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onEmpty:
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    TextButton(
+                    if (!erasing && progress == null) TextButton(
                         onClick = { onRestore(track) },
                         modifier = Modifier.testTag("trash_restore_${track.id}")
                     ) {
@@ -1368,7 +1381,26 @@ private fun TrashSheet(tracks: List<Track>, onRestore: (Track) -> Unit, onEmpty:
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
-        TextButton(
+        if (progress != null) {
+            // Le vidage en cours, au pour cent près : les parcours ne disparaissent qu'une
+            // fois vraiment effacés.
+            Text(
+                stringResource(R.string.trash_emptying, progress),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag("trash_emptying")
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress / 100f },
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        } else TextButton(
             onClick = { confirmEmpty = true },
             colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             modifier = Modifier

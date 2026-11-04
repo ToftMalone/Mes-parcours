@@ -205,6 +205,20 @@ class ScreensScreenshotTest {
         captureScreenRoboImage("src/test/screenshots/refonte/historique_corbeille_clair.png")
     }
 
+    @Test fun historique_corbeille_vidage() {
+        seed()
+        runBlocking {
+            val trashed = db.trackDao.getAllTracks().first().takeLast(2)
+            trashed.forEach { repository.deleteTrack(it.id) }
+            db.trackDao.markForErase(listOf(trashed.first().id))
+        }
+        repository.showTrashEraseProgressForTesting(42)
+        history(false); waitForTag("history_open_trash")
+        compose.onNodeWithTag("history_open_trash").performClick()
+        waitForTag("trash_emptying")
+        captureScreenRoboImage("src/test/screenshots/refonte/historique_corbeille_vidage_clair.png")
+    }
+
     @Test fun historique_clair() { seed(); history(false); waitForTag("history_list"); shoot("historique", false) }
     @Test fun historique_sombre() { seed(); history(true); waitForTag("history_list"); shoot("historique", true) }
 

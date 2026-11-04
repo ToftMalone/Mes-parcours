@@ -209,6 +209,9 @@
     <string name="delete_dialog_title">Supprimer ce parcours ?</string>
     <string name="delete_dialog_body">« %1$s » ira à la corbeille, d\'où vous pourrez le restaurer pendant 30 jours.</string>
     <string name="trash_button">Corbeille (%1$d)</string>
+    <string name="trash_button_emptying">Vidage… %1$d %%</string>
+    <string name="trash_emptying">Vidage de la corbeille… %1$d %%</string>
+    <string name="trash_item_erasing">Effacement en cours…</string>
     <string name="trash_title">Corbeille</string>
     <string name="trash_subtitle">Les parcours supprimés restent ici 30 jours, puis sont effacés d\'eux-mêmes, à moins de vider la corbeille avant.</string>
     <string name="trash_restore">Restaurer</string>

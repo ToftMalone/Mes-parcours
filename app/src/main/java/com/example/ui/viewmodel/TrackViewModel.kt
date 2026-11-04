@@ -470,6 +470,9 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     val trashedTracks: StateFlow<List<Track>> = repository.trashedTracks
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Avancement du vidage de la corbeille, en pour cent ; null hors vidage. */
+    val trashEraseProgress: StateFlow<Int?> = repository.trashEraseProgress
+
     /** Sort un parcours de la corbeille. */
     fun restoreFromTrash(trackId: Long, onDone: () -> Unit = {}) {
         DebugLog.i("Action", "Restaurer depuis la corbeille #$trackId")

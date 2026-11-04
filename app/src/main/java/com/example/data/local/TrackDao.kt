@@ -309,8 +309,8 @@ interface TrackDao {
     // ------------------------------------------------------------------
 
     /** Les parcours de la corbeille, du plus récemment supprimé au plus ancien. */
-    // `deletedAt = 0` : en cours d'effacement (voir markForErase), déjà plus dans la corbeille.
-    @Query("SELECT * FROM tracks WHERE deletedAt IS NOT NULL AND deletedAt > 0 ORDER BY deletedAt DESC")
+    // `deletedAt = 0` : en cours d'effacement (voir markForErase) — affiché jusqu'au bout.
+    @Query("SELECT * FROM tracks WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC")
     fun getTrashedTracks(): Flow<List<Track>>
 
     /** Met à la corbeille, et retire de la carte : un parcours supprimé ne s'y dessine plus. */
@@ -318,16 +318,18 @@ interface TrackDao {
     suspend fun moveToTrash(trackId: Long, now: Long)
 
     /**
-     * Retire tout de suite des parcours de la corbeille affichée, avant leur effacement
-     * qui prend une quinzaine de secondes sur un gros fichier : `deletedAt` passe à 0, la
-     * date la plus ancienne qui soit. Rapporté par le père de l'auteur : la trace restait
-     * visible pendant tout l'effacement, il la croyait « impossible à supprimer » et
-     * quittait l'application, qui pouvait alors être arrêtée en plein travail. Une trace
-     * ainsi marquée est reprise par la purge du démarrage ([TrackRepository.purgeTrash]),
-     * puisque 0 précède toute date d'expiration.
+     * Marque des parcours comme en cours d'effacement, qui prend une quinzaine de
+     * secondes sur un gros fichier : `deletedAt` passe à 0, la date la plus ancienne qui
+     * soit. La corbeille les montre « en cours d'effacement », sans « Restaurer », jusqu'à
+     * ce qu'ils disparaissent ; et si l'application est arrêtée en plein travail, la purge
+     * du démarrage ([TrackRepository.purgeTrash]) les reprend, puisque 0 précède toute
+     * date d'expiration.
      */
     @Query("UPDATE tracks SET deletedAt = 0, isSelectedForMap = 0 WHERE id IN (:trackIds)")
     suspend fun markForErase(trackIds: List<Long>)
+
+    @Query("SELECT COUNT(*) FROM track_points WHERE trackId IN (:trackIds)")
+    suspend fun countPointsOfTracks(trackIds: List<Long>): Long
 
     @Query("UPDATE tracks SET deletedAt = NULL WHERE id = :trackId")
     suspend fun restoreFromTrash(trackId: Long)

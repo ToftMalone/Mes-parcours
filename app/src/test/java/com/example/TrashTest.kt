@@ -8,6 +8,7 @@ import com.example.data.model.Track
 import com.example.data.model.TrackPoint
 import com.example.data.repository.TrackRepository
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -205,19 +206,43 @@ class TrashTest {
     }
 
     @Test
-    fun `une trace marquée pour effacement quitte la corbeille aussitôt, et le démarrage finit le travail`() = runBlocking {
+    fun `une trace en cours d'effacement reste affichée, et le démarrage finit le travail`() = runBlocking {
         val trashed = createTrack("Interrompu")
         repository.deleteTrack(trashed)
-        assertEquals(1, repository.trashedTracks.first().size)
 
         // Ce que fait le vidage avant d'effacer : l'application peut être arrêtée juste après.
         db.trackDao.markForErase(listOf(trashed))
-        assertTrue("plus affichée dans la corbeille", repository.trashedTracks.first().isEmpty())
+        val shown = repository.trashedTracks.first()
+        assertEquals("encore affichée, comme en cours d'effacement", listOf(0L), shown.map { it.deletedAt })
         assertEquals(10, db.trackDao.getPointsForTrack(trashed).size)
 
         // Au démarrage suivant, la purge des parcours expirés la reprend.
         assertEquals(1, repository.purgeTrash())
         assertNull(db.trackDao.getTrackById(trashed))
         assertTrue(db.trackDao.getPointsForTrack(trashed).isEmpty())
+    }
+
+    @Test
+    fun `le vidage annonce son avancement, puis s'efface`() = runBlocking {
+        val big = db.trackDao.insertTrack(Track(name = "Gros", startTime = 1_000_000L))
+        (0 until 3).forEach { batch ->
+            db.trackDao.insertTrackPoints(
+                (0 until 20_000).map { TrackPoint(trackId = big, latitude = 45.0, longitude = 5.0, timestamp = (batch * 20_000L + it) * 1_000L) }
+            )
+        }
+        repository.deleteTrack(big)
+        val seen = java.util.Collections.synchronizedList(mutableListOf<Int?>())
+        val watcher = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            repository.trashEraseProgress.collect { seen += it }
+        }
+
+        assertEquals(1, repository.emptyTrash())
+        watcher.cancel()
+
+        val values = seen.filterNotNull()
+        assertTrue("avancement publié : $seen", values.isNotEmpty() && values.any { it in 1..95 })
+        assertEquals("croissant", values, values.sorted())
+        assertNull("plus rien affiché une fois vidée", repository.trashEraseProgress.value)
+        assertTrue(repository.trashedTracks.first().isEmpty())
     }
 }

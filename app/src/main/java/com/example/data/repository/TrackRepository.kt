@@ -1690,7 +1690,22 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * leurs trente jours. Ajouté après coup à la demande de l'auteur ; l'écran ne le
      * propose qu'après un avertissement qu'on ne peut valider avant trois secondes.
      */
-    suspend fun emptyTrash(): Int = eraseForGood(trackDao.getTrashedIdsBefore(Long.MAX_VALUE))
+    suspend fun emptyTrash(): Int = eraseForGood(trackDao.getTrashedIdsBefore(Long.MAX_VALUE), reportProgress = true)
+
+    /**
+     * Avancement du vidage de la corbeille demandé par l'utilisateur, en pour cent ; null
+     * hors vidage. Demandé par l'auteur : son père voyait la trace rester affichée
+     * pendant la quinzaine de secondes d'un effacement, sans signe que quelque chose se
+     * passait, et la croyait impossible à supprimer.
+     */
+    private val _trashEraseProgress = MutableStateFlow<Int?>(null)
+    val trashEraseProgress: StateFlow<Int?> = _trashEraseProgress.asStateFlow()
+
+    /** Pour les captures d'écran : montrer la corbeille en plein vidage. */
+    @androidx.annotation.VisibleForTesting
+    internal fun showTrashEraseProgressForTesting(percent: Int?) {
+        _trashEraseProgress.value = percent
+    }
 
     /**
      * Borne la place que prend la corbeille : au-delà de [trashPointLimit] points, les
@@ -1727,35 +1742,49 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      *   son fichier pour les réutiliser, qui ne rétrécit jamais sans `VACUUM`. Le
      *   stockage de l'application ne baissait donc pas d'un octet.
      */
-    private suspend fun eraseForGood(trackIds: List<Long>): Int {
+    private suspend fun eraseForGood(trackIds: List<Long>, reportProgress: Boolean = false): Int {
         com.example.util.DebugLog.d("Base", "eraseForGood(trackIds=${trackIds.size} éléments)")
         if (trackIds.isEmpty()) return 0
-        // D'abord hors de la corbeille affichée, puis effacés : voir TrackDao.markForErase.
+        // Marqués d'abord : un effacement interrompu reprend au démarrage (TrackDao.markForErase).
         trackIds.chunked(500).forEach { trackDao.markForErase(it) }
-        var erased = 0
-        trackIds.forEach { id ->
-            // Début, fin et durée de chaque étape au journal : sans elles, un effacement
-            // encore en cours ne se distinguait pas d'un effacement resté en panne.
-            val start = System.nanoTime()
-            var points = 0
-            while (true) {
-                val n = trackDao.deletePointChunk(id, ERASE_CHUNK_POINTS)
-                if (n <= 0) break
-                points += n
+        // L'avancement se compte en points : c'est leur effacement qui prend le temps. Les
+        // derniers pour cent couvrent le ménage qui suit (tracés orphelins, compactage).
+        val totalPoints = if (reportProgress) {
+            trackIds.chunked(500).sumOf { trackDao.countPointsOfTracks(it) }.coerceAtLeast(1)
+        } else 1L
+        var donePoints = 0L
+        if (reportProgress) _trashEraseProgress.value = 0
+        try {
+            var erased = 0
+            trackIds.forEach { id ->
+                // Début, fin et durée de chaque étape au journal : sans elles, un effacement
+                // encore en cours ne se distinguait pas d'un effacement resté en panne.
+                val start = System.nanoTime()
+                var points = 0
+                while (true) {
+                    val n = trackDao.deletePointChunk(id, ERASE_CHUNK_POINTS)
+                    if (n <= 0) break
+                    points += n
+                    donePoints += n
+                    if (reportProgress) _trashEraseProgress.value = (donePoints * 95 / totalPoints).toInt().coerceIn(0, 95)
+                }
+                trackDao.deleteTrack(id)
+                invalidatePointCaches(id)
+                erased++
+                com.example.util.DebugLog.i(
+                    "Base",
+                    "parcours #$id effacé pour de bon : $points points, ${(System.nanoTime() - start) / 1_000_000} ms"
+                )
             }
-            trackDao.deleteTrack(id)
-            invalidatePointCaches(id)
-            erased++
-            com.example.util.DebugLog.i(
-                "Base",
-                "parcours #$id effacé pour de bon : $points points, ${(System.nanoTime() - start) / 1_000_000} ms"
-            )
+            // Les tracés KML auxquels plus aucun point ne renvoie partent avec eux. Le
+            // ménage relit toute la table des points : seulement quand il y a eu effacement.
+            com.example.util.DebugLog.timed("Base", "tracés KML orphelins retirés") { trackDao.deleteOrphanPlacemarks() }
+            if (reportProgress) _trashEraseProgress.value = 98
+            compactDatabase()
+            return erased
+        } finally {
+            if (reportProgress) _trashEraseProgress.value = null
         }
-        // Les tracés KML auxquels plus aucun point ne renvoie partent avec eux. Le
-        // ménage relit toute la table des points : seulement quand il y a eu effacement.
-        com.example.util.DebugLog.timed("Base", "tracés KML orphelins retirés") { trackDao.deleteOrphanPlacemarks() }
-        compactDatabase()
-        return erased
     }
 
     /**
