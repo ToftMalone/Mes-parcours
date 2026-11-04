@@ -8,7 +8,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import com.example.ui.component.logTouches
 import com.example.ui.screen.MainScreen
+import com.example.util.DebugLog
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TrackViewModel
 import com.example.util.FormatUtils
@@ -29,6 +31,11 @@ class MainActivity : ComponentActivity() {
         trackViewModel.updateAppForegroundStatus(false)
     }
 
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        DebugLog.i("Toucher", "Touche ${android.view.KeyEvent.keyCodeToString(keyCode)}")
+        return super.onKeyUp(keyCode, event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // OsmConfig.init est déjà appelé par TrackApplication.onCreate, qui s'exécute
         // avant toute activité : le refaire ici ne servait à rien.
@@ -43,7 +50,8 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 MainScreen(
                     viewModel = trackViewModel,
-                    modifier = Modifier.fillMaxSize()
+                    // Chaque toucher, et ce qu'il a touché, va au journal de débogage.
+                    modifier = Modifier.fillMaxSize().logTouches("écran principal")
                 )
             }
         }

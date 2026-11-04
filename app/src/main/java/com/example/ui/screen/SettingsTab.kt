@@ -81,6 +81,15 @@ import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
 import com.example.ui.component.CookieShape
 import com.example.ui.component.LocalAppMessenger
+import com.example.ui.component.MpDialog
+import com.example.ui.component.MpTextButton
+import com.example.ui.component.ShapeBadge
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.ui.component.MpSwitch
 import com.example.ui.component.SunShape
 import com.example.ui.theme.DisplayFontFamily
@@ -118,6 +127,7 @@ fun SettingsTab(
     onSubPageChanged: (Boolean) -> Unit = {}
 ) {
     var page by remember { mutableStateOf(SettingsPage.MAIN) }
+    LaunchedEffect(page) { com.example.util.DebugLog.i("Écran", "Page des paramètres : $page") }
     LaunchedEffect(page) { onSubPageChanged(page != SettingsPage.MAIN) }
     BackHandler(enabled = page != SettingsPage.MAIN) { page = SettingsPage.MAIN }
 
@@ -218,6 +228,123 @@ private fun SettingsMain(
                 onClick = onOpenAbout,
                 testTag = "open_about_button",
                 trailing = { Chevron() }
+            )
+            DebugLogRow()
+        }
+    }
+}
+
+/**
+ * Le journal de débogage ([com.example.util.DebugLog]) : sa taille, et de quoi
+ * l'envoyer — partage direct (messagerie, courriel…) ou fichier enregistré là où l'on
+ * veut. Demandé par l'auteur pour diagnostiquer à distance les problèmes de son père.
+ */
+@Composable
+private fun DebugLogRow() {
+    val context = LocalContext.current
+    val messenger = LocalAppMessenger.current
+    val scope = rememberCoroutineScope()
+    var open by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var size by remember { mutableStateOf(0L) }
+    LaunchedEffect(open) {
+        size = withContext(Dispatchers.IO) { com.example.util.DebugLog.totalSize(context) }
+    }
+    val sizeText = String.format(java.util.Locale.FRANCE, "%.1f Mo", size / (1024.0 * 1024.0))
+
+    // L'archive, fabriquée hors du fil principal (base relue, fichiers compressés).
+    suspend fun prepare(): java.io.File? = withContext(Dispatchers.IO) {
+        runCatching {
+            val snapshot = com.example.data.repository.TrackRepository.getInstance(context).debugSnapshot(context)
+            com.example.util.DebugLog.buildExport(context, snapshot)
+        }.onFailure { com.example.util.DebugLog.e("Journal", "Échec de la préparation de l'archive", it) }.getOrNull()
+    }
+
+    val saveLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri == null) { busy = false; return@rememberLauncherForActivityResult }
+        scope.launch {
+            val zip = prepare()
+            val ok = zip != null && withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri, "wt")!!.use { out -> zip.inputStream().use { it.copyTo(out) } }
+                }.onFailure { com.example.util.DebugLog.e("Journal", "Échec de l'enregistrement de l'archive", it) }.isSuccess
+            }
+            busy = false
+            open = false
+            if (ok) messenger.show(context.getString(R.string.debug_log_saved), Icons.Rounded.Save)
+            else messenger.show(context.getString(R.string.debug_log_failed), Icons.Rounded.BugReport, isError = true)
+        }
+    }
+
+    SettingsRow(
+        icon = Icons.Rounded.BugReport,
+        title = stringResource(R.string.settings_debug_log),
+        subtitle = stringResource(R.string.settings_debug_log_subtitle, sizeText),
+        onClick = { open = true },
+        testTag = "settings_debug_log_row",
+        trailing = { Chevron() }
+    )
+
+    if (open) {
+        MpDialog(
+            onDismissRequest = { if (!busy) open = false },
+            title = stringResource(R.string.debug_log_title),
+            body = stringResource(R.string.debug_log_body, sizeText),
+            icon = {
+                ShapeBadge(
+                    icon = Icons.Rounded.BugReport,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            },
+            confirmLabel = stringResource(if (busy) R.string.debug_log_preparing else R.string.debug_log_share),
+            confirmEnabled = !busy,
+            confirmTestTag = "debug_log_share",
+            onConfirm = {
+                busy = true
+                scope.launch {
+                    val zip = prepare()
+                    busy = false
+                    if (zip == null) {
+                        messenger.show(context.getString(R.string.debug_log_failed), Icons.Rounded.BugReport, isError = true)
+                        return@launch
+                    }
+                    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", zip)
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "application/zip"
+                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, zip.name)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(
+                        android.content.Intent.createChooser(send, context.getString(R.string.debug_log_share_title))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                    open = false
+                }
+            },
+            dismissLabel = stringResource(R.string.debug_log_save),
+            onDismiss = {
+                if (!busy) {
+                    busy = true
+                    val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.FRANCE).format(java.util.Date())
+                    saveLauncher.launch("journal-mes-parcours-$stamp.zip")
+                }
+            }
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            MpTextButton(
+                text = stringResource(R.string.debug_log_clear),
+                onClick = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { com.example.util.DebugLog.clear(context) }
+                        size = withContext(Dispatchers.IO) { com.example.util.DebugLog.totalSize(context) }
+                        messenger.show(context.getString(R.string.debug_log_cleared), Icons.Rounded.BugReport)
+                    }
+                },
+                modifier = Modifier.testTag("debug_log_clear")
             )
         }
     }

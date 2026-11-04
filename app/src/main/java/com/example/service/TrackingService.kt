@@ -195,6 +195,7 @@ class TrackingService : Service() {
     }
 
     override fun onCreate() {
+        com.example.util.DebugLog.d("Service", "onCreate()")
         super.onCreate()
         repository = TrackRepository.getInstance(applicationContext)
         altitudeResolver = AltitudeResolver(applicationContext)
@@ -211,6 +212,7 @@ class TrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        com.example.util.DebugLog.d("Service", "onStartCommand(intent=$intent, flags=$flags, startId=$startId)")
         // Redémarrage par le système après une éviction mémoire : START_STICKY relance
         // le service avec une intention nulle. Sans ce cas, aucune branche ne
         // s'appliquait — ni notification de premier plan, ni GPS, ni minuteur. Le
@@ -257,6 +259,7 @@ class TrackingService : Service() {
     }
 
     private suspend fun attachToOrRestoreActiveTrack(name: String, activityType: String, existingTrackId: Long = -1L) {
+        com.example.util.DebugLog.d("Service", "attachToOrRestoreActiveTrack(name=$name, activityType=$activityType, existingTrackId=$existingTrackId)")
         // Lu avant toute suspension : une reprise après redémarrage peut se faire en
         // pause, et l'écran ne doit pas afficher « en cours » le temps de la lecture.
         val restorePaused = isPaused
@@ -319,6 +322,7 @@ class TrackingService : Service() {
     }
 
     private fun startTracking(name: String, activityType: String, existingTrackId: Long = -1L) {
+        com.example.util.DebugLog.d("Service", "startTracking(name=$name, activityType=$activityType, existingTrackId=$existingTrackId)")
         hasSession = true
         isServiceStopping = false
         isPaused = false
@@ -357,6 +361,7 @@ class TrackingService : Service() {
      * chronomètre repartait ensuite — il tournait pendant la pause.
      */
     private fun applyState() {
+        com.example.util.DebugLog.d("Service", "applyState()")
         if (isServiceStopping || trackId <= 0) return
         repository.setRecordingPaused(isPaused)
         requestLocationUpdates()
@@ -379,6 +384,7 @@ class TrackingService : Service() {
      * donc pas s'achever dans le désordre et laisser en base l'avant-dernier état.
      */
     private fun persistPauseState() {
+        com.example.util.DebugLog.d("Service", "persistPauseState()")
         serviceScope.launch {
             pauseWriteMutex.withLock {
                 val id = trackId
@@ -388,6 +394,7 @@ class TrackingService : Service() {
     }
 
     private fun startTimer() {
+        com.example.util.DebugLog.d("Service", "startTimer()")
         timerJob?.cancel()
         if (segmentStartedAtRealtime == 0L) {
             segmentStartedAtRealtime = android.os.SystemClock.elapsedRealtime()
@@ -410,11 +417,13 @@ class TrackingService : Service() {
 
     /** Fige la durée acquise : le chronomètre repartira de cette valeur. */
     private fun freezeElapsed() {
+        com.example.util.DebugLog.d("Service", "freezeElapsed()")
         elapsedBaseSeconds = elapsedSeconds
         segmentStartedAtRealtime = 0L
     }
 
     private fun pauseTracking() {
+        com.example.util.DebugLog.d("Service", "pauseTracking()")
         isPaused = true
         // Coupe le tronçon : à la reprise, aucun trait ne reliera les deux morceaux.
         lastLocation = null
@@ -436,6 +445,7 @@ class TrackingService : Service() {
      * puis le service s'arrête — il n'a pas été mis au premier plan et n'a rien à faire.
      */
     private fun pauseOrphanTrack() {
+        com.example.util.DebugLog.d("Service", "pauseOrphanTrack()")
         isPaused = true
         repository.setRecordingPaused(true)
         serviceScope.launch {
@@ -445,6 +455,7 @@ class TrackingService : Service() {
     }
 
     private fun restoreAfterRestart() {
+        com.example.util.DebugLog.d("Service", "restoreAfterRestart()")
         serviceScope.launch {
             val active = repository.getActiveRecordingTrack()
             withContext(Dispatchers.Main) {
@@ -467,6 +478,7 @@ class TrackingService : Service() {
 
     /** Reprend l'enregistrement, ou le rouvre en pause après un redémarrage. */
     private fun restoreTracking(paused: Boolean) {
+        com.example.util.DebugLog.d("Service", "restoreTracking(paused=$paused)")
         hasSession = true
         isPaused = paused
         repository.setRecordingPaused(paused)
@@ -483,6 +495,7 @@ class TrackingService : Service() {
     }
 
     private fun removeLocationUpdatesSafely() {
+        com.example.util.DebugLog.d("Service", "removeLocationUpdatesSafely()")
         simulationJob?.cancel()
         simulationJob = null
         appliedLowPower = null
@@ -490,7 +503,7 @@ class TrackingService : Service() {
             try {
                 fusedLocationClient.removeLocationUpdates(locationCallback)
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.example.util.DebugLog.e("Service", "exception rattrapée (TrackingService.kt:493)", e)
             }
             isLocationUpdatesActive = false
         }
@@ -498,6 +511,7 @@ class TrackingService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun requestLocationUpdates() {
+        com.example.util.DebugLog.d("Service", "requestLocationUpdates()")
         if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
             androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             return
@@ -561,18 +575,19 @@ class TrackingService : Service() {
                     try {
                         fusedLocationClient.removeLocationUpdates(locationCallback)
                     } catch (ex: Exception) {
-                        ex.printStackTrace()
+                        com.example.util.DebugLog.e("Service", "exception rattrapée (TrackingService.kt:564)", ex)
                     }
                 }
             }
         } catch (e: Exception) {
             isLocationUpdatesActive = false
             appliedLowPower = null
-            e.printStackTrace()
+            com.example.util.DebugLog.e("Service", "exception rattrapée (TrackingService.kt:571)", e)
         }
     }
 
     private fun startGPSCoordinateSimulation() {
+        com.example.util.DebugLog.d("Service", "startGPSCoordinateSimulation()")
         simulationJob?.cancel()
         isLocationUpdatesActive = true
         simulationJob = serviceScope.launch {
@@ -621,6 +636,7 @@ class TrackingService : Service() {
      * réelle reste donc visible, et l'état du signal GPS est déjà signalé à côté.
      */
     private fun publishAltitude(location: Location): Double? {
+        com.example.util.DebugLog.d("Service", "publishAltitude(location=$location)")
         val fix = altitudeResolver.resolve(location) ?: return null
         val smoothed = altitudeSmoother.add(fix.metersAboveSeaLevel)
         lastKnownAltitude = smoothed
@@ -629,6 +645,7 @@ class TrackingService : Service() {
     }
 
     private fun processNewLocation(location: Location) {
+        com.example.util.DebugLog.d("Service", "processNewLocation(location=$location)")
         if (isPaused) {
             pointScope.launch {
                 val currSpeed = if (location.hasSpeed()) location.speed else 0f
@@ -653,10 +670,16 @@ class TrackingService : Service() {
         }
         pointScope.launch {
             // Ignoré tant que trackId n'est pas connu : la clé étrangère refuserait le point
-            if (trackId <= 0) return@launch
+            if (trackId <= 0) {
+                com.example.util.DebugLog.d("Service", "position écartée : parcours pas encore créé")
+                return@launch
+            }
 
             // Écarte les points imprécis (seulement si la précision annoncée dépasse 65 mètres)
-            if (location.hasAccuracy() && location.accuracy > 65.0f) return@launch
+            if (location.hasAccuracy() && location.accuracy > 65.0f) {
+                com.example.util.DebugLog.d("Service", "position écartée : précision ${location.accuracy} m (> 65 m)")
+                return@launch
+            }
 
             val currLat = location.latitude
             val currLng = location.longitude
@@ -752,6 +775,7 @@ class TrackingService : Service() {
     }
 
     private fun updateStatsNotification() {
+        com.example.util.DebugLog.d("Service", "updateStatsNotification()")
         val stats = repository.liveStats.value
         val km = stats.distanceMeters / 1000.0
         val formattedKm = String.format("%.2f km", km)
@@ -798,6 +822,7 @@ class TrackingService : Service() {
     }
 
     private fun stopTracking() {
+        com.example.util.DebugLog.d("Service", "stopTracking()")
         timerJob?.cancel()
         timerJob = null
         isServiceStopping = true
@@ -831,6 +856,7 @@ class TrackingService : Service() {
     }
 
     private fun startForegroundServiceNotification() {
+        com.example.util.DebugLog.d("Service", "startForegroundServiceNotification()")
         val notification = buildNotification(getString(R.string.notif_recording_starting))
         
         try {
@@ -844,12 +870,12 @@ class TrackingService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.DebugLog.e("Service", "exception rattrapée (TrackingService.kt:847)", e)
             try {
                 // Repli sur un service de premier plan sans type
                 startForeground(NOTIFICATION_ID, notification)
             } catch (ex: Exception) {
-                ex.printStackTrace()
+                com.example.util.DebugLog.e("Service", "exception rattrapée (TrackingService.kt:852)", ex)
             }
         }
     }
@@ -907,6 +933,7 @@ class TrackingService : Service() {
     }
 
     private fun createNotificationChannel() {
+        com.example.util.DebugLog.d("Service", "createNotificationChannel()")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
@@ -925,6 +952,7 @@ class TrackingService : Service() {
     }
 
     override fun onDestroy() {
+        com.example.util.DebugLog.d("Service", "onDestroy()")
         timerJob?.cancel()
         isServiceStopping = true
         removeLocationUpdatesSafely()

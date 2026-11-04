@@ -105,7 +105,7 @@ AppDatabase / TrackDao  ──  entités Track + TrackPoint
 - `data/` — modèles, `TrackDao`, `AppDatabase`, `TrackRepository`
 - `service/TrackingService` — acquisition GPS, accumulateurs de statistiques, notification
 - `ui/component/MapViewContainer` — pont osmdroid ↔ Compose (le plus gros fichier)
-- `util/` — `Importer`, `Exporter`, `MediaStoreExporter`, `AutoBackupManager`,
+- `util/` — `DebugLog` (journal de débogage), `Importer`, `Exporter`, `MediaStoreExporter`, `AutoBackupManager`,
   `SolarTimes`, `TunnelDetector`, `Altitude`, `ElevationAccumulator`, `FormatUtils`,
   `KmlColor`, préférences de style
 
@@ -520,6 +520,55 @@ Le premier point reçu n'apporte ni distance ni vitesse — il n'a pas de préc�
 quoi les mesurer — mais il ouvre l'altitude de référence. C'est ce que faisait déjà la
 boucle d'origine en démarrant à l'indice 1.
 
+## Journal de débogage
+
+Demandé par l'auteur pour « trouver quand mon père rencontre des problèmes », puis
+précisé : « il faut que ce journal note **TOUT** ce qui se passe dans l'appli ». Le père
+l'exporte (Paramètres → Application → « Journal de débogage » → Partager ou
+Enregistrer), l'auteur le transmet à Claude, qui l'analyse.
+
+`util/DebugLog` : fichiers tournants de 10 Mo dans `filesDir/logs` (interne, jamais
+exposé), **200 Mo au plus** (`MAX_TOTAL_BYTES`, les plus anciens effacés, taille comptée
+en octets), écriture sur un fil unique qui vide par paquets, plantage écrit **avant** la
+mort du processus (`installCrashHandler`). Ligne : `date heure.ms niveau [fil] étiquette : message`,
+pile d'appels complète sous chaque erreur. L'archive (`buildExport`, `filesDir/log_export`,
+seul sous-dossier ajouté au `FileProvider`) contient `etat.txt` (appareil, mémoire, place
+libre, puis `TrackRepository.debugSnapshot` : chaque parcours avec ses points, corbeille
+comprise, taille de la base, du WAL, des pages libres, du cache de tuiles, tous les
+réglages), `logcat.txt` (ce qu'Android et les bibliothèques ont écrit pour ce processus)
+et tous les fichiers `journal-*.txt`, dans l'ordre de leur nom.
+
+Ce qui est noté, sans qu'un écran ait à y penser :
+
+- **Chaque toucher** (`ui/component/TouchLog`, `Modifier.logTouches`) : appui, appui long,
+  glissement, geste à plusieurs doigts, avec **l'élément touché**, retrouvé dans l'arbre
+  sémantique de Compose (libellé, icône, `testTag`, état coché, valeur d'un curseur, texte
+  d'un champ). Posé à la racine de `MainActivity` et dans `MpDialog` / `MpSheet`, qui sont
+  des fenêtres à part. Un nouveau bouton est couvert d'office ; un nouveau dialogue qui
+  n'emprunte ni `MpDialog` ni `MpSheet` doit recevoir `logTouches` lui-même.
+- Onglets, fiche détail, outil ouvert, page des paramètres, dialogues et feuilles ouverts
+  et fermés ; touches (retour) ; cycle de vie des activités ; alertes mémoire ; chaque
+  réglage modifié ; un état des lieux toutes les cinq minutes.
+- Chaque action du `TrackViewModel` (paramètres, « terminé », échec avec la pile), chaque
+  appel de fonction de `TrackRepository`, du `TrackingService` (positions écartées et
+  leur raison comprises), de l'import, de la sauvegarde, du `BootReceiver` — insérés par
+  script en tête de chaque fonction, à tenir pour toute fonction nouvelle.
+- Cartes : chaque zoom, chaque reconstruction des calques avec sa durée et ses volumes
+  (carte principale, carte des outils, rechargements de la zone visible) — de quoi
+  trancher un « ça rame » sans deviner.
+- Tous les anciens `printStackTrace()` et `Log.e` passent par le journal.
+
+**Le journal contient des positions** : voulu (les défauts sont souvent sur la carte), et
+c'est pourquoi il reste interne tant que l'utilisateur ne l'envoie pas lui-même.
+Volume mesuré à l'estime : une dizaine de lignes par seconde en enregistrement, environ
+5 Mo par heure. `DebugLogTest` (borne, rotation, pile, archive, effacement) et
+`TouchLogTest` (élément touché identifié) verrouillent.
+
+**Pour analyser un journal** : lire d'abord `etat.txt` (version, place, parcours), puis
+chercher ` E [` (erreurs) et `PLANTAGE`, puis remonter les lignes `Toucher` et `Action`
+qui précèdent pour retrouver le geste exact ; les lignes `Carte` / `Outils` donnent les
+durées de dessin. Le code correspondant est celui du commit de la version indiquée.
+
 ## Le voile noir des transitions : corrigé en 0.16
 
 Rapporté ainsi : « quand j'ouvre un parcours, l'animation d'ouverture fait un effet
@@ -890,9 +939,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 241 tests unitaires en 27 suites : `ScreensScreenshotTest` (38, captures seules —
+- 246 tests unitaires en 29 suites : `ScreensScreenshotTest` (38, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (8), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (8), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),

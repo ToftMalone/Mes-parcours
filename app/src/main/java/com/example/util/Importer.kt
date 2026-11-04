@@ -118,6 +118,7 @@ object Importer {
         onPlacemark: ((TrackPlacemark) -> Long)? = null,
         onBatch: (List<TrackPoint>) -> Unit
     ): ImportSummary? {
+        com.example.util.DebugLog.d("Import", "importFromUri(uri=$uri, trackId=$trackId)")
         val fileName = getFileName(context, uri)
         val extension = fileName.substringAfterLast('.', "").lowercase()
         val defaultName = fileName.substringBeforeLast('.')
@@ -174,6 +175,7 @@ object Importer {
     // ---------------------------------------------------------------- GPX
 
     private fun parseGPX(inputStream: InputStream, defaultName: String, sink: PointSink): TrackMeta {
+        com.example.util.DebugLog.d("Import", "parseGPX(inputStream=$inputStream, defaultName=$defaultName, sink=$sink)")
         val parser = Xml.newPullParser()
         parser.setInput(inputStream, null)
 
@@ -280,6 +282,7 @@ object Importer {
         sink: PointSink,
         onPlacemark: ((TrackPlacemark) -> Long)?
     ): TrackMeta {
+        com.example.util.DebugLog.d("Import", "parseKML(inputStream=$inputStream, defaultName=$defaultName, prescan=$prescan, sink=$sink)")
         // Le KML ne porte pas d'horodatage : on garde la convention historique d'un
         // point par seconde, calée pour que la trace se termine à l'instant présent.
         //
@@ -305,6 +308,7 @@ object Importer {
      * entier : l'empreinte mémoire ne dépend pas de la taille du fichier.
      */
     private fun prescanKml(inputStream: InputStream): KmlPrescan {
+        com.example.util.DebugLog.d("Import", "prescanKml(inputStream=$inputStream)")
         val handler = KmlStyleHandler()
         newSaxParser().parse(inputStream, handler)
         return KmlPrescan(handler.table, handler.pointCount)
@@ -357,6 +361,7 @@ object Importer {
     // ------------------------------------------------------------- Divers
 
     private fun getFileName(context: Context, uri: Uri): String {
+        com.example.util.DebugLog.d("Import", "getFileName(uri=$uri)")
         var name = context.getString(R.string.import_default_name)
         try {
             context.contentResolver.query(uri, null, null, null, null)?.use {
@@ -369,12 +374,13 @@ object Importer {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.DebugLog.e("Import", "exception rattrapée (Importer.kt:372)", e)
         }
         return name
     }
 
     private fun isKMLContent(context: Context, uri: Uri): Boolean {
+        com.example.util.DebugLog.d("Import", "isKMLContent(uri=$uri)")
         return try {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 val bytes = ByteArray(256)
@@ -530,6 +536,7 @@ private class PointSink(
 
     /** Ouvre un nouveau segment, sauf si le segment courant est encore vide. */
     fun startNewSegment() {
+        com.example.util.DebugLog.d("Import", "startNewSegment()")
         if (pointsInSegment > 0) {
             segmentIndex++
             pointsInSegment = 0
@@ -580,6 +587,7 @@ private class PointSink(
     }
 
     fun flush() {
+        com.example.util.DebugLog.d("Import", "flush()")
         if (buffer.isEmpty()) return
         onBatch(buffer)
         buffer = ArrayList(BATCH_SIZE)

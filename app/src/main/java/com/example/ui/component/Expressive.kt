@@ -274,11 +274,19 @@ fun MpDialog(
     confirmEnabled: Boolean = true,
     content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
+    androidx.compose.runtime.DisposableEffect(title) {
+        com.example.util.DebugLog.i("Écran", "Dialogue ouvert : « $title »")
+        onDispose { com.example.util.DebugLog.i("Écran", "Dialogue fermé : « $title »") }
+    }
     AlertDialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = {
+            com.example.util.DebugLog.i("Écran", "Dialogue « $title » refermé sans choix (retour ou voile)")
+            onDismissRequest()
+        },
         shape = RoundedCornerShape(32.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier,
+        // Un dialogue est une fenêtre à part : ses touchers ne passent pas par l'écran.
+        modifier = modifier.logTouches("dialogue « $title »"),
         icon = icon,
         title = {
             Text(
@@ -329,8 +337,15 @@ fun MpSheet(
     onDismissRequest: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        com.example.util.DebugLog.i("Écran", "Feuille ouverte")
+        onDispose { com.example.util.DebugLog.i("Écran", "Feuille fermée") }
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = {
+            com.example.util.DebugLog.i("Écran", "Feuille refermée (glissée, retour ou voile)")
+            onDismissRequest()
+        },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -347,6 +362,8 @@ fun MpSheet(
     ) {
         Column(
             modifier = Modifier
+                // Fenêtre à part, comme les dialogues : ses touchers ont leur propre relevé.
+                .logTouches("feuille")
                 .fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, bottom = 32.dp)
                 .navigationBarsPadding(),

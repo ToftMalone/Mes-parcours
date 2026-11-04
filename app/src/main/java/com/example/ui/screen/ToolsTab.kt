@@ -156,6 +156,7 @@ fun ToolsTab(
     onOpenHistory: () -> Unit = {}
 ) {
     var openTool by remember { mutableStateOf<Tool?>(null) }
+    LaunchedEffect(openTool) { com.example.util.DebugLog.i("Écran", "Outil ouvert : ${openTool ?: "aucun (liste des outils)"}") }
 
     LaunchedEffect(openTool) { onInToolChanged(openTool != null) }
     // Le retour arrière ferme l'outil avant de quitter l'onglet.

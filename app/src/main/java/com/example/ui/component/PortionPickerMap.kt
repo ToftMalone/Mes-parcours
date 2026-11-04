@@ -132,6 +132,7 @@ fun PortionPickerMap(
             }
 
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+                com.example.util.DebugLog.d("Outils", "zoom de la carte de l'outil : ${mapView.zoomLevelDouble}")
                 schedule()
                 return false
             }
@@ -164,9 +165,12 @@ fun PortionPickerMap(
 
     // Le tracé, la portion en rouge et les deux repères suivent le détail et les bornes.
     LaunchedEffect(mapView, points, start, end, cut, trackColor, cutColor, sketch, colorOf, backgroundTracks) {
+        // Durée de chaque reconstruction : la piste à vérifier quand la carte de l'outil rame.
+        val rebuildStart = System.nanoTime()
         mapView.overlays.clear()
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                com.example.util.DebugLog.i("Outils", "appui sur la carte de l'outil : ${p.latitude}, ${p.longitude}, zoom ${mapView.zoomLevelDouble}")
                 val raw = currentOnTapGeo.value
                 if (raw != null) raw(p)
                 else {
@@ -225,6 +229,12 @@ fun PortionPickerMap(
         start?.let { mapView.overlays.add(boundaryMarker(mapView, it, trackColor, density)) }
         end?.let { mapView.overlays.add(boundaryMarker(mapView, it, cutColor, density)) }
         mapView.invalidate()
+        com.example.util.DebugLog.d(
+            "Outils",
+            "carte de l'outil redessinée : ${mapView.overlays.size} calques, ${points.size} points, " +
+                "${backgroundTracks.size} traces de fond (${backgroundTracks.sumOf { it.points.size }} points), " +
+                "${sketch.size} points dessinés, ${(System.nanoTime() - rebuildStart) / 1_000_000} ms"
+        )
     }
 
     LaunchedEffect(mapView, isDark) {

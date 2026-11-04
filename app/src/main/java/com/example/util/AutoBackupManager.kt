@@ -25,8 +25,10 @@ object AutoBackupManager {
     private const val NOTIFICATION_ID = 8801
 
     fun performAutoBackup(context: Context, trackId: Long) {
+        com.example.util.DebugLog.d("Sauvegarde", "performAutoBackup(trackId=$trackId)")
         if (!AutoBackupPreferences.isAutoBackupEnabled(context)) {
             Log.d(TAG, "Auto backup is disabled in settings")
+            com.example.util.DebugLog.d("Sauvegarde", "Sauvegarde automatique désactivée dans les réglages")
             return
         }
 
@@ -92,6 +94,7 @@ object AutoBackupManager {
                     val formatsStr = formatsList.joinToString(", ")
                     val summaryMsg = context.getString(R.string.autobackup_summary, formatsStr)
                     Log.d(TAG, summaryMsg)
+                    com.example.util.DebugLog.d("Sauvegarde", summaryMsg)
 
                     withContext(Dispatchers.Main) {
                         showToastAndNotification(context, summaryMsg)
@@ -99,7 +102,8 @@ object AutoBackupManager {
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error performing auto backup", e)
+                android.util.Log.e(TAG, "Error performing auto backup", e)
+                com.example.util.DebugLog.e("Sauvegarde", "Échec de la sauvegarde automatique", e)
             }
         }
     }
@@ -110,6 +114,7 @@ object AutoBackupManager {
         trackId: Long,
         action: (com.example.data.model.TrackPoint) -> Unit
     ) {
+        com.example.util.DebugLog.d("Sauvegarde", "forEachPointOf(db=$db, trackId=$trackId)")
         var afterId = 0L
         while (true) {
             val page = db.trackDao.getPointsPage(trackId, afterId, 2_000)
@@ -147,7 +152,8 @@ object AutoBackupManager {
 
             notificationManager.notify(NOTIFICATION_ID, notification)
         } catch (e: Exception) {
-            Log.e(TAG, "Error showing notification", e)
+            android.util.Log.e(TAG, "Error showing notification", e)
+            com.example.util.DebugLog.e("Sauvegarde", "Échec de la notification de sauvegarde", e)
         }
     }
 }

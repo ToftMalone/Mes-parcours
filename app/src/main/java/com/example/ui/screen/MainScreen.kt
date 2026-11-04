@@ -315,13 +315,13 @@ fun MainScreen(
                                     try {
                                         fusedLocationClient.removeLocationUpdates(cb)
                                     } catch (ex: Exception) {
-                                        ex.printStackTrace()
+                                        com.example.util.DebugLog.e("Écran", "exception rattrapée (MainScreen.kt:318)", ex)
                                     }
                                 }
                             }
                     } catch (e: Exception) {
                         isLocationUpdatesActive = false
-                        e.printStackTrace()
+                        com.example.util.DebugLog.e("Écran", "exception rattrapée (MainScreen.kt:324)", e)
                     }
                 }
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
@@ -331,7 +331,7 @@ fun MainScreen(
                         try {
                             fusedLocationClient.removeLocationUpdates(it)
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            com.example.util.DebugLog.e("Écran", "exception rattrapée (MainScreen.kt:334)", e)
                         }
                         isLocationUpdatesActive = false
                     }
@@ -350,7 +350,7 @@ fun MainScreen(
                     try {
                         fusedLocationClient.removeLocationUpdates(it)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        com.example.util.DebugLog.e("Écran", "exception rattrapée (MainScreen.kt:353)", e)
                     }
                     isLocationUpdatesActive = false
                 }
@@ -360,6 +360,10 @@ fun MainScreen(
 
     var currentTab by remember { mutableStateOf("enregistrer") }
     var viewingDetailedTrackId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(currentTab) { com.example.util.DebugLog.i("Écran", "Onglet affiché : $currentTab") }
+    LaunchedEffect(viewingDetailedTrackId) {
+        com.example.util.DebugLog.i("Écran", viewingDetailedTrackId?.let { "Fiche détail ouverte : #$it" } ?: "Aucune fiche détail ouverte")
+    }
 
     // Le retour système ramène à l'onglet Enregistrer depuis les autres onglets
     if (viewingDetailedTrackId == null && currentTab != "enregistrer") {

@@ -91,9 +91,11 @@ object MediaStoreExporter {
                 }
             }
             Log.d(TAG, "Successfully streamed $fileName")
+            com.example.util.DebugLog.d("Export", "Fichier écrit : $fileName")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save file $fileName locally", e)
+            android.util.Log.e(TAG, "Failed to save file $fileName locally", e)
+            com.example.util.DebugLog.e("Export", "Échec de l'écriture de $fileName", e)
             false
         }
     }

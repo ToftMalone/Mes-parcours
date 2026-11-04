@@ -607,7 +607,9 @@ fun MapViewContainer(
                     state.displayColor = displayColor
                     map.tag = state
 
-                    rebuildMapOverlays(map, state, isZoomedOut)
+                    com.example.util.DebugLog.timed("Carte", "calques redessinés (zoom ${map.zoomLevelDouble}, ${state.overlayTracks.size} tracés superposés, ${state.overlayTracks.sumOf { it.points.size }} points, ${state.points.size} points en direct)") {
+                        rebuildMapOverlays(map, state, isZoomedOut)
+                    }
                 }
             }
         )
@@ -942,6 +944,7 @@ fun rememberMapViewWithLifecycle(
             }
             override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
                 val zoom = map.zoomLevelDouble
+                com.example.util.DebugLog.d("Carte", "zoom de la carte principale : $zoom")
                 val zoomedOut = zoom < ZOOM_THRESHOLD
                 val mapState = map.tag as? MapState ?: return false
 
@@ -959,7 +962,9 @@ fun rememberMapViewWithLifecycle(
                 // Synchronously toggle tracking visibility under zoom threshold boundary shift
                 if (mapState.wasZoomedOut != actualZoomedOut) {
                     mapState.wasZoomedOut = actualZoomedOut
-                    rebuildMapOverlays(map, mapState, actualZoomedOut)
+                    com.example.util.DebugLog.timed("Carte", "calques redessinés après zoom (${map.zoomLevelDouble})") {
+                        rebuildMapOverlays(map, mapState, actualZoomedOut)
+                    }
                 }
                 return true
             }
@@ -1434,6 +1439,7 @@ private fun trackLongPressDetector(
         }
 
         override fun onLongPress(e: android.view.MotionEvent) {
+            com.example.util.DebugLog.i("Carte", "appui long sur la carte en (${e.x.toInt()}, ${e.y.toInt()})")
             if (multiTouch) return
             val projection = mapView.projection
             val tap = projection.fromPixels(e.x.toInt(), e.y.toInt()) as GeoPoint

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.data.model.GpsStatus
 import com.example.util.userMessage
+import com.example.util.DebugLog
 import com.example.data.model.LiveStats
 import com.example.data.model.MapTrack
 import com.example.data.model.MapViewport
@@ -194,10 +195,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     val bypassZoomThreshold: StateFlow<Boolean> = _bypassZoomThreshold.asStateFlow()
 
     fun setBypassZoomThreshold(value: Boolean) {
+        DebugLog.i("Action", "Forcer l'affichage des tracés : $value")
         _bypassZoomThreshold.value = value
     }
 
     fun updateAppForegroundStatus(inForeground: Boolean) {
+        DebugLog.i("Appli", if (inForeground) "Application au premier plan" else "Application en arrière-plan")
         repository.updateAppForegroundStatus(inForeground)
     }
 
@@ -222,6 +225,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     val currentAltitude: StateFlow<com.example.util.AltitudeFix?> = repository.currentAltitude
 
     fun updateUserLocation(location: TrackPoint?) {
+        location?.let { DebugLog.d("Position", "écran : ${it.latitude}, ${it.longitude}, vitesse ${it.speed} m/s") }
         repository.updateUserLocation(location)
     }
 
@@ -233,6 +237,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     val gpsAccuracy: StateFlow<Float?> = repository.gpsAccuracy
 
     fun updateGpsStatus(status: GpsStatus) {
+        if (status != repository.gpsStatus.value) DebugLog.i("GPS", "état : $status")
         repository.updateGpsStatus(status)
     }
 
@@ -264,6 +269,9 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     ) { tracks, viewport -> tracks to viewport }
     .conflate()
     .map { (tracks, viewport) ->
+        // Durée et volume de chaque rechargement : la première chose à regarder quand
+        // la carte rame (rapporté après la 2.3.10 : zoom et dézoom lents).
+        val start = System.nanoTime()
         tracks.map { track ->
             MapTrack(
                 isImported = track.isImported,
@@ -272,6 +280,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 displayColor = track.displayColor,
                 displayWidthDp = track.displayWidthDp,
                 points = repository.getDisplayPoints(track.id, viewport)
+            )
+        }.also { loaded ->
+            DebugLog.d(
+                "Carte",
+                "tracés superposés rechargés : ${loaded.size} parcours, ${loaded.sumOf { it.points.size }} points, " +
+                    "${(System.nanoTime() - start) / 1_000_000} ms, zone $viewport"
             )
         }
     }.flowOn(Dispatchers.IO)
@@ -282,12 +296,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     )
 
     fun toggleTrackSelectionForMap(track: Track) {
+        DebugLog.i("Action", "Carte : « ${track.name} » (#${track.id}) ${if (track.isSelectedForMap) "masqué" else "affiché"}")
         viewModelScope.launch {
             repository.updateTrack(track.copy(isSelectedForMap = !track.isSelectedForMap))
         }
     }
 
     fun setTracksShownOnMap(tracks: List<Track>, shown: Boolean) {
+        DebugLog.i("Action", "Carte : ${tracks.size} parcours ${if (shown) "affichés" else "masqués"} (${tracks.joinToString { "#" + it.id }})")
         viewModelScope.launch {
             repository.setShownOnMap(tracks.map { it.id }, shown)
         }
@@ -323,7 +339,12 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     ) { id, viewport -> id to viewport }
     .conflate()
     .map { (id, viewport) ->
-        if (id != null) repository.getDisplayPoints(id, viewport) else emptyList()
+        if (id != null) {
+            val start = System.nanoTime()
+            repository.getDisplayPoints(id, viewport).also {
+                DebugLog.d("Carte", "fiche #$id rechargée : ${it.size} points, ${(System.nanoTime() - start) / 1_000_000} ms")
+            }
+        } else emptyList()
     }.flowOn(Dispatchers.IO)
     .stateIn(
         scope = viewModelScope,
@@ -332,6 +353,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     )
 
     fun startRecording(context: Context, trackName: String, activityType: String) {
+        DebugLog.i("Action", "Démarrer un enregistrement « $trackName » ($activityType)")
         repository.setTrackingState(true)
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_START
@@ -342,6 +364,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     fun resumeTrack(context: Context, trackId: Long, onSuccess: () -> Unit) {
+        DebugLog.i("Action", "Reprendre le parcours #$trackId")
         viewModelScope.launch {
             val success = repository.resumeExistingTrack(trackId)
             if (success) {
@@ -350,12 +373,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     putExtra(TrackingService.EXTRA_TRACK_ID, trackId)
                 }
                 androidx.core.content.ContextCompat.startForegroundService(context, intent)
+                DebugLog.i("Action", "resumeTrack : terminé")
                 onSuccess()
             }
         }
     }
 
     fun stopRecording(context: Context) {
+        DebugLog.i("Action", "Arrêter l'enregistrement")
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_STOP
         }
@@ -363,6 +388,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     fun pauseRecording(context: Context) {
+        DebugLog.i("Action", "Mettre en pause")
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_PAUSE
         }
@@ -371,6 +397,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
 
     /** Reprend l'enregistrement sur un nouveau tronçon, jamais raccordé au précédent. */
     fun resumeRecording(context: Context) {
+        DebugLog.i("Action", "Reprendre après la pause")
         val intent = Intent(context, TrackingService::class.java).apply {
             action = TrackingService.ACTION_RESUME
         }
@@ -383,6 +410,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      * une — et l'épaisseur de son trait, en dp.
      */
     fun setTrackStyle(track: Track, color: Int?, widthDp: Float) {
+        DebugLog.i("Action", "Apparence de « ${track.name} » (#${track.id}) : couleur $color, épaisseur $widthDp dp")
         if (track.displayColor == color && track.displayWidthDp == widthDp) return
         viewModelScope.launch {
             repository.updateTrack(track.copy(displayColor = color, displayWidthDp = widthDp))
@@ -390,6 +418,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     }
 
     fun renameTrack(track: Track, newName: String) {
+        DebugLog.i("Action", "Renommer #${track.id} « ${track.name} » en « $newName »")
         val trimmed = newName.trim()
         if (trimmed.isEmpty() || trimmed == track.name) return
         viewModelScope.launch {
@@ -403,6 +432,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      * `TrackRepository.deleteTrack`).
      */
     fun deleteTrack(trackId: Long, onResult: (Boolean) -> Unit = {}) {
+        DebugLog.i("Action", "Supprimer le parcours #$trackId")
         viewModelScope.launch {
             val deleted = repository.deleteTrack(trackId)
             if (deleted) trimTrash()
@@ -419,6 +449,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      * de suppressions faites et de refus.
      */
     fun deleteTracks(trackIds: List<Long>, onResult: (deleted: Int, refused: Int) -> Unit = { _, _ -> }) {
+        DebugLog.i("Action", "Supprimer ${trackIds.size} parcours : $trackIds")
         viewModelScope.launch {
             var deleted = 0
             var refused = 0
@@ -441,6 +472,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
 
     /** Sort un parcours de la corbeille. */
     fun restoreFromTrash(trackId: Long, onDone: () -> Unit = {}) {
+        DebugLog.i("Action", "Restaurer depuis la corbeille #$trackId")
         viewModelScope.launch {
             repository.restoreFromTrash(trackId)
             onDone()
@@ -453,10 +485,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
      * croire la corbeille vidée.
      */
     fun emptyTrash(onDone: (Int) -> Unit = {}, onError: (String) -> Unit = {}) {
+        DebugLog.i("Action", "Vider la corbeille")
         viewModelScope.launch {
             runCatching { repository.emptyTrash() }
                 .onSuccess(onDone)
-                .onFailure { onError(it.userMessage(appContext, R.string.err_trash_empty_failed)) }
+                .onFailure {
+                    DebugLog.e("Action", "emptyTrash : échec", it)
+                    onError(it.userMessage(appContext, R.string.err_trash_empty_failed))
+                }
         }
     }
 
@@ -475,21 +511,26 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
     fun isBeingRecorded(track: Track): Boolean = repository.isBeingRecorded(track)
 
     fun selectTrack(trackId: Long?) {
+        DebugLog.i("Action", if (trackId != null) "Ouvrir la fiche du parcours #$trackId" else "Fermer la fiche")
         _selectedTrackId.value = trackId
     }
 
     fun importTrack(context: Context, uri: android.net.Uri, onSuccess: (Long) -> Unit, onError: (String) -> Unit) {
+        DebugLog.i("Action", "Importer $uri")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val trackId = repository.importTrackFromUri(context, uri)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    DebugLog.i("Action", "importTrack : terminé")
                     onSuccess(trackId)
                 }
             } catch (e: com.example.util.Importer.ImportException) {
+                DebugLog.e("Action", "importTrack : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(e.userMessage(appContext, R.string.err_file_unreadable))
                 }
             } catch (e: Exception) {
+                DebugLog.e("Action", "importTrack : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(appContext.getString(R.string.err_import_failed, e.userMessage(appContext, R.string.err_unknown)))
                 }
@@ -505,13 +546,16 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: (Long) -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Fusionner $trackIds dans #$destinationTrackId « $mergedName »")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val mergedId = repository.mergeAndSaveTracks(trackIds, destinationTrackId, mergedName)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    DebugLog.i("Action", "mergeTracks : terminé")
                     onSuccess(mergedId)
                 }
             } catch (e: Exception) {
+                DebugLog.e("Action", "mergeTracks : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(appContext.getString(R.string.err_merge_failed, e.userMessage(appContext, R.string.err_unknown)))
                 }
@@ -544,13 +588,16 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: (Long) -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Prolonger #$trackId : ${taps.size} appuis, depuis $from, à la fin $atEnd, supprimer l'original $deleteSource")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val id = if (from != null) repository.extendFromPoint(trackId, from, taps, newName, deleteSource)
                 else repository.extendTrack(trackId, taps, atEnd, newName, deleteSource)
                 if (deleteSource) trimTrash()
+                DebugLog.i("Action", "extendTrack : terminé")
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(id) }
             } catch (e: Exception) {
+                DebugLog.e("Action", "extendTrack : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(e.userMessage(appContext, R.string.err_extend_failed))
                 }
@@ -567,7 +614,14 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         maxLon: Double
     ): List<com.example.data.model.TrackPoint> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            repository.getPickerPoints(trackId, minLat, maxLat, minLon, maxLon)
+            val start = System.nanoTime()
+            repository.getPickerPoints(trackId, minLat, maxLat, minLon, maxLon).also {
+                DebugLog.d(
+                    "Outils",
+                    "carte de l'outil, #$trackId rechargé : ${it.size} points, ${(System.nanoTime() - start) / 1_000_000} ms, " +
+                        "zone $minLat..$maxLat / $minLon..$maxLon"
+                )
+            }
         }
 
     /**
@@ -627,12 +681,15 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Retirer un tronçon : $segment")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 repository.removeSegment(segment)
                 trimTrash()
+                DebugLog.i("Action", "removeSegment : terminé")
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess() }
             } catch (e: Exception) {
+                DebugLog.e("Action", "removeSegment : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(e.userMessage(appContext, R.string.err_split_failed))
                 }
@@ -650,12 +707,15 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: (List<Long>) -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Retirer une portion de #$trackId : de $from à $to, supprimer l'original $deleteSource")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val newTrackIds = repository.cutPortion(trackId, from, to, baseName, deleteSource)
                 if (deleteSource) trimTrash()
+                DebugLog.i("Action", "cutPortion : terminé")
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onSuccess(newTrackIds) }
             } catch (e: Exception) {
+                DebugLog.e("Action", "cutPortion : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(e.userMessage(appContext, R.string.err_split_failed))
                 }
@@ -672,6 +732,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: (List<Long>) -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Découper #$trackId : mode $mode, écart $gapMillis ms, supprimer l'original $deleteSource")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val newTrackIds = repository.splitTrack(
@@ -683,9 +744,11 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 )
                 if (deleteSource) trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    DebugLog.i("Action", "splitTrack : terminé")
                     onSuccess(newTrackIds)
                 }
             } catch (e: Exception) {
+                DebugLog.e("Action", "splitTrack : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     // Le message porté par l'exception est déjà rédigé pour être lu
                     // (« il n'y a rien à découper »…) : le préfixer le rendrait moins
@@ -709,6 +772,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: (TrackRepository.StationaryCleanup) -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Nettoyer #$trackId : arrêts de $minStopSeconds s et plus, supprimer l'original $deleteSource")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val result = repository.removeStationaryPoints(
@@ -719,9 +783,11 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 )
                 if (deleteSource) trimTrash()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    DebugLog.i("Action", "removeStationaryPoints : terminé")
                     onSuccess(result)
                 }
             } catch (e: Exception) {
+                DebugLog.e("Action", "removeStationaryPoints : échec", e)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onError(e.userMessage(appContext, R.string.err_clean_failed))
                 }
@@ -772,6 +838,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+        DebugLog.i("Action", "Exporter « ${track.name} » (#${track.id}) en $format vers $uri")
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val finalUri = ensureUriExtension(context, uri, format.extension)
@@ -783,9 +850,11 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                     }
                 }
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    DebugLog.i("Action", "exportToUri : terminé")
                     onSuccess()
                 }
             } catch (e: Exception) {
+                DebugLog.e("Action", "exportToUri : échec", e)
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
                     onError(e.userMessage(context, R.string.err_export_failed))
                 }
@@ -846,7 +915,7 @@ class TrackViewModel(private val repository: TrackRepository, private val appCon
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.DebugLog.e("Action", "exception rattrapée (TrackViewModel.kt:918)", e)
         }
         return uri
     }

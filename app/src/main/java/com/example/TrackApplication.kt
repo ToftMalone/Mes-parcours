@@ -2,6 +2,7 @@ package com.example
 
 import android.app.Application
 import com.example.data.repository.TrackRepository
+import com.example.util.DebugLog
 import com.example.util.FormatUtils
 import com.example.util.OnboardingPreferences
 import com.example.util.OsmConfig
@@ -12,8 +13,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class TrackApplication : Application() {
+    /** Gardé en champ : `SharedPreferences` ne retient ses écouteurs que faiblement. */
+    private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
+
     override fun onCreate() {
         super.onCreate()
+        // En tout premier : tout ce qui suit, plantages compris, doit pouvoir y être noté.
+        DebugLog.init(this)
+        installDebugObservers()
         OsmConfig.init(this)
         // Les formats (durées, noms de parcours) ont besoin des ressources hors composition.
         FormatUtils.init(this)
@@ -65,5 +72,53 @@ class TrackApplication : Application() {
                 repository.compactDatabase()
             }
         }
+    }
+
+    /**
+     * Ce que le journal relève de lui-même, sans qu'aucun écran ait à y penser : le cycle
+     * de vie de chaque écran, les alertes mémoire d'Android, chaque réglage modifié, et un
+     * état des lieux toutes les cinq minutes (mémoire, place libre).
+     */
+    private fun installDebugObservers() {
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            private fun log(activity: android.app.Activity, event: String) =
+                DebugLog.i("Cycle", "${activity.javaClass.simpleName} : $event")
+            override fun onActivityCreated(a: android.app.Activity, b: android.os.Bundle?) =
+                log(a, if (b == null) "créée" else "recréée (état restauré)")
+            override fun onActivityStarted(a: android.app.Activity) = log(a, "visible")
+            override fun onActivityResumed(a: android.app.Activity) = log(a, "au premier plan")
+            override fun onActivityPaused(a: android.app.Activity) = log(a, "en pause")
+            override fun onActivityStopped(a: android.app.Activity) = log(a, "cachée")
+            override fun onActivitySaveInstanceState(a: android.app.Activity, b: android.os.Bundle) = log(a, "état sauvegardé")
+            override fun onActivityDestroyed(a: android.app.Activity) =
+                log(a, if (a.isChangingConfigurations) "détruite (rotation ou changement de thème)" else "détruite")
+        })
+
+        val prefs = android.preference.PreferenceManager.getDefaultSharedPreferences(this)
+        prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            DebugLog.d("Réglage", "$key = ${key?.let { p.all[it] }}")
+        }.also(prefs::registerOnSharedPreferenceChangeListener)
+
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            while (true) {
+                DebugLog.i("État", DebugLog.environment(this@TrackApplication))
+                kotlinx.coroutines.delay(5 * 60 * 1000L)
+            }
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        DebugLog.w("Mémoire", "Android demande de libérer de la mémoire (niveau $level) — ${DebugLog.environment(this)}")
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        DebugLog.w("Mémoire", "Mémoire presque épuisée — ${DebugLog.environment(this)}")
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        DebugLog.i("Cycle", "Configuration changée : orientation ${newConfig.orientation}, mode nuit ${newConfig.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK}")
     }
 }

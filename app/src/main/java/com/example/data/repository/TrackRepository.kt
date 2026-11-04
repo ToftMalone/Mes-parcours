@@ -39,6 +39,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     suspend fun getTrackById(trackId: Long): Track? = trackDao.getTrackById(trackId)
 
     suspend fun resumeExistingTrack(trackId: Long): Boolean {
+        com.example.util.DebugLog.d("Base", "resumeExistingTrack(trackId=$trackId)")
         val track = trackDao.getTrackById(trackId) ?: return false
         val updated = track.copy(isRecording = true, isPaused = false)
         trackDao.updateTrack(updated)
@@ -93,6 +94,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * importée — et on ne relit que la fin du tracé pour la carte en direct.
      */
     suspend fun loadResumeState(track: Track): ResumeState {
+        com.example.util.DebugLog.d("Base", "loadResumeState(track=$track)")
         val pointCount = trackDao.getTrackPointMeta(track.id)?.pointCount ?: 0
 
         if (pointCount <= statsRecomputeLimit) {
@@ -128,6 +130,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     suspend fun createNewTrack(name: String, activityType: String): Long {
+        com.example.util.DebugLog.d("Base", "createNewTrack(name=$name, activityType=$activityType)")
         val startTime = System.currentTimeMillis()
         val generatedName = com.example.util.FormatUtils.formatTrackInProgressName(startTime)
         val track = Track(
@@ -145,6 +148,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     suspend fun finishTracking(trackId: Long, stats: LiveStats) {
+        com.example.util.DebugLog.d("Base", "finishTracking(trackId=$trackId, stats=$stats)")
         val existing = trackDao.getTrackById(trackId)
         if (existing != null) {
             val endTime = System.currentTimeMillis()
@@ -231,6 +235,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     private val fullPointsCache = java.util.concurrent.ConcurrentHashMap<Long, List<TrackPoint>>()
 
     fun invalidatePointCaches(trackId: Long) {
+        com.example.util.DebugLog.d("Base", "invalidatePointCaches(trackId=$trackId)")
         pointMetaCache.remove(trackId)
         skeletonCache.remove(trackId)
         fullPointsCache.remove(trackId)
@@ -244,6 +249,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * renvoie simplement tous les points, exactement comme auparavant.
      */
     suspend fun getDisplayPoints(trackId: Long, viewport: MapViewport?): List<TrackPoint> {
+        com.example.util.DebugLog.d("Base", "getDisplayPoints(trackId=$trackId, viewport=$viewport)")
         // Une trace en cours d'enregistrement grossit à chaque seconde : son effectif
         // et son emprise seraient déjà faux à la lecture suivante. Les mettre en cache
         // figeait l'affichage sur ce qu'elle contenait à la première consultation — la
@@ -307,6 +313,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * la trace entière en mémoire.
      */
     suspend fun forEachPoint(trackId: Long, pageSize: Int = 2_000, action: (TrackPoint) -> Unit) {
+        com.example.util.DebugLog.d("Base", "forEachPoint(trackId=$trackId, pageSize=$pageSize)")
         var afterId = 0L
         while (true) {
             val page = trackDao.getPointsPage(trackId, afterId, pageSize)
@@ -317,6 +324,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     private fun coversMostOfTrack(meta: TrackPointMeta, viewport: MapViewport): Boolean {
+        com.example.util.DebugLog.d("Base", "coversMostOfTrack(meta=$meta, viewport=$viewport)")
         val minLat = meta.minLat ?: return false
         val maxLat = meta.maxLat ?: return false
         val minLon = meta.minLon ?: return false
@@ -353,6 +361,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * grossier hors écran et fin dans la zone visible.
      */
     private fun mergeOrderedById(a: List<TrackPoint>, b: List<TrackPoint>): List<TrackPoint> {
+        com.example.util.DebugLog.d("Base", "mergeOrderedById(a=${a.size} éléments, b=${b.size} éléments)")
         if (a.isEmpty()) return b
         if (b.isEmpty()) return a
 
@@ -443,6 +452,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * cours, puisqu'ils ne survivent pas au processus qui les a lancés.
      */
     fun cleanupInterruptedImports() {
+        com.example.util.DebugLog.d("Base", "cleanupInterruptedImports()")
         database.runInTransaction {
             trackDao.deleteImportPlaceholderPointsBlocking()
             trackDao.deleteImportPlaceholdersBlocking()
@@ -466,6 +476,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         destinationTrackId: Long,
         mergedName: String
     ): Long {
+        com.example.util.DebugLog.d("Base", "mergeAndSaveTracks(trackIds=${trackIds.size} éléments, destinationTrackId=$destinationTrackId, mergedName=$mergedName)")
         return database.withTransaction {
             val tracks = trackIds.map { trackId ->
                 trackDao.getTrackById(trackId) ?: throw UserFacingArgumentException(R.string.err_track_id_not_found, listOf(trackId))
@@ -643,6 +654,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         baseName: String,
         deleteSource: Boolean
     ): List<Long> {
+        com.example.util.DebugLog.d("Base", "splitTrack(sourceTrackId=$sourceTrackId, mode=$mode, gapMillis=$gapMillis, baseName=$baseName, deleteSource=$deleteSource)")
         val source = trackDao.getTrackById(sourceTrackId)
             ?: throw UserFacingArgumentException(R.string.err_track_not_found)
         if (source.isRecording) {
@@ -789,6 +801,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * bornes de la portion sans relire le parcours.
      */
     suspend fun getPreviewPoints(trackId: Long, maxPoints: Int = 3_000): List<TrackPoint> {
+        com.example.util.DebugLog.d("Base", "getPreviewPoints(trackId=$trackId, maxPoints=$maxPoints)")
         val total = trackDao.getTrackPointMeta(trackId)?.pointCount ?: 0
         if (total == 0) return emptyList()
         val stride = maxOf(1, (total + maxPoints - 1) / maxPoints)
@@ -842,6 +855,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         maxLon: Double,
         maxPoints: Int = 4_000
     ): List<TrackPoint> {
+        com.example.util.DebugLog.d("Base", "getPickerPoints(trackId=$trackId, minLat=$minLat, maxLat=$maxLat, minLon=$minLon, maxLon=$maxLon, maxPoints=$maxPoints)")
         // La zone lue déborde l'écran d'une moitié de chaque côté, comme sur la carte
         // principale : un trait qui sort de l'écran doit rester dessiné jusqu'au bord.
         var latPad = (maxLat - minLat) / 2
@@ -922,6 +936,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         lon: Double,
         radiusMeters: Double
     ): com.example.util.PortionBound? {
+        com.example.util.DebugLog.d("Base", "findPortionBound(trackId=$trackId, lowId=$lowId, highId=$highId, lat=$lat, lon=$lon, radiusMeters=$radiusMeters)")
         val candidates = ArrayList<com.example.util.PortionBound>(2)
 
         val latPad = radiusMeters / 111_320.0
@@ -986,6 +1001,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         from: com.example.util.PortionBound,
         to: com.example.util.PortionBound
     ): Double {
+        com.example.util.DebugLog.d("Base", "measurePortion(trackId=$trackId, from=$from, to=$to)")
         val low = if (from <= to) from else to
         val high = if (from <= to) to else from
         var total = 0.0
@@ -1035,6 +1051,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         baseName: String,
         deleteSource: Boolean
     ): List<Long> {
+        com.example.util.DebugLog.d("Base", "cutPortion(sourceTrackId=$sourceTrackId, from=$from, to=$to, baseName=$baseName, deleteSource=$deleteSource)")
         val source = trackDao.getTrackById(sourceTrackId)
             ?: throw UserFacingArgumentException(R.string.err_track_not_found)
         if (isBeingRecorded(source)) {
@@ -1173,6 +1190,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     /** Le tronçon de [trackId] qui contient le point [pointId], ou null. */
     suspend fun findSegment(trackId: Long, pointId: Long): TrackSegment? {
+        com.example.util.DebugLog.d("Base", "findSegment(trackId=$trackId, pointId=$pointId)")
         var first: TrackPoint? = null
         var before: TrackPoint? = null
         var previous: TrackPoint? = null
@@ -1214,6 +1232,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         after: TrackPoint?,
         distance: Double
     ): TrackSegment {
+        com.example.util.DebugLog.d("Base", "segmentOf(trackId=$trackId, first=$first, last=$last, before=$before, after=$after, distance=$distance)")
         val name = first.placemarkId?.let { getPlacemarks(trackId)[it]?.name }
         return TrackSegment(trackId, first, last, before, after, distance, name)
     }
@@ -1225,6 +1244,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * affiché sur la carte si l'original l'était : c'est là qu'on vient de le toucher.
      */
     suspend fun removeSegment(segment: TrackSegment): Long {
+        com.example.util.DebugLog.d("Base", "removeSegment(segment=$segment)")
         if (segment.before == null && segment.after == null) {
             throw UserFacingStateException(R.string.err_segment_only)
         }
@@ -1259,6 +1279,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         newName: String,
         deleteSource: Boolean
     ): Long {
+        com.example.util.DebugLog.d("Base", "extendFromPoint(sourceTrackId=$sourceTrackId, from=$from, taps=${taps.size} éléments, newName=$newName, deleteSource=$deleteSource)")
         val first = trackDao.getFirstPoint(sourceTrackId)
         val last = trackDao.getLastPoint(sourceTrackId)
             ?: throw UserFacingStateException(R.string.err_extend_empty_track)
@@ -1350,6 +1371,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         newName: String,
         deleteSource: Boolean
     ): Long {
+        com.example.util.DebugLog.d("Base", "extendTrack(sourceTrackId=$sourceTrackId, taps=${taps.size} éléments, atEnd=$atEnd, newName=$newName, deleteSource=$deleteSource)")
         val source = trackDao.getTrackById(sourceTrackId)
             ?: throw UserFacingArgumentException(R.string.err_track_not_found)
         if (isBeingRecorded(source)) {
@@ -1467,6 +1489,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         newName: String,
         deleteSource: Boolean
     ): StationaryCleanup {
+        com.example.util.DebugLog.d("Base", "removeStationaryPoints(sourceTrackId=$sourceTrackId, minStopSeconds=$minStopSeconds, newName=$newName, deleteSource=$deleteSource)")
         val source = trackDao.getTrackById(sourceTrackId)
             ?: throw UserFacingArgumentException(R.string.err_track_not_found)
         if (isBeingRecorded(source)) {
@@ -1572,14 +1595,17 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     fun getSelectedImportedTracksFlow(): Flow<List<Track>> {
+        com.example.util.DebugLog.d("Base", "getSelectedImportedTracksFlow()")
         return trackDao.getSelectedImportedTracksFlow()
     }
 
     suspend fun updateTrack(track: Track) {
+        com.example.util.DebugLog.d("Base", "updateTrack(track=$track)")
         trackDao.updateTrack(track)
     }
 
     suspend fun setShownOnMap(trackIds: List<Long>, shown: Boolean) {
+        com.example.util.DebugLog.d("Base", "setShownOnMap(trackIds=${trackIds.size} éléments, shown=$shown)")
         // SQLite borne le nombre de paramètres d'une requête : par paquets.
         trackIds.chunked(500).forEach { trackDao.setShownOnMap(it, shown) }
     }
@@ -1593,6 +1619,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * changeraient d'apparence à la mise à jour, sans qu'il ait rien demandé.
      */
     suspend fun backfillDisplayColors(context: android.content.Context) {
+        com.example.util.DebugLog.d("Base", "backfillDisplayColors()")
         if (TrackStylePreferences.hasMigratedColors(context)) return
         val legacy = TrackStylePreferences.readLegacyCategoryColors(context)
         trackDao.backfillDisplayColors(
@@ -1607,6 +1634,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     suspend fun insertPoint(point: TrackPoint) {
+        com.example.util.DebugLog.d("Base", "insertPoint(point=$point)")
         if (point.trackId <= 0) return
         try {
             // Pas de vérification préalable de l'existence du parcours : c'était une
@@ -1617,7 +1645,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             // Ajouté à la liste en direct, pour que l'écran suive immédiatement
             _livePoints.value = _livePoints.value + point
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.DebugLog.e("Base", "exception rattrapée (TrackRepository.kt:1620)", e)
         }
     }
 
@@ -1631,6 +1659,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * l'écran, lui, se croyait à l'arrêt et n'offrait plus de quoi l'interrompre.
      */
     suspend fun deleteTrack(trackId: Long): Boolean {
+        com.example.util.DebugLog.d("Base", "deleteTrack(trackId=$trackId)")
         val track = trackDao.getTrackById(trackId)
         if (track != null && isBeingRecorded(track)) return false
         trackDao.moveToTrash(trackId, System.currentTimeMillis())
@@ -1643,6 +1672,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     /** Sort un parcours de la corbeille ; il revient dans l'historique, masqué sur la carte. */
     suspend fun restoreFromTrash(trackId: Long) {
+        com.example.util.DebugLog.d("Base", "restoreFromTrash(trackId=$trackId)")
         trackDao.restoreFromTrash(trackId)
     }
 
@@ -1676,6 +1706,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * parcours effacés.
      */
     suspend fun enforceTrashLimit(): Int {
+        com.example.util.DebugLog.d("Base", "enforceTrashLimit()")
         var total = 0L
         val excess = trackDao.getTrashedPointCounts().filterIndexed { index, entry ->
             total += entry.pointCount
@@ -1697,6 +1728,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      *   stockage de l'application ne baissait donc pas d'un octet.
      */
     private suspend fun eraseForGood(trackIds: List<Long>): Int {
+        com.example.util.DebugLog.d("Base", "eraseForGood(trackIds=${trackIds.size} éléments)")
         if (trackIds.isEmpty()) return 0
         var erased = 0
         trackIds.forEach { id ->
@@ -1736,6 +1768,56 @@ class TrackRepository private constructor(private val database: AppDatabase) {
         }.getOrDefault(false)
     }
 
+    /**
+     * État des lieux joint au journal de débogage exporté ([com.example.util.DebugLog]) :
+     * chaque parcours (corbeille comprise) avec son nombre de points, la taille de la
+     * base et de son journal WAL, la place libre dans la base, le cache des tuiles et
+     * les réglages. De quoi comprendre sans le téléphone sous la main ce qui occupe la
+     * place ou ralentit — l'histoire des 54 Go se serait lue ici en une ligne.
+     */
+    suspend fun debugSnapshot(context: Context): String = withContext(Dispatchers.IO) {
+        val out = StringBuilder()
+        runCatching {
+            val db = database.openHelper.writableDatabase
+            fun pragma(name: String) = db.query("PRAGMA $name").use { if (it.moveToFirst()) it.getLong(0) else -1L }
+            val pageSize = pragma("page_size")
+            out.append("Base : ${pragma("page_count") * pageSize / 1024} Kio, dont ${pragma("freelist_count") * pageSize / 1024} Kio libres\n")
+            val dbFile = context.getDatabasePath("my_tracks_db")
+            listOf("", "-wal", "-shm").forEach { suffix ->
+                val f = java.io.File(dbFile.path + suffix)
+                out.append("Fichier ${f.name} : ${if (f.exists()) "${f.length() / 1024} Kio" else "absent"}\n")
+            }
+            out.append("\nParcours (id | nom | importé | fusionné | sur la carte | enregistrement | pause | corbeille | distance m | points) :\n")
+            db.query(
+                "SELECT t.id, t.name, t.isImported, t.isMerged, t.isSelectedForMap, t.isRecording, t.isPaused, " +
+                    "t.deletedAt, t.totalDistance, (SELECT COUNT(*) FROM track_points p WHERE p.trackId = t.id) " +
+                    "FROM tracks t ORDER BY t.id"
+            ).use { c ->
+                var total = 0L
+                while (c.moveToNext()) {
+                    total += c.getLong(9)
+                    out.append(
+                        "#${c.getLong(0)} | ${c.getString(1)} | ${c.getInt(2)} | ${c.getInt(3)} | ${c.getInt(4)} | " +
+                            "${c.getInt(5)} | ${c.getInt(6)} | ${if (c.isNull(7)) "-" else java.util.Date(c.getLong(7))} | " +
+                            "${c.getDouble(8).toLong()} | ${c.getLong(9)}\n"
+                    )
+                }
+                out.append("Total : ${c.count} parcours, $total points\n")
+            }
+            out.append("Tracés KML : ${db.query("SELECT COUNT(*) FROM placemarks").use { if (it.moveToFirst()) it.getLong(0) else -1 }}\n")
+        }.onFailure { out.append("Lecture de la base impossible : $it\n") }
+
+        val tiles = java.io.File(context.externalCacheDir ?: context.cacheDir, "osmdroid")
+        out.append("\nCache des tuiles : ${tiles.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024} Kio\n")
+        out.append("Journal de débogage : ${com.example.util.DebugLog.totalSize(context) / 1024} Kio\n")
+        out.append("Enregistrement en cours : ${_isTracking.value}, pause : ${_isPaused.value}, parcours ${_currentTrackId.value}\n")
+
+        out.append("\nRéglages :\n")
+        android.preference.PreferenceManager.getDefaultSharedPreferences(context).all.toSortedMap()
+            .forEach { (k, v) -> out.append("$k = $v\n") }
+        out.toString()
+    }
+
     /** Les tracés KML d'origine d'un parcours, par identifiant, pour l'export. */
     suspend fun getPlacemarks(trackId: Long): Map<Long, com.example.data.model.TrackPlacemark> =
         trackDao.getPlacemarksForTrack(trackId).associateBy { it.id }
@@ -1746,6 +1828,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
 
     /** Mémorise la pause en base, pour qu'elle survive à l'arrêt du processus. */
     suspend fun setTrackPaused(trackId: Long, paused: Boolean) {
+        com.example.util.DebugLog.d("Base", "setTrackPaused(trackId=$trackId, paused=$paused)")
         trackDao.setTrackPaused(trackId, paused)
     }
 
@@ -1757,6 +1840,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     val isTracking: StateFlow<Boolean> = _isTracking.asStateFlow()
 
     fun setTrackingState(isTracking: Boolean) {
+        com.example.util.DebugLog.d("Base", "setTrackingState(isTracking=$isTracking)")
         _isTracking.value = isTracking
     }
 
@@ -1764,6 +1848,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
 
     fun setRecordingPaused(paused: Boolean) {
+        com.example.util.DebugLog.d("Base", "setRecordingPaused(paused=$paused)")
         _isPaused.value = paused
     }
 
@@ -1774,6 +1859,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     val liveStats: StateFlow<LiveStats> = _liveStats.asStateFlow()
 
     fun updateLiveStats(stats: LiveStats) {
+        com.example.util.DebugLog.d("Base", "updateLiveStats(stats=$stats)")
         _liveStats.value = stats
     }
 
@@ -1799,6 +1885,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     val currentAltitude: StateFlow<com.example.util.AltitudeFix?> = _currentAltitude.asStateFlow()
 
     fun updateAltitude(fix: com.example.util.AltitudeFix?) {
+        com.example.util.DebugLog.d("Base", "updateAltitude(fix=$fix)")
         _currentAltitude.value = fix
     }
 
@@ -1806,22 +1893,27 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     val isAppInForeground: StateFlow<Boolean> = _isAppInForeground.asStateFlow()
 
     fun updateAppForegroundStatus(inForeground: Boolean) {
+        com.example.util.DebugLog.d("Base", "updateAppForegroundStatus(inForeground=$inForeground)")
         _isAppInForeground.value = inForeground
     }
 
     fun updateGpsStatus(status: GpsStatus) {
+        com.example.util.DebugLog.d("Base", "updateGpsStatus(status=$status)")
         _gpsStatus.value = status
     }
 
     fun updateGpsAccuracy(accuracy: Float?) {
+        com.example.util.DebugLog.d("Base", "updateGpsAccuracy(accuracy=$accuracy)")
         _gpsAccuracy.value = accuracy
     }
 
     fun updateUserLocation(location: TrackPoint?) {
+        com.example.util.DebugLog.d("Base", "updateUserLocation(location=$location)")
         _currentUserLocation.value = location
     }
 
     fun restoreActiveTrackingState(trackId: Long, points: List<TrackPoint>, stats: LiveStats) {
+        com.example.util.DebugLog.d("Base", "restoreActiveTrackingState(trackId=$trackId, points=${points.size} éléments, stats=$stats)")
         _currentTrackId.value = trackId
         _isTracking.value = true
         _livePoints.value = points
@@ -1829,6 +1921,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
     }
 
     suspend fun getActiveRecordingTrack(): Track? {
+        com.example.util.DebugLog.d("Base", "getActiveRecordingTrack()")
         return trackDao.getActiveRecordingTrack()
     }
 
@@ -1842,6 +1935,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      * à l'écran alors que les positions s'enregistraient bel et bien.
      */
     suspend fun checkForAndRestoreActiveTrack(markPaused: Boolean = true): Track? {
+        com.example.util.DebugLog.d("Base", "checkForAndRestoreActiveTrack(markPaused=$markPaused)")
         if (_isTracking.value && _currentTrackId.value != null) {
             val id = _currentTrackId.value!!
             return trackDao.getTrackById(id)

@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        com.example.util.DebugLog.d("Démarrage", "onReceive(intent=$intent)")
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
@@ -41,11 +42,11 @@ class BootReceiver : BroadcastReceiver() {
                         }
                     } catch (e: Exception) {
                         // Démarrage refusé par le système : même repli que ci-dessus.
-                        e.printStackTrace()
+                        com.example.util.DebugLog.e("Démarrage", "exception rattrapée (BootReceiver.kt:44)", e)
                         RecordingRecovery.notifyInterrupted(context)
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    com.example.util.DebugLog.e("Démarrage", "exception rattrapée (BootReceiver.kt:48)", e)
                 } finally {
                     pendingResult.finish()
                 }

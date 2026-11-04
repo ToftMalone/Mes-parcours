@@ -21,4 +21,11 @@
        y compris après la vérification de l'empreinte.
     -->
     <files-path name="updates" path="updates/" />
+
+    <!--
+       Archive du journal de débogage (`DebugLog.buildExport`), confiée à l'application
+       que l'utilisateur choisit pour l'envoyer. Ce seul sous-dossier, qui ne contient
+       que la dernière archive : jamais `logs/`, le journal vivant.
+    -->
+    <files-path name="log_export" path="log_export/" />
 </paths>
