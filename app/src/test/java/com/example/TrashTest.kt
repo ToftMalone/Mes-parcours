@@ -245,4 +245,16 @@ class TrashTest {
         assertNull("plus rien affiché une fois vidée", repository.trashEraseProgress.value)
         assertTrue(repository.trashedTracks.first().isEmpty())
     }
+
+    @Test
+    fun `une trace en cours d'effacement ne se restaure pas`() = runBlocking {
+        val trashed = createTrack("En cours")
+        repository.deleteTrack(trashed)
+        db.trackDao.markForErase(listOf(trashed))
+
+        repository.restoreFromTrash(trashed)
+
+        assertEquals("reste à effacer", 0L, db.trackDao.getTrackById(trashed)?.deletedAt)
+        assertTrue(db.trackDao.getAllTracks().first().none { it.id == trashed })
+    }
 }

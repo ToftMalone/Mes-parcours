@@ -953,9 +953,9 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 249 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
+- 250 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (10), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (11), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
   `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
@@ -1256,6 +1256,25 @@ une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import
 - `gradle-wrapper.properties` ne porte pas de `distributionSha256Sum` : la
   distribution Gradle est téléchargée en HTTPS mais sans vérification d'empreinte
   (`setup-gradle` valide le JAR du wrapper, pas la distribution).
+
+### Relecture « bugs et failles » de la 2.3.15
+
+À la demande de l'auteur. Quatre points corrigés :
+
+1. **Le journal de débogage partait dans la sauvegarde Google.** `files/logs` et
+   `files/log_export` (positions, gestes) n'étaient exclus ni de `backup_rules.xml` ni de
+   `data_extraction_rules.xml`, ajoutés en 2.3.12 sans que ces règles suivent. Exclus
+   désormais des deux voies, cloud et transfert d'appareil. **Toute donnée nouvelle
+   écrite sous `filesDir` doit y être examinée.**
+2. **Une traduction anglais / allemand était arrivée par erreur dans les 2.3.14 et
+   2.3.15** (`values-en`, `values-de`, `util/AppLocale`, `locales_config.xml`) : des
+   fichiers présents dans le dossier de travail, embarqués par un `git add -A` dans un
+   commit sans rapport. Retirée, à la demande de l'auteur (voir « Langue »). **Vérifier
+   `git status` avant chaque commit, ne jamais verser à l'aveugle.**
+3. **Restaurer une trace en cours d'effacement** la faisait revenir dans l'historique
+   pendant que ses points partaient : `restoreFromTrash` ne vise plus que `deletedAt > 0`.
+4. `checkForAndRestoreActiveTrack` relisait `_currentTrackId` après l'avoir testé, avec
+   un `!!` qu'un arrêt sur un autre fil pouvait faire planter.
 
 ### Audit batterie de la 1.2
 

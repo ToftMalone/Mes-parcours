@@ -331,7 +331,9 @@ interface TrackDao {
     @Query("SELECT COUNT(*) FROM track_points WHERE trackId IN (:trackIds)")
     suspend fun countPointsOfTracks(trackIds: List<Long>): Long
 
-    @Query("UPDATE tracks SET deletedAt = NULL WHERE id = :trackId")
+    // Jamais un parcours en cours d'effacement (deletedAt = 0) : il reviendrait dans
+    // l'historique pendant que ses points continuent de partir.
+    @Query("UPDATE tracks SET deletedAt = NULL WHERE id = :trackId AND deletedAt > 0")
     suspend fun restoreFromTrash(trackId: Long)
 
     @Query("DELETE FROM track_points WHERE trackId = :trackId")

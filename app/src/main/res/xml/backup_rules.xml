@@ -16,6 +16,10 @@
    poids. Une vingtaine de Mio partaient dans la sauvegarde, de quoi en épuiser le
    quota et la faire échouer en silence, pour un fichier que l'application sait
    reprendre depuis GitHub.
+   Le journal de débogage (`files/logs`) et son archive (`files/log_export`) sont
+   exclus de partout : ils contiennent les positions et les gestes de l'utilisateur.
+   Ajoutés en 2.3.12 sans que ces règles suivent, ils partaient dans la sauvegarde
+   Google — trouvé à la relecture de sécurité de la 2.3.15.
 -->
 <full-backup-content>
     <exclude domain="database" path="my_tracks_db" />
@@ -23,5 +27,7 @@
     <exclude domain="database" path="my_tracks_db-shm" />
     <exclude domain="sharedpref" path="." />
     <exclude domain="file" path="updates" />
+    <exclude domain="file" path="logs" />
+    <exclude domain="file" path="log_export" />
     <exclude domain="external" path="." />
 </full-backup-content>

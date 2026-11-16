@@ -1984,9 +1984,11 @@ class TrackRepository private constructor(private val database: AppDatabase) {
      */
     suspend fun checkForAndRestoreActiveTrack(markPaused: Boolean = true): Track? {
         com.example.util.DebugLog.d("Base", "checkForAndRestoreActiveTrack(markPaused=$markPaused)")
-        if (_isTracking.value && _currentTrackId.value != null) {
-            val id = _currentTrackId.value!!
-            return trackDao.getTrackById(id)
+        // Relu une seule fois : un arrêt sur un autre fil pouvait le remettre à null
+        // entre le test et la lecture, et le `!!` faisait alors planter.
+        val currentId = _currentTrackId.value
+        if (_isTracking.value && currentId != null) {
+            return trackDao.getTrackById(currentId)
         }
         val activeTrack = trackDao.getActiveRecordingTrack()
         if (activeTrack != null) {
