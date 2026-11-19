@@ -1,5 +1,11 @@
 package com.example
 
+import com.example.ui.component.FloatingDock
+import com.example.ui.component.FloatingDockHost
+import com.example.ui.component.aboveDock
+import androidx.compose.foundation.background
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.content.Context
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,8 +71,29 @@ class ScreensScreenshotTest {
     private lateinit var viewModel: TrackViewModel
     private lateinit var repository: TrackRepository
 
-    /** Barre d'état et barre de navigation flottante, telles que MainScreen les réserve. */
-    private val tabPadding = PaddingValues(top = 32.dp, bottom = 88.dp)
+    /** Barre d'état et dock flottant, tels que MainScreen les réserve. */
+    private val tabPadding = PaddingValues(top = 32.dp, bottom = com.example.ui.component.DockReservedHeight)
+
+    /**
+     * L'écran tel que MainScreen le montre : le dock flottant par-dessus, toujours
+     * affiché. [aboveDock] : écran sans marge propre (fiche, outil ouvert, page de
+     * réglages), qui s'arrête au-dessus du dock.
+     */
+    @androidx.compose.runtime.Composable
+    private fun Docked(
+        tab: String,
+        aboveDock: Boolean = false,
+        content: @androidx.compose.runtime.Composable (Modifier) -> Unit
+    ) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)
+        ) {
+            content(Modifier.fillMaxSize().then(if (aboveDock) Modifier.aboveDock() else Modifier))
+            FloatingDockHost(visible = true, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)) { m ->
+                FloatingDock(currentTab = tab, onTabSelected = {}, showUpdateBadge = false, modifier = m)
+            }
+        }
+    }
 
     @Before
     fun setUp() {
@@ -175,12 +202,14 @@ class ScreensScreenshotTest {
     private fun history(dark: Boolean) {
         compose.setContent {
             MyApplicationTheme(darkTheme = dark) {
-                HistoryTab(
-                    viewModel = viewModel,
-                    onNavigateToDetails = {},
-                    contentPadding = tabPadding,
-                    modifier = Modifier.fillMaxSize()
-                )
+                Docked("historique") { m ->
+                    HistoryTab(
+                        viewModel = viewModel,
+                        onNavigateToDetails = {},
+                        contentPadding = tabPadding,
+                        modifier = m
+                    )
+                }
             }
         }
     }
@@ -296,7 +325,9 @@ class ScreensScreenshotTest {
     private fun detail(trackId: Long, dark: Boolean) {
         compose.setContent {
             MyApplicationTheme(darkTheme = dark) {
-                DetailView(trackId = trackId, viewModel = viewModel, onBackClick = {})
+                Docked("historique", aboveDock = true) { m ->
+                    DetailView(trackId = trackId, viewModel = viewModel, onBackClick = {}, modifier = m)
+                }
             }
         }
     }
@@ -323,7 +354,10 @@ class ScreensScreenshotTest {
     private fun tools(dark: Boolean) {
         compose.setContent {
             MyApplicationTheme(darkTheme = dark) {
-                ToolsTab(viewModel = viewModel, contentPadding = tabPadding, modifier = Modifier.fillMaxSize())
+                var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                Docked("outils", aboveDock = open) { m ->
+                    ToolsTab(viewModel = viewModel, contentPadding = tabPadding, modifier = m, onInToolChanged = { open = it })
+                }
             }
         }
     }
@@ -391,7 +425,10 @@ class ScreensScreenshotTest {
     private fun settings(dark: Boolean, update: AvailableUpdate? = null) {
         compose.setContent {
             MyApplicationTheme(darkTheme = dark) {
-                SettingsTab(contentPadding = tabPadding, availableUpdate = update, modifier = Modifier.fillMaxSize())
+                var sub by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                Docked("parametres", aboveDock = sub) { m ->
+                    SettingsTab(contentPadding = tabPadding, availableUpdate = update, modifier = m, onSubPageChanged = { sub = it })
+                }
             }
         }
     }
@@ -439,7 +476,9 @@ class ScreensScreenshotTest {
         repository.updateAltitude(com.example.util.AltitudeFix(184.0, 3f))
         compose.setContent {
             MyApplicationTheme(darkTheme = dark) {
-                TrackingTab(viewModel = viewModel, hasLocationPermission = permission, onRequestPermission = {})
+                Docked("enregistrer") { m ->
+                    TrackingTab(viewModel = viewModel, hasLocationPermission = permission, onRequestPermission = {}, modifier = m)
+                }
             }
         }
     }
