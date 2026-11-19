@@ -878,8 +878,17 @@ tiennent toujours :
   `MpSwitch`, boutons, `MpDialog`, `MpSheet`, `WaveProgress`, et les messages en bas
   d'écran (`AppMessenger` / `LocalAppMessenger` / `AppMessageHost`) qui remplacent les
   `Toast` d'Android dans l'interface Compose.
-- `ui/component/MainNavigationBar.kt` — la barre flottante. Elle s'efface quand un
-  outil ou une page de réglages (nouveautés, À propos) occupe l'écran.
+- `ui/component/FloatingDock.kt` — le dock flottant, qui a remplacé la pilule de la
+  refonte (`MainNavigationBar`, retirée) d'après un cahier des charges fourni par
+  l'auteur : pilule de 64 dp à 28 dp au-dessus de la barre système, bouton rond de
+  tête, onglet actif élargi à 128 dp avec son libellé, écrasement au changement
+  d'onglet, montée et descente animées. Tailles, ressorts et durées sont ceux du
+  cahier des charges, à ne pas retoucher à l'œil. Adaptations : le bouton de tête est
+  « Enregistrer » (la carte tient lieu d'accueil ; pas de croix, rien à fermer), trois
+  onglets derrière (quatre plus le bouton dépasseraient 360 dp), Material Icons au lieu
+  de la police Material Symbols. Il descend quand un outil ou une page de réglages
+  occupe l'écran. Le contenu qui défile réserve `DockReservedHeight` (128 dp) en bas
+  quand le dock est là, `DockHiddenReservedHeight` (24 dp) sinon, barre système en plus.
 - Chaque écran a été refait dans son fichier : `HistoryTab`, `DetailView`,
   `ToolsTab`, `SettingsTab` (avec les pages « Nouveautés » et « À propos »),
   `UpdatePrompt` (étapes en feuilles du bas), `WelcomeScreen` (trois pages),

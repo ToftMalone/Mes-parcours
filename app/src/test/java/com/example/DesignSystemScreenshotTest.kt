@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
-import com.example.ui.component.MainNavigationBar
+import com.example.ui.component.FloatingDock
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.StatXlTextStyle
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -64,7 +64,7 @@ class DesignSystemScreenshotTest {
             modifier = Modifier.padding(vertical = 8.dp)
         ) {
             for (tab in listOf("enregistrer", "historique", "outils", "parametres")) {
-                MainNavigationBar(currentTab = tab, onTabSelected = {}, showUpdateBadge = tab != "parametres")
+                FloatingDock(currentTab = tab, onTabSelected = {}, showUpdateBadge = tab != "parametres", isRecording = tab != "enregistrer")
             }
         }
     }

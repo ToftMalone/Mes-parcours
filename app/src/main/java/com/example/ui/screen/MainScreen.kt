@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -33,7 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.example.ui.component.MainNavigationBar
+import com.example.ui.component.DockHiddenReservedHeight
+import com.example.ui.component.DockReservedHeight
+import com.example.ui.component.FloatingDock
+import com.example.ui.component.FloatingDockHost
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ShareLocation
 import androidx.compose.runtime.CompositionLocalProvider
@@ -440,18 +444,19 @@ fun MainScreen(
                     modifier = modifier
                 )
             } else {
+                // Un outil ou une page de réglages ouverts prennent tout l'écran : le dock
+                // descend, et revient au retour.
+                val dockVisible = !(currentTab == "outils" && toolOpen) && !(currentTab == "parametres" && settingsSubPageOpen)
                 Scaffold(
-                    bottomBar = {
-                        // Un outil ou une page de réglages ouverts prennent tout l'écran.
-                        if (!(currentTab == "outils" && toolOpen) && !(currentTab == "parametres" && settingsSubPageOpen)) MainNavigationBar(
-                            currentTab = currentTab,
-                            onTabSelected = { currentTab = it },
-                            showUpdateBadge = availableUpdate != null,
-                            isRecording = isTracking
-                        )
-                    },
                 modifier = modifier.fillMaxSize().testTag("main_screen")
-            ) { innerPadding ->
+            ) { scaffoldPadding ->
+                // Le dock flotte au-dessus du contenu, qui défile dessous : chaque écran
+                // garde en bas de quoi faire remonter ses dernières lignes au-dessus de lui.
+                val innerPadding = PaddingValues(
+                    top = scaffoldPadding.calculateTopPadding(),
+                    bottom = scaffoldPadding.calculateBottomPadding() +
+                        if (dockVisible) DockReservedHeight else DockHiddenReservedHeight
+                )
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -521,6 +526,15 @@ fun MainScreen(
                             )
                         }
                     }
+                    FloatingDockHost(visible = dockVisible, modifier = Modifier.align(Alignment.BottomCenter)) { m ->
+                        FloatingDock(
+                            currentTab = currentTab,
+                            onTabSelected = { currentTab = it },
+                            showUpdateBadge = availableUpdate != null,
+                            isRecording = isTracking,
+                            modifier = m
+                        )
+                    }
                 }
             }
             }
@@ -569,7 +583,8 @@ fun MainScreen(
             bottomPadding = when {
                 detailId != null -> 24.dp
                 currentTab == "historique" -> 168.dp
-                else -> 96.dp
+                // Juste au-dessus du dock (64 dp posés 28 dp au-dessus de la barre système).
+                else -> 100.dp
             },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
