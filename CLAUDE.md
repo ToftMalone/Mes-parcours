@@ -880,13 +880,13 @@ tiennent toujours :
   `Toast` d'Android dans l'interface Compose.
 - `ui/component/FloatingDock.kt` — le dock flottant, qui a remplacé la pilule de la
   refonte (`MainNavigationBar`, retirée) d'après un cahier des charges fourni par
-  l'auteur : pilule de 64 dp à 28 dp au-dessus de la barre système, bouton rond de
-  tête, onglet actif élargi à 128 dp avec son libellé, écrasement au changement
+  l'auteur : pilule de 64 dp à 28 dp au-dessus de la barre système, onglet actif élargi à 128 dp avec son libellé, écrasement au changement
   d'onglet, montée et descente animées. Tailles, ressorts et durées sont ceux du
-  cahier des charges, à ne pas retoucher à l'œil. Adaptations : le bouton de tête est
-  « Enregistrer » (la carte tient lieu d'accueil ; pas de croix, rien à fermer), trois
-  onglets derrière (quatre plus le bouton dépasseraient 360 dp), Material Icons au lieu
-  de la police Material Symbols. **Il ne disparaît jamais**, à la demande de l'auteur
+  cahier des charges, à ne pas retoucher à l'œil. Adaptations : **pas de bouton rond de tête**,
+  « Enregistrer » est un onglet comme les autres, qui se marque et affiche son libellé
+  (à la demande de l'auteur ; la grille et la croix du modèle n'avaient rien à ouvrir ni
+  à fermer ici, et quatre onglets plus ce bouton dépasseraient 360 dp), Material Icons
+  au lieu de la police Material Symbols. **Il ne disparaît jamais**, à la demande de l'auteur
   (le cahier des charges le cachait dans les outils et les réglages) : posé hors de la
   transition de `MainScreen`, il reste sur la fiche d'un parcours (un onglet touché la
   referme), dans un outil ouvert et dans les pages de réglages, qui s'arrêtent

@@ -1,6 +1,5 @@
 package com.example.ui.component
 
-import android.view.HapticFeedbackConstants
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -49,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -69,13 +67,12 @@ import kotlinx.coroutines.launch
  * (`MainNavigationBar`).
  *
  * Adaptations à l'application, le reste étant à l'identique :
- * - **Le bouton rond de tête est l'onglet « Enregistrer »**, la carte, qui tient lieu
- *   d'accueil. Le modèle y mettait une grille, puis une croix une fois à l'accueil pour
- *   « fermer la section » : l'application n'a pas de sections, une croix sur la carte
- *   n'aurait rien à fermer. L'icône d'enregistrement passe donc de contour à pleine,
- *   avec la même animation « pop ».
- * - **Trois onglets** derrière lui : Historique, Outils, Paramètres. Quatre onglets plus
- *   ce bouton feraient 360 dp, plus que la largeur de bien des téléphones.
+ * - **Pas de bouton rond de tête : « Enregistrer » est un onglet comme les autres**,
+ *   qui s'élargit et affiche son libellé quand on y est, à la demande de l'auteur. Le
+ *   modèle y mettait une grille, puis une croix pour « fermer la section » :
+ *   l'application n'a pas de sections. Une première version en faisait le bouton de la
+ *   carte, mais il ne se marquait pas comme les autres onglets. Quatre onglets plus ce
+ *   bouton feraient 360 dp, plus que la largeur de bien des téléphones ; sans lui, 306 dp.
  * - Icônes de Material Icons (contour inactif, pleine active), déjà utilisées partout,
  *   plutôt que la police Material Symbols : le cahier des charges le prévoit.
  * - Couleurs du thème ; ombre teintée selon `LocalIsDarkTheme`, jamais
@@ -83,7 +80,7 @@ import kotlinx.coroutines.launch
  * - **Toujours affiché**, à la demande de l'auteur : outils, pages de réglages et fiche
  *   d'un parcours s'arrêtent au-dessus de lui ([aboveDock]).
  * - Pastilles conservées : mise à jour ignorée sur Paramètres, enregistrement en cours
- *   sur le bouton de tête.
+ *   sur « Enregistrer ».
  */
 
 private val Emphasized = CubicBezierEasing(0.2f, 0f, 0f, 1f)
@@ -108,33 +105,15 @@ private data class DockDestination(
     val testTag: String
 )
 
-private val HOME = DockDestination(
-    "enregistrer", R.string.nav_record, Icons.Outlined.RadioButtonChecked, Icons.Rounded.RadioButtonChecked, "tab_button_tracking"
-)
-
 private val TABS = listOf(
+    DockDestination("enregistrer", R.string.nav_record, Icons.Outlined.RadioButtonChecked, Icons.Rounded.RadioButtonChecked, "tab_button_tracking"),
     DockDestination("historique", R.string.nav_history, Icons.Outlined.History, Icons.Rounded.History, "tab_button_history"),
     DockDestination("outils", R.string.nav_tools, Icons.Outlined.Handyman, Icons.Rounded.Handyman, "tab_button_tools"),
     DockDestination("parametres", R.string.nav_settings, Icons.Outlined.Settings, Icons.Rounded.Settings, "tab_button_settings")
 )
 
-/** Entrée « pop » : échelle 0,4 → 1 et rotation −40° → 0, rejouée quand [key] change. */
-@Composable
-private fun Modifier.pop(key: Any?): Modifier {
-    val p = remember(key) { Animatable(0f) }
-    LaunchedEffect(key) { p.animateTo(1f, spring(0.55f, 420f)) }
-    return graphicsLayer {
-        val v = p.value
-        val s = 0.4f + 0.6f * v
-        scaleX = s; scaleY = s
-        rotationZ = -40f * (1f - v)
-        alpha = v.coerceIn(0f, 1f)
-    }
-}
-
 /**
- * Le dock : bouton rond de la carte, puis les onglets, dont l'actif s'élargit et
- * affiche son libellé. Chaque changement d'onglet l'écrase un instant puis le relâche.
+ * Le dock : les quatre onglets, dont l'actif s'élargit et affiche son libellé. Chaque changement d'onglet l'écrase un instant puis le relâche.
  */
 @Composable
 fun FloatingDock(
@@ -153,8 +132,6 @@ fun FloatingDock(
         squash.snapTo(1f)
         launch { squash.animateTo(0f, spring(0.5f, 500f)) }
     }
-    val view = LocalView.current
-    val atHome = currentTab == HOME.route
 
     Row(
         modifier
@@ -171,28 +148,6 @@ fun FloatingDock(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .selectable(selected = atHome, role = Role.Tab) {
-                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    onTabSelected(HOME.route)
-                }
-                .testTag(HOME.testTag),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(Modifier.pop(key = atHome)) {
-                Icon(
-                    imageVector = if (atHome) HOME.selectedIcon else HOME.icon,
-                    contentDescription = stringResource(HOME.labelRes),
-                    tint = onContainer,
-                    modifier = Modifier.size(24.dp)
-                )
-                // Enregistrement en cours vu depuis un autre onglet.
-                if (isRecording && !atHome) StatusDot(LocalRecordingColor.current, container, Modifier.align(Alignment.TopEnd))
-            }
-        }
         TABS.forEach { tab ->
             val selected = currentTab == tab.route
             DockTab(
@@ -200,8 +155,13 @@ fun FloatingDock(
                 active = selected,
                 container = container,
                 onContainer = onContainer,
-                // Une fois sur l'onglet, la carte en tête des paramètres prend le relais.
-                showBadge = showUpdateBadge && tab.route == "parametres" && !selected,
+                badge = when {
+                    // Une fois sur l'onglet, la carte en tête des paramètres prend le relais.
+                    showUpdateBadge && tab.route == "parametres" && !selected -> MaterialTheme.colorScheme.error
+                    // Enregistrement en cours vu depuis un autre onglet.
+                    isRecording && tab.route == "enregistrer" && !selected -> LocalRecordingColor.current
+                    else -> null
+                },
                 onClick = { onTabSelected(tab.route) }
             )
         }
@@ -228,7 +188,7 @@ private fun DockTab(
     active: Boolean,
     container: Color,
     onContainer: Color,
-    showBadge: Boolean,
+    badge: Color?,
     onClick: () -> Unit
 ) {
     val accent = MaterialTheme.colorScheme.primary
@@ -257,10 +217,11 @@ private fun DockTab(
                 tint = fg,
                 modifier = Modifier.size(24.dp)
             )
-            if (showBadge) {
+            if (badge != null) {
                 StatusDot(
-                    MaterialTheme.colorScheme.error, container,
-                    Modifier.align(Alignment.TopEnd).testTag("settings_update_badge")
+                    badge, container,
+                    Modifier.align(Alignment.TopEnd)
+                        .then(if (destination.route == "parametres") Modifier.testTag("settings_update_badge") else Modifier)
                 )
             }
         }
