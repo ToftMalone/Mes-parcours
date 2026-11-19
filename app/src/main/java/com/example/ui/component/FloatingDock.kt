@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -79,6 +80,8 @@ import kotlinx.coroutines.launch
  *   plutôt que la police Material Symbols : le cahier des charges le prévoit.
  * - Couleurs du thème ; ombre teintée selon `LocalIsDarkTheme`, jamais
  *   `isSystemInDarkTheme()` (invariant 9).
+ * - **Toujours affiché**, à la demande de l'auteur : outils, pages de réglages et fiche
+ *   d'un parcours s'arrêtent au-dessus de lui ([aboveDock]).
  * - Pastilles conservées : mise à jour ignorée sur Paramètres, enregistrement en cours
  *   sur le bouton de tête.
  */
@@ -89,8 +92,13 @@ private val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 /** Place à réserver sous le contenu qui défile quand le dock est affiché (sans la barre système). */
 val DockReservedHeight: Dp = 128.dp
 
-/** Place à réserver quand le dock est caché. */
-val DockHiddenReservedHeight: Dp = 24.dp
+/**
+ * Pour un écran sans marge propre (outil ouvert, page de réglages, fiche d'un
+ * parcours) : il s'arrête au-dessus du dock, qui ne disparaît jamais. 64 dp de dock
+ * posés 28 dp au-dessus de la barre système. La barre système est consommée ici :
+ * un `navigationBarsPadding` plus bas dans l'écran ne la compte pas une seconde fois.
+ */
+fun Modifier.aboveDock(): Modifier = navigationBarsPadding().padding(bottom = 92.dp)
 
 private data class DockDestination(
     val route: String,

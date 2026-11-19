@@ -886,9 +886,12 @@ tiennent toujours :
   cahier des charges, à ne pas retoucher à l'œil. Adaptations : le bouton de tête est
   « Enregistrer » (la carte tient lieu d'accueil ; pas de croix, rien à fermer), trois
   onglets derrière (quatre plus le bouton dépasseraient 360 dp), Material Icons au lieu
-  de la police Material Symbols. Il descend quand un outil ou une page de réglages
-  occupe l'écran. Le contenu qui défile réserve `DockReservedHeight` (128 dp) en bas
-  quand le dock est là, `DockHiddenReservedHeight` (24 dp) sinon, barre système en plus.
+  de la police Material Symbols. **Il ne disparaît jamais**, à la demande de l'auteur
+  (le cahier des charges le cachait dans les outils et les réglages) : posé hors de la
+  transition de `MainScreen`, il reste sur la fiche d'un parcours (un onglet touché la
+  referme), dans un outil ouvert et dans les pages de réglages, qui s'arrêtent
+  au-dessus de lui (`Modifier.aboveDock`). Les onglets réservent `DockReservedHeight`
+  (128 dp, barre système en plus) sous leur contenu qui défile.
 - Chaque écran a été refait dans son fichier : `HistoryTab`, `DetailView`,
   `ToolsTab`, `SettingsTab` (avec les pages « Nouveautés » et « À propos »),
   `UpdatePrompt` (étapes en feuilles du bas), `WelcomeScreen` (trois pages),

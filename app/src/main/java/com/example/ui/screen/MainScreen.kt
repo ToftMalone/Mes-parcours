@@ -34,7 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.example.ui.component.DockHiddenReservedHeight
+import com.example.ui.component.aboveDock
 import com.example.ui.component.DockReservedHeight
 import com.example.ui.component.FloatingDock
 import com.example.ui.component.FloatingDockHost
@@ -441,12 +441,10 @@ fun MainScreen(
                         viewingDetailedTrackId = null
                         currentTab = "enregistrer"
                     },
-                    modifier = modifier
+                    // Le dock reste affiché par-dessus la fiche : elle s'arrête au-dessus de lui.
+                    modifier = modifier.aboveDock()
                 )
             } else {
-                // Un outil ou une page de réglages ouverts prennent tout l'écran : le dock
-                // descend, et revient au retour.
-                val dockVisible = !(currentTab == "outils" && toolOpen) && !(currentTab == "parametres" && settingsSubPageOpen)
                 Scaffold(
                 modifier = modifier.fillMaxSize().testTag("main_screen")
             ) { scaffoldPadding ->
@@ -454,8 +452,7 @@ fun MainScreen(
                 // garde en bas de quoi faire remonter ses dernières lignes au-dessus de lui.
                 val innerPadding = PaddingValues(
                     top = scaffoldPadding.calculateTopPadding(),
-                    bottom = scaffoldPadding.calculateBottomPadding() +
-                        if (dockVisible) DockReservedHeight else DockHiddenReservedHeight
+                    bottom = scaffoldPadding.calculateBottomPadding() + DockReservedHeight
                 )
                 Box(
                     modifier = Modifier.fillMaxSize()
@@ -510,7 +507,8 @@ fun MainScreen(
                                 onNavigateToDetails = { id ->
                                     viewingDetailedTrackId = id
                                 },
-                                modifier = Modifier.fillMaxSize(),
+                                // Un outil ouvert n'a pas de marge propre : il s'arrête au-dessus du dock.
+                                modifier = Modifier.fillMaxSize().then(if (toolOpen) Modifier.aboveDock() else Modifier),
                                 contentPadding = innerPadding,
                                 onInToolChanged = { toolOpen = it },
                                 onOpenHistory = { currentTab = "historique" }
@@ -518,22 +516,13 @@ fun MainScreen(
                         }
                         "parametres" -> {
                             SettingsTab(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().then(if (settingsSubPageOpen) Modifier.aboveDock() else Modifier),
                                 contentPadding = innerPadding,
                                 availableUpdate = availableUpdate,
                                 onShowUpdate = { updateReopenTrigger++ },
                                 onSubPageChanged = { settingsSubPageOpen = it }
                             )
                         }
-                    }
-                    FloatingDockHost(visible = dockVisible, modifier = Modifier.align(Alignment.BottomCenter)) { m ->
-                        FloatingDock(
-                            currentTab = currentTab,
-                            onTabSelected = { currentTab = it },
-                            showUpdateBadge = availableUpdate != null,
-                            isRecording = isTracking,
-                            modifier = m
-                        )
                     }
                 }
             }
@@ -546,6 +535,23 @@ fun MainScreen(
         // Composé en permanence, y compris pendant l'affichage d'un parcours en
         // détail : c'est ce qui lui permet de garder la mise à jour déjà trouvée.
         // Seul son affichage est suspendu, pour ne pas recouvrir la vue de détail.
+        // Le dock ne disparaît jamais, à la demande de l'auteur : ni dans un outil, ni
+        // dans une page de réglages, ni sur la fiche d'un parcours. Posé hors de la
+        // transition, il ne glisse pas avec les écrans. Un onglet touché depuis la fiche
+        // la referme.
+        FloatingDockHost(visible = true, modifier = Modifier.align(Alignment.BottomCenter)) { m ->
+            FloatingDock(
+                currentTab = currentTab,
+                onTabSelected = {
+                    viewingDetailedTrackId = null
+                    currentTab = it
+                },
+                showUpdateBadge = availableUpdate != null,
+                isRecording = isTracking,
+                modifier = m
+            )
+        }
+
         UpdatePrompt(
             reopenTrigger = updateReopenTrigger,
             isVisible = detailId == null,
@@ -581,7 +587,6 @@ fun MainScreen(
         AppMessageHost(
             messenger = messenger,
             bottomPadding = when {
-                detailId != null -> 24.dp
                 currentTab == "historique" -> 168.dp
                 // Juste au-dessus du dock (64 dp posés 28 dp au-dessus de la barre système).
                 else -> 100.dp
