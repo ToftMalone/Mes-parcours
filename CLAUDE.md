@@ -1291,8 +1291,8 @@ une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import
 ### Relecture « failles et bugs » d'après la 2.3.17
 
 À la demande de l'auteur (« trouver 10 failles de sécurité et plusieurs bugs »). Dix
-failles relevées, dont huit nouvelles ; neuf corrigées (les 9 et 10 dans un second
-temps, à la demande de l'auteur). Quatre bugs, tous corrigés.
+failles relevées, dont huit nouvelles, toutes corrigées (les 8, 9 et 10 dans un
+second temps, à la demande de l'auteur). Quatre bugs, tous corrigés.
 
 **Failles corrigées :**
 
@@ -1319,14 +1319,17 @@ temps, à la demande de l'auteur). Quatre bugs, tous corrigés.
 7. **Export XML cassable par un nom** : voir le bug 3 ci-dessous, qui est aussi un
    moyen de rendre une sauvegarde illisible.
 
-**Faille relevée, non corrigée** (à arbitrer) :
-
-8. **Le travail de publication a `contents: write` du début à la fin**, tests compris.
-   Le séparer en un travail de compilation (lecture seule) et un travail de publication
-   (écriture) borne ce que peut faire une dépendance compromise. La 9 en réduit déjà
-   l'enjeu.
-
 **Corrigées dans un second temps :**
+
+8. **Le workflow de publication avait `contents: write` du début à la fin**, tests
+   compris. `release.yml` est désormais coupé en deux travaux : `compiler` (lecture
+   seule : tests, compilation signée, `update.json`, transmis par un artefact) et
+   `publier` (écriture, aucun code du dépôt exécuté : il récupère l'artefact et appelle
+   `gh release create`, avec `GH_REPO` faute de dépôt cloné). Une dépendance
+   compromise n'a donc plus qu'un jeton en lecture, et ne peut plus remplacer
+   `update.json`. **Non essayé avant la première publication qui l'emprunte** : une
+   publication ne se simule pas. Si elle échoue au travail `publier`, l'APK est intact
+   dans l'artefact, et relancer ce seul travail suffit.
 
 9. **Vérification des dépendances Gradle** (`gradle/verification-metadata.xml`) :
    l'empreinte SHA-256 de chaque bibliothèque, extension et outil d'Android, que

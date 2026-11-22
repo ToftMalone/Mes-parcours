@@ -43,13 +43,25 @@ on:
         required: true
         type: string
 
-# Nécessaire pour créer la publication et y joindre les fichiers.
+# Lecture seule par défaut. Seul le travail « publier », qui ne fait que créer la
+# publication à partir des fichiers déjà prêts, reçoit le droit d'écriture.
+#
+# Pourquoi deux travaux : tout le code tiers (tests, Gradle et ses extensions, outils
+# d'Android) s'exécute dans « compiler ». Avec un jeton en écriture, une dépendance
+# compromise pouvait réécrire le dépôt ou remplacer une publication — et donc
+# update.json, que les téléphones croient. Elle n'a plus désormais qu'un jeton en
+# lecture. « publier » n'exécute aucun code du dépôt : il récupère trois fichiers et
+# appelle `gh`. (Relecture d'après la 2.3.17, point 8.)
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  publier:
+  compiler:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.prepare.outputs.tag }}
+      apk: ${{ steps.prepare.outputs.apk }}
+      versionName: ${{ steps.prepare.outputs.versionName }}
 
     steps:
       - name: Récupérer le code
@@ -57,11 +69,11 @@ jobs:
         with:
           # Le message du tag sert de notes de version : il faut l'historique.
           fetch-depth: 0
-          # Sans cela, checkout laisse le jeton du dépôt (droit d'écriture, voir
-          # « permissions ») dans .git/config pour toute la suite du travail : lisible
-          # par les tests, par Gradle et par chacune de ses extensions, dans le même
-          # travail que la clé de signature. Rien ici n'en a besoin pour git : la
-          # publication passe par `gh`, qui reçoit le jeton par GH_TOKEN.
+          # Sans cela, checkout laisse le jeton du dépôt dans .git/config pour toute
+          # la suite du travail : lisible par les tests, par Gradle et par chacune de
+          # ses extensions, dans le même travail que la clé de signature. Ce jeton
+          # n'est plus qu'en lecture ici (voir « permissions »), mais rien n'en a
+          # besoin pour git : autant ne pas l'y laisser.
           persist-credentials: false
 
       - name: Installer le JDK
@@ -190,6 +202,32 @@ jobs:
           echo "Notes de version :"
           cat notes.md
 
+      # Les fichiers passent au travail suivant par un artefact de ce même lancement.
+      - name: Transmettre l'APK, update.json et les notes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: publication
+          path: |
+            ${{ steps.prepare.outputs.apk }}
+            update.json
+            notes.md
+          if-no-files-found: error
+          retention-days: 1
+
+  publier:
+    needs: compiler
+    runs-on: ubuntu-latest
+    # Le seul droit d'écriture du workflow : créer la publication et y joindre les
+    # fichiers. Aucun code du dépôt ne s'exécute ici.
+    permissions:
+      contents: write
+
+    steps:
+      - name: Récupérer l'APK, update.json et les notes
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: publication
+
       - name: Créer la publication
         env:
           GH_TOKEN: ${{ github.token }}
@@ -197,9 +235,11 @@ jobs:
           # plutôt que d'être interpolées dans la commande : `${{ }}` est remplacé
           # avant que le shell ne voie la ligne, si bien qu'un caractère de shell
           # dans le versionName s'exécuterait au lieu d'être un nom.
-          TAG: ${{ steps.prepare.outputs.tag }}
-          APK: ${{ steps.prepare.outputs.apk }}
-          VERSION_NAME: ${{ steps.prepare.outputs.versionName }}
+          TAG: ${{ needs.compiler.outputs.tag }}
+          APK: ${{ needs.compiler.outputs.apk }}
+          VERSION_NAME: ${{ needs.compiler.outputs.versionName }}
+          # Pas de dépôt cloné dans ce travail : gh doit savoir lequel viser.
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           # update.json doit porter exactement ce nom : l'application le cherche à
