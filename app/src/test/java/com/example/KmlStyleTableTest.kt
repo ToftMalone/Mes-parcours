@@ -91,4 +91,21 @@ class KmlStyleTableTest {
 
         assertNull(table.resolve("#a"))
     }
+
+    @Test
+    fun `la table des styles est bornee`() {
+        // Un fichier piégé de millions de <Style id="…"> la remplissait jusqu'à
+        // saturer la mémoire.
+        val table = KmlStyleTable()
+        repeat(20_000) { table.putStyle("s$it", rouge) }
+
+        assertEquals(rouge, table.resolve("#s0"))
+        assertNull("au-delà de la borne, plus rien n'est retenu", table.resolve("#s19999"))
+        // Une entrée existante se remplace toujours.
+        table.putStyle("s0", bleu)
+        assertEquals(bleu, table.resolve("#s0"))
+        // Un identifiant démesuré est écarté.
+        table.putStyle("x".repeat(10_000), vert)
+        assertNull(table.resolve("x".repeat(10_000)))
+    }
 }

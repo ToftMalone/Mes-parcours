@@ -69,15 +69,15 @@ class KmlStyleTable {
     /** Enregistre la couleur et l'épaisseur de ligne d'un `<Style id="…">`. */
     fun putStyle(id: String?, color: Int?, width: Float? = null) {
         val key = normalize(id) ?: return
-        if (color != null) lineColors[key] = color
-        if (width != null) lineWidths[key] = width
+        if (color != null && hasRoom(lineColors, key)) lineColors[key] = color
+        if (width != null && hasRoom(lineWidths, key)) lineWidths[key] = width
     }
 
     /** Enregistre le style « au repos » désigné par un `<StyleMap id="…">`. */
     fun putStyleMap(id: String?, normalStyleUrl: String?) {
         val key = normalize(id) ?: return
         val target = normalize(normalStyleUrl) ?: return
-        normalStyleOf[key] = target
+        if (hasRoom(normalStyleOf, key)) normalStyleOf[key] = target
     }
 
     /**
@@ -106,13 +106,32 @@ class KmlStyleTable {
         return null
     }
 
-    /** Identifiant sans son croisillon de référence ni ses blancs. */
+    /**
+     * Identifiant sans son croisillon de référence ni ses blancs ; null s'il est vide ou
+     * démesuré. L'attribut `id` n'a pas la borne des textes lus entre balises : un
+     * identifiant de plusieurs mégaoctets serait sinon gardé tel quel en mémoire.
+     */
     private fun normalize(raw: String?): String? {
         val cleaned = raw?.trim()?.removePrefix("#")?.trim()
-        return if (cleaned.isNullOrEmpty()) null else cleaned
+        return if (cleaned.isNullOrEmpty() || cleaned.length > MAX_ID_LENGTH) null else cleaned
     }
+
+    /**
+     * Place pour [key] dans [map] : une entrée existante se remplace toujours, une
+     * nouvelle n'entre que sous [MAX_STYLES].
+     *
+     * Sans plafond, un fichier piégé de quelques centaines de mégaoctets fait de
+     * millions de `<Style id="…">` remplissait cette table jusqu'à saturer la mémoire,
+     * dès la première lecture — celle qui ne garde, en principe, « que quelques
+     * dizaines d'entrées ». Un vrai export Google Earth en compte au plus quelques
+     * centaines ; les styles au-delà de la borne retombent sur la couleur de la palette.
+     */
+    private fun hasRoom(map: Map<String, *>, key: String): Boolean =
+        map.size < MAX_STYLES || map.containsKey(key)
 
     private companion object {
         const val MAX_INDIRECTION = 8
+        const val MAX_STYLES = 10_000
+        const val MAX_ID_LENGTH = 256
     }
 }

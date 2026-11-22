@@ -111,7 +111,9 @@ private fun describe(node: SemanticsNode): String {
         ?.let { parts += "« $it »" }
     c.getOrNull(SemanticsProperties.ContentDescription)?.joinToString(" ")?.takeIf { it.isNotBlank() }
         ?.let { parts += "icône « $it »" }
-    c.getOrNull(SemanticsProperties.EditableText)?.text?.let { parts += "champ « $it »" }
+    // Le contenu d'un champ n'est jamais noté, seulement sa longueur : c'est ce que
+    // l'utilisateur tape (un lieu cherché, un nom), et le journal part chez un tiers.
+    c.getOrNull(SemanticsProperties.EditableText)?.text?.let { parts += "champ de ${it.length} caractère(s)" }
     c.getOrNull(SemanticsProperties.TestTag)?.let { parts += "[$it]" }
     c.getOrNull(SemanticsProperties.ToggleableState)?.let { parts += "état $it" }
     c.getOrNull(SemanticsProperties.Selected)?.let { parts += if (it) "sélectionné" else "non sélectionné" }

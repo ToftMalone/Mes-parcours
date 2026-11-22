@@ -48,11 +48,14 @@ object Exporter {
                 out.append("    <trkseg>\n")
                 inSeg = true
             }
-            out.append("      <trkpt lat=\"${pt.latitude}\" lon=\"${pt.longitude}\">\n")
-            out.append("        <ele>${pt.altitude}</ele>\n")
+            // Jamais `${pt.latitude}` : Kotlin écrit « 5.0E-4 » sous le millième, ce que
+            // le schéma GPX (xsd:decimal) refuse. Tout point à moins de 70 m du méridien
+            // de Greenwich — qui traverse la France — ressortait ainsi illisible ailleurs.
+            out.append("      <trkpt lat=\"${coordinate(pt.latitude)}\" lon=\"${coordinate(pt.longitude)}\">\n")
+            out.append("        <ele>${coordinate(pt.altitude)}</ele>\n")
             out.append("        <time>${formatTime(pt.timestamp)}</time>\n")
             if (pt.speed > 0f) {
-                out.append("        <speed>${pt.speed}</speed>\n")
+                out.append("        <speed>${plain(pt.speed.toString())}</speed>\n")
             }
             out.append("      </trkpt>\n")
         }
@@ -236,18 +239,6 @@ object Exporter {
             lineOpen = false
         }
 
-        /**
-         * Un nombre tel que le fichier l'a donné : la représentation la plus courte qui
-         * le relise à l'identique, sans « .0 » inutile — l'altitude nulle de Google Earth
-         * ressort « 0 » — et jamais en notation scientifique (« 1.0E-4 »), que KML ne
-         * prévoit pas.
-         */
-        private fun coordinate(value: Double): String {
-            if (value == Math.rint(value) && kotlin.math.abs(value) < 1e15) return value.toLong().toString()
-            val text = value.toString()
-            return if ('E' in text) java.math.BigDecimal(text).stripTrailingZeros().toPlainString() else text
-        }
-
         private fun formatWidth(width: Float): String =
             if (width % 1f == 0f) width.toInt().toString() else String.format(Locale.ROOT, "%.1f", width)
 
@@ -257,11 +248,49 @@ object Exporter {
         }
     }
 
-    private fun escapeXml(str: String): String {
-        return str.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&apos;")
+    /**
+     * Un nombre tel que le fichier l'a donné : la représentation la plus courte qui le
+     * relise à l'identique, sans « .0 » inutile — l'altitude nulle de Google Earth ressort
+     * « 0 » — et jamais en notation scientifique (« 1.0E-4 »), que ni KML ni GPX ne
+     * prévoient.
+     */
+    internal fun coordinate(value: Double): String {
+        if (value == Math.rint(value) && kotlin.math.abs(value) < 1e15) return value.toLong().toString()
+        return plain(value.toString())
+    }
+
+    /** [text], un nombre écrit par Kotlin, sans notation scientifique. */
+    private fun plain(text: String): String =
+        if ('E' in text) java.math.BigDecimal(text).stripTrailingZeros().toPlainString() else text
+
+    /**
+     * Échappe [str] pour XML et **retire ce que XML 1.0 interdit** : caractères de
+     * contrôle (hors tabulation et fins de ligne), U+FFFE / U+FFFF et moitiés de paires
+     * de substitution orphelines. Un seul d'entre eux dans un nom — collé depuis une
+     * autre application au renommage, par exemple — rendait tout le fichier exporté
+     * illisible, sauvegarde automatique comprise.
+     */
+    internal fun escapeXml(str: String): String {
+        val out = StringBuilder(str.length + 16)
+        var i = 0
+        while (i < str.length) {
+            val c = str[i]
+            when {
+                Character.isHighSurrogate(c) && i + 1 < str.length && Character.isLowSurrogate(str[i + 1]) -> {
+                    out.append(c).append(str[i + 1]); i++
+                }
+                Character.isSurrogate(c) -> Unit
+                c < ' ' && c != '\t' && c != '\n' && c != '\r' -> Unit
+                c == '\uFFFE' || c == '\uFFFF' -> Unit
+                c == '&' -> out.append("&amp;")
+                c == '<' -> out.append("&lt;")
+                c == '>' -> out.append("&gt;")
+                c == '"' -> out.append("&quot;")
+                c == '\'' -> out.append("&apos;")
+                else -> out.append(c)
+            }
+            i++
+        }
+        return out.toString()
     }
 }

@@ -36,6 +36,12 @@ object UpdateDownloader {
     private const val TIMEOUT_MS = 15_000
     private const val BUFFER_SIZE = 64 * 1024
 
+    /** Taille au-delà de laquelle un APK est refusé : l'application en fait une vingtaine de Mio. */
+    private const val MAX_APK_BYTES = 200L * 1024 * 1024
+
+    /** Place laissée libre après le téléchargement, pour ne jamais remplir le téléphone. */
+    private const val FREE_SPACE_MARGIN = 100L * 1024 * 1024
+
     /**
      * Dossier de destination, dans le stockage **interne** de l'application.
      *
@@ -88,7 +94,15 @@ object UpdateDownloader {
             }
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
 
-            val total = connection.contentLength.toLong()
+            val total = connection.contentLengthLong
+            // Taille bornée, annoncée comme reçue : l'empreinte n'est vérifiée qu'à la
+            // fin, donc tout ce qu'envoie le serveur est d'abord écrit. Sans borne, un
+            // manifeste altéré — ou une réponse en découpage par blocs qui ne finit pas —
+            // remplissait le stockage interne, comme la corbeille l'avait déjà fait.
+            if (total > MAX_APK_BYTES) return@withContext null
+            val needed = (if (total > 0) total else MAX_APK_BYTES) + FREE_SPACE_MARGIN
+            val free = target.parentFile?.usableSpace ?: 0L
+            if (free < needed) return@withContext null
             var downloaded = 0L
 
             // Empreinte calculée pendant l'écriture : relire le fichier ensuite
@@ -109,6 +123,7 @@ object UpdateDownloader {
                         output.write(buffer, 0, read)
                         digest.update(buffer, 0, read)
                         downloaded += read
+                        if (downloaded > MAX_APK_BYTES) throw java.io.IOException("APK démesuré")
                         if (total > 0) onProgress((downloaded.toFloat() / total).coerceIn(0f, 1f))
                     }
                     output.flush()

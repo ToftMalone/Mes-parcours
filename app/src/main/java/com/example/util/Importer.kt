@@ -54,6 +54,9 @@ private const val MAX_STYLE_ID_LENGTH = 256
  */
 internal const val MAX_COORDINATE_TOKEN_LENGTH = 128
 
+/** Profondeur d'imbrication des balises au-delà de laquelle un KML est refusé (voir KmlHandler). */
+internal const val MAX_KML_DEPTH = 64
+
 /** Nom d'élément KML sans préfixe de namespace, en minuscules. */
 private fun kmlTagOf(localName: String?, qName: String?): String {
     val raw = if (!localName.isNullOrEmpty()) localName else qName ?: return ""
@@ -833,6 +836,14 @@ private class KmlHandler(
     override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
         val tag = kmlTagOf(localName, qName)
         val parent = openTags.lastOrNull()
+        // Imbrication bornée : chaque <Folder> ouvert allonge le chemin de dossiers
+        // recopié dans **chaque** tracé qu'il contient (TrackPlacemark.folderPath). Un
+        // fichier piégé de dizaines de milliers de dossiers imbriqués, chacun nommé de
+        // 512 caractères, faisait écrire des mégaoctets par tracé, jusqu'à remplir le
+        // téléphone. Un vrai fichier Google Earth n'approche pas cette profondeur.
+        if (openTags.size >= MAX_KML_DEPTH) {
+            throw org.xml.sax.SAXException("Fichier KML trop imbriqué (plus de $MAX_KML_DEPTH niveaux)")
+        }
         openTags += tag
         when (tag) {
             "name" -> {

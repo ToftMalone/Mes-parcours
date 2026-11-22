@@ -134,4 +134,27 @@ class KmlRoundTripTest {
         assertEquals(first.points.map { it.segmentColor }, second.points.map { it.segmentColor })
         assertEquals(first.points.map { it.isDiscontinuous }, second.points.map { it.isDiscontinuous })
     }
+
+    @Test
+    fun `un KML aux dossiers imbriques a l'exces est refuse`() {
+        // Chaque dossier ouvert allonge le chemin recopié dans chaque tracé : un
+        // fichier piégé faisait écrire des mégaoctets par tracé, jusqu'à remplir le
+        // téléphone.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val depth = com.example.util.MAX_KML_DEPTH + 10
+        val kml = buildString {
+            append("<kml><Document><name>Piège</name>")
+            repeat(depth) { append("<Folder><name>").append("d".repeat(500)).append("</name>") }
+            append("<Placemark><LineString><coordinates>6,45 6.001,45.001</coordinates></LineString></Placemark>")
+            repeat(depth) { append("</Folder>") }
+            append("</Document></kml>")
+        }
+        val refus = runCatching { import(context, kml, "piege.kml") }.exceptionOrNull()
+        assertTrue("refus attendu, obtenu : $refus", refus is org.xml.sax.SAXException)
+
+        // Une imbrication ordinaire passe toujours.
+        val ordinaire = kml.replace("<Folder><name>" + "d".repeat(500) + "</name>", "")
+            .replace("</Folder>", "")
+        assertEquals("Piège", import(context, ordinaire, "ordinaire.kml").name)
+    }
 }

@@ -719,8 +719,6 @@ class TrackingService : Service() {
                 timestamp = currTime,
                 isDiscontinuous = pointDiscontinuous
             )
-            repository.insertPoint(point)
-
             // Publie aussi l'état du GPS dans le dépôt, pour que l'écran suive en direct
             repository.updateGpsStatus(GpsStatus.FOUND)
             repository.updateGpsAccuracy(location.accuracy)
@@ -755,6 +753,14 @@ class TrackingService : Service() {
             }
 
             lastLocation = location
+
+            // L'écriture vient **après** la mise à jour de lastLocation, et c'est voulu.
+            // insertPoint suspend : le fil unique de pointScope passe alors à la position
+            // suivante, livrée dans le même LocationResult. Écrite avant, cette suivante
+            // lisait encore l'ancienne lastLocation : la distance était comptée A→B puis
+            // A→C au lieu de B→C, et les deux premiers points d'un tronçon s'ouvraient
+            // chacun comme un nouveau tronçon. Tout ce qui précède ne suspend pas.
+            repository.insertPoint(point)
 
             // Calculate live statistics
             val avgSpeed = if (totalSpeedPoints > 0) speedSumMps / totalSpeedPoints else 0.0

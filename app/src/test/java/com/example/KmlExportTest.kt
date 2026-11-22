@@ -198,4 +198,32 @@ class KmlExportTest {
         val written = com.example.util.KmlColor.format(france)
         assertEquals(france, com.example.util.KmlColor.parse(written))
     }
+
+    @Test
+    fun `le GPX n'ecrit jamais de notation scientifique`() {
+        // Près du méridien de Greenwich, qui traverse la France : Kotlin écrivait
+        // « 5.0E-4 », que le schéma GPX (xsd:decimal) refuse.
+        val out = StringBuilder()
+        val writer = Exporter.GpxWriter(out)
+        writer.start(track)
+        writer.add(point(1).copy(latitude = 44.5, longitude = 0.0005, altitude = 0.0001, speed = 0.0002f))
+        writer.finish()
+        val gpx = out.toString()
+
+        assertFalse(gpx, gpx.contains("E-"))
+        assertTrue(gpx, gpx.contains("lat=\"44.5\" lon=\"0.0005\""))
+        assertTrue(gpx, gpx.contains("<ele>0.0001</ele>"))
+        assertTrue(gpx, gpx.contains("<speed>0.0002</speed>"))
+    }
+
+    @Test
+    fun `un caractere interdit par XML dans un nom ne casse pas le fichier`() {
+        val nom = "Tour\u0001 du lac\u0008 & <retour> \uD83D\uDEB2 \uD800fin"
+        val kml = export(listOf(point(1), point(2)), track.copy(name = nom))
+
+        assertTrue(kml, kml.contains("<name>Tour du lac &amp; &lt;retour&gt; \uD83D\uDEB2 fin</name>"))
+        // Le fichier entier doit se relire.
+        javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            .parse(org.xml.sax.InputSource(java.io.StringReader(kml)))
+    }
 }

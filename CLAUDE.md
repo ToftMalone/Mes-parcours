@@ -965,11 +965,11 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 250 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
+- 254 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
   `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (11), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (12), `KmlRoundTripTest` (2),
-  `RecordingGuardsTest` (7), `KmlStyleTableTest` (7), `TrackSegmentsTest` (7),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (14), `KmlRoundTripTest` (3),
+  `RecordingGuardsTest` (7), `KmlStyleTableTest` (8), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
   `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),
   `TunnelDetectorTest` (6), `MergeTracksTest` (5), `MigrationChainTest` (3), plus trois
@@ -1287,6 +1287,69 @@ une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import
    pendant que ses points partaient : `restoreFromTrash` ne vise plus que `deletedAt > 0`.
 4. `checkForAndRestoreActiveTrack` relisait `_currentTrackId` après l'avoir testé, avec
    un `!!` qu'un arrêt sur un autre fil pouvait faire planter.
+
+### Relecture « failles et bugs » d'après la 2.3.17
+
+À la demande de l'auteur (« trouver 10 failles de sécurité et plusieurs bugs »). Dix
+failles relevées, dont huit nouvelles ; sept corrigées. Quatre bugs, tous corrigés.
+
+**Failles corrigées :**
+
+1. **Table des styles KML sans borne** (`KmlStyleTable`) : un fichier piégé de
+   millions de `<Style id="…">` saturait la mémoire dès la première lecture. Plafond
+   de 10 000 styles, identifiants de plus de 256 caractères écartés.
+2. **Dossiers KML imbriqués sans borne** : le chemin des dossiers est recopié dans
+   chaque tracé (`folderPath`) ; des dizaines de milliers de dossiers imbriqués
+   faisaient écrire des mégaoctets par tracé, jusqu'à remplir le téléphone. Au-delà de
+   `MAX_KML_DEPTH` (64) niveaux de balises, l'import est refusé.
+3. **Téléchargement de mise à jour sans borne de taille** (`UpdateDownloader`) :
+   l'empreinte n'étant vérifiée qu'à la fin, tout ce qu'envoyait le serveur était
+   d'abord écrit. Refus au-delà de 200 Mo, et si la place libre restante tomberait
+   sous 100 Mo.
+4. **Le jeton GitHub (droit d'écriture) restait dans `.git/config`** pendant tout le
+   travail de publication, lisible par les tests, Gradle et ses extensions, à côté de
+   la clé de signature. `persist-credentials: false` sur `actions/checkout`.
+5. **Le journal notait le texte tapé** dans les champs (`TouchLog` : lieu cherché,
+   nom saisi). Seule la longueur est notée désormais.
+6. **Sauvegardes visibles à moitié écrites** (`MediaStoreExporter`) : sans
+   `IS_PENDING`, un fichier en cours d'écriture était visible des autres applications,
+   et un échec laissait dans Téléchargements un fichier tronqué au nom d'une
+   sauvegarde normale. Fichier caché pendant l'écriture, effacé en cas d'échec.
+7. **Export XML cassable par un nom** : voir le bug 3 ci-dessous, qui est aussi un
+   moyen de rendre une sauvegarde illisible.
+
+**Failles relevées, non corrigées** (à arbitrer) :
+
+8. **Le travail de publication a `contents: write` du début à la fin**, tests compris.
+   Le séparer en un travail de compilation (lecture seule) et un travail de publication
+   (écriture) borne ce que peut faire une dépendance compromise.
+9. **Aucune vérification des dépendances Gradle** (`gradle/verification-metadata.xml`)
+   : une bibliothèque ou une extension compromise sur Maven s'exécute dans le travail
+   qui détient la clé de signature.
+10. Déjà relevées par les audits précédents, toujours ouvertes : pas de
+    `distributionSha256Sum` dans `gradle-wrapper.properties`, et le cache de tuiles
+    dans `externalCacheDir` (lisible par d'autres applications sur Android 9 et
+    antérieur).
+
+**Bugs corrigés :**
+
+1. **La distance était comptée en double** quand Android livrait plusieurs positions
+   d'un coup (le défaut « `insertPoint` suspend » relevé à la 2.0.3) : l'écriture en
+   base suspendait la coroutine, la position suivante lisait encore l'ancienne
+   `lastLocation` et comptait A→B puis A→C. `lastLocation` est désormais avancée
+   **avant** `insertPoint`. Non couvert par un test : `TrackingService` ne tourne pas
+   sous Robolectric.
+2. **Le GPX exporté écrivait « 5.0E-4 »** sous le millième (latitude, longitude,
+   altitude, vitesse), que le schéma GPX refuse : tout point à moins de 70 m du méridien
+   de Greenwich, qui traverse la France, rendait le fichier illisible ailleurs. Même
+   écriture que le KML (`Exporter.coordinate`).
+3. **Un caractère interdit par XML dans un nom** (caractère de contrôle collé au
+   renommage, moitié de paire de substitution) rendait tout le fichier exporté
+   illisible. `escapeXml` les retire.
+4. **Une sauvegarde automatique interrompue** laissait un fichier tronqué (faille 6).
+
+`KmlExportTest`, `KmlStyleTableTest` et `KmlRoundTripTest` verrouillent les points 1, 2,
+et les bugs 2 et 3.
 
 ### Audit batterie de la 1.2
 
