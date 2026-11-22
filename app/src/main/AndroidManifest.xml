@@ -18,6 +18,11 @@
          application ordinaire ne peut pas installer en silence. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Visibilité de la release depuis un APK de debug : voir UpdateDownloader.isExpectedApk. -->
+    <queries>
+        <package android:name="${updatePackageName}" />
+    </queries>
+
     <application
         android:name=".TrackApplication"
         android:allowBackup="true"

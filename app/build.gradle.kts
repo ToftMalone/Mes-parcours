@@ -38,6 +38,10 @@ android {
     // compris dans le build de debug : c'est toujours la release que l'on publie, et
     // `context.packageName` y vaudrait le nom suffixé `.debug`.
     buildConfigField("String", "UPDATE_PACKAGE_NAME", "\"$applicationId\"")
+    // Rend la release visible depuis un APK de debug (Android 11+ cache les autres
+    // applications) : UpdateDownloader vérifie qu'elle est installée avant de lui
+    // présenter une mise à jour.
+    manifestPlaceholders["updatePackageName"] = applicationId!!
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

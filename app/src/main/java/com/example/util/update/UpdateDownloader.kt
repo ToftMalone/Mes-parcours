@@ -185,8 +185,16 @@ object UpdateDownloader {
      * utilisateur qui croit mettre à jour celle-ci. D'où ce contrôle-ci, qui ramène
      * tout fichier accepté dans le cas où Android vérifie lui-même la signature.
      *
+     * **Encore faut-il que ce paquet soit déjà installé.** Android ne compare la
+     * signature qu'à celle d'une application en place : sur un téléphone qui n'a pas la
+     * release — un APK de debug seul, par exemple — l'APK téléchargé s'installait comme
+     * une application neuve, signée de n'importe quelle clé. Quiconque prenait la main
+     * sur le compte GitHub y faisait ainsi installer **son** application, sans même avoir
+     * volé la clé de signature, l'utilisateur croyant mettre à jour « Mes parcours ».
+     * Une mise à jour ne vise donc qu'une release présente (`isInstalled`).
+     *
      * Le certificat n'est volontairement pas comparé ici : une fois le nom de paquet
-     * garanti, ce serait refaire le contrôle d'Android, avec le risque — invérifiable
+     * garanti et la release en place, ce serait refaire le contrôle d'Android, avec le risque — invérifiable
      * sans appareil — qu'une version d'Android ne rende pas la signature d'une
      * archive non installée et fasse refuser à tort toutes les mises à jour.
      *
@@ -210,7 +218,21 @@ object UpdateDownloader {
         } ?: return false
 
         return info.packageName == BuildConfig.UPDATE_PACKAGE_NAME &&
-            PackageInfoCompat.getLongVersionCode(info) == update.versionCode.toLong()
+            PackageInfoCompat.getLongVersionCode(info) == update.versionCode.toLong() &&
+            isInstalled(pm, BuildConfig.UPDATE_PACKAGE_NAME)
+    }
+
+    /** [packageName] est installé : Android comparera alors la signature de la mise à jour à la sienne. */
+    private fun isInstalled(pm: PackageManager, packageName: String): Boolean = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(packageName, 0)
+        }
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
     }
 
     /**

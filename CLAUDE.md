@@ -1397,7 +1397,30 @@ et les bugs 2 et 3.
 
 `DebugLogTest` et `KmlRoundTripTest` verrouillent.
 
-**Relevées, laissées en l'état** (à arbitrer) :
+4. **Une mise à jour pouvait installer l'application de n'importe qui** sur un
+   téléphone sans la release (un APK de debug seul). Android ne compare la signature
+   qu'à celle d'une application déjà en place : faute de release, l'APK téléchargé
+   s'installait comme application neuve, signé de n'importe quelle clé. Il suffisait
+   donc de prendre la main sur le compte GitHub — **sans voler la clé de signature** —
+   pour faire installer son application à la place de « Mes parcours ».
+   `UpdateDownloader.isExpectedApk` exige désormais que la release soit installée
+   (`<queries>` sur `updatePackageName` pour qu'un APK de debug la voie). Sur un
+   téléphone qui n'a que le debug, la mise à jour est refusée après téléchargement.
+
+**Le vrai chemin de piratage, hors du code : le compte GitHub.** Qui le tient peut
+pousser un workflow qui lit les secrets de signature, signer sa propre application et
+la publier comme mise à jour : le téléphone la proposerait, Android l'accepterait (même
+clé), et elle hériterait de tout, localisation « Toujours » comprise. Aucune ligne de
+l'application ne peut l'empêcher. Défenses, par ordre d'efficacité : double
+authentification (clé physique ou application, pas de SMS) sur le compte GitHub ;
+secrets de signature déplacés dans un environnement GitHub protégé (approbation
+obligatoire, publication limitée à `main` et aux tags `v*`) — ce qui arrête aussi un
+workflow poussé par erreur ou par une session d'assistant détournée, pas un voleur du
+compte ; en dernier recours, une seconde signature d'`update.json` par une clé gardée
+hors de GitHub, que l'application vérifierait — au prix d'une étape manuelle à chaque
+publication.
+
+**Relevées, laissées en l'état** (refusées par l'auteur) :
 
 - **Détournement de toucher (« tapjacking »), Android 7 à 11.** Une application qui
   dessine par-dessus les autres peut faire appuyer sur « Vider la corbeille » ou
