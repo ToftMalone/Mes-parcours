@@ -40,9 +40,18 @@ object OsmConfig {
             config.tileDownloadThreads = 10.toShort()
             config.cacheMapTileCount = 24.toShort()
 
-            // 4. Explicitly set valid app-private cache paths AFTER config.load()
-            val cacheDir = appContext.externalCacheDir ?: appContext.cacheDir
-            val osmdroidBasePath = File(cacheDir, "osmdroid")
+            // 4. Cache des tuiles dans le stockage **interne** (`cacheDir`), après config.load().
+            //
+            // Il était dans `externalCacheDir`, lisible par toute application ayant la
+            // permission de stockage sur Android 9 et antérieur : les tuiles gardées
+            // trahissaient les zones consultées, domicile compris. Relevé par trois audits
+            // avant d'être corrigé. L'ancien dossier est effacé une fois, hors du fil
+            // principal : il peut peser des centaines de mégaoctets.
+            appContext.externalCacheDir?.let { external ->
+                val legacy = File(external, "osmdroid")
+                if (legacy.exists()) Thread({ legacy.deleteRecursively() }, "ménage-tuiles").start()
+            }
+            val osmdroidBasePath = tileCacheDir(appContext)
             val osmdroidTileCache = File(osmdroidBasePath, "tiles")
 
             if (!osmdroidBasePath.exists()) {
@@ -61,4 +70,7 @@ object OsmConfig {
             isInitialized = true
         }
     }
+
+    /** Dossier d'osmdroid (cache de tuiles compris), interne à l'application. */
+    fun tileCacheDir(context: Context): File = File(context.applicationContext.cacheDir, "osmdroid")
 }

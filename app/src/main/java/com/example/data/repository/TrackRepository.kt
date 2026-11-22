@@ -1855,7 +1855,7 @@ class TrackRepository private constructor(private val database: AppDatabase) {
             out.append("Tracés KML : ${db.query("SELECT COUNT(*) FROM placemarks").use { if (it.moveToFirst()) it.getLong(0) else -1 }}\n")
         }.onFailure { out.append("Lecture de la base impossible : $it\n") }
 
-        val tiles = java.io.File(context.externalCacheDir ?: context.cacheDir, "osmdroid")
+        val tiles = com.example.util.OsmConfig.tileCacheDir(context)
         out.append("\nCache des tuiles : ${tiles.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024} Kio\n")
         out.append("Journal de débogage : ${com.example.util.DebugLog.totalSize(context) / 1024} Kio\n")
         out.append("Enregistrement en cours : ${_isTracking.value}, pause : ${_isPaused.value}, parcours ${_currentTrackId.value}\n")

@@ -61,7 +61,8 @@ rendre `cmdline-tools/latest/bin/*` exécutable (`chmod -R +x`), accepter les li
 installer `platforms;android-36` et `build-tools;36.0.0`, écrire `sdk.dir=…` dans
 `local.properties` (ignoré par git), puis `./gradlew assembleDebug --no-daemon`.
 Maven Central répond parfois 429 : relancer avec une pause, Gradle garde en cache ce
-qu'il a déjà obtenu. Les publications restent faites par `release.yml`.
+qu'il a déjà obtenu. **Les dépendances sont vérifiées** (`gradle/verification-metadata.xml`) :
+ajouter ou monter une dépendance impose de régénérer ce fichier, mode d'emploi en tête. Les publications restent faites par `release.yml`.
 
 Les APK versés sur `main` sous `app/build/outputs/apk/` ne sont donc plus mis à jour
 automatiquement : ils datent du dernier passage de l'ancien workflow (2.0.1).
@@ -1074,7 +1075,7 @@ vingt-deux ont été traités dans cette version (voir le journal des nouveauté
   consultée part chez Google — ce que la promesse « rien ne quitte l'appareil » ne
   laisse pas attendre.
 - Le cache de tuiles osmdroid est dans `externalCacheDir` : lisible par une autre
-  application sur Android 9 et antérieur.
+  application sur Android 9 et antérieur. **Corrigé après la 2.3.17** (stockage interne).
 - Le filtre anti-dérive `dist > 1.0` écarte les intervalles de moins d'un mètre : à
   1 Hz, la marche lente (moins de 3,6 km/h) est structurellement sous-comptée.
 - `FLAG_KEEP_SCREEN_ON` est posé sans condition dans `MainActivity` : l'écran ne
@@ -1138,7 +1139,7 @@ que de les interpoler dans un shell.
   fuite, ni démarrage d'enregistrement à froid.
 - **Le cache de tuiles est dans `externalCacheDir`** — déjà relevé par l'audit du
   0.11.2. Lisible par une autre application sur Android 9 et antérieur, ce qui
-  trahit les zones consultées.
+  trahit les zones consultées. **Corrigé après la 2.3.17.**
 - **La sauvegarde automatique écrit dans `Download/Mes parcours/`.** C'est la
   fonctionnalité voulue, pas un défaut ; sur Android 9 et antérieur, toute
   application ayant la permission de lecture accède donc à l'intégralité des
@@ -1265,9 +1266,8 @@ une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import
 - L'APK de debug versé sur `main` est public et débogable : avec le débogage USB
   activé, `run-as` lit sa base. À réserver aux essais ; la release pour l'usage
   quotidien.
-- `gradle-wrapper.properties` ne porte pas de `distributionSha256Sum` : la
-  distribution Gradle est téléchargée en HTTPS mais sans vérification d'empreinte
-  (`setup-gradle` valide le JAR du wrapper, pas la distribution).
+- ~~`gradle-wrapper.properties` ne porte pas de `distributionSha256Sum`~~ : corrigé
+  après la 2.3.17 (voir « Relecture « failles et bugs » d'après la 2.3.17 »).
 
 ### Relecture « bugs et failles » de la 2.3.15
 
@@ -1291,7 +1291,8 @@ une carte qui déraille. Un fichier piégé ne nuit donc qu'à son propre import
 ### Relecture « failles et bugs » d'après la 2.3.17
 
 À la demande de l'auteur (« trouver 10 failles de sécurité et plusieurs bugs »). Dix
-failles relevées, dont huit nouvelles ; sept corrigées. Quatre bugs, tous corrigés.
+failles relevées, dont huit nouvelles ; neuf corrigées (les 9 et 10 dans un second
+temps, à la demande de l'auteur). Quatre bugs, tous corrigés.
 
 **Failles corrigées :**
 
@@ -1318,18 +1319,32 @@ failles relevées, dont huit nouvelles ; sept corrigées. Quatre bugs, tous corr
 7. **Export XML cassable par un nom** : voir le bug 3 ci-dessous, qui est aussi un
    moyen de rendre une sauvegarde illisible.
 
-**Failles relevées, non corrigées** (à arbitrer) :
+**Faille relevée, non corrigée** (à arbitrer) :
 
 8. **Le travail de publication a `contents: write` du début à la fin**, tests compris.
    Le séparer en un travail de compilation (lecture seule) et un travail de publication
-   (écriture) borne ce que peut faire une dépendance compromise.
-9. **Aucune vérification des dépendances Gradle** (`gradle/verification-metadata.xml`)
-   : une bibliothèque ou une extension compromise sur Maven s'exécute dans le travail
-   qui détient la clé de signature.
-10. Déjà relevées par les audits précédents, toujours ouvertes : pas de
-    `distributionSha256Sum` dans `gradle-wrapper.properties`, et le cache de tuiles
-    dans `externalCacheDir` (lisible par d'autres applications sur Android 9 et
-    antérieur).
+   (écriture) borne ce que peut faire une dépendance compromise. La 9 en réduit déjà
+   l'enjeu.
+
+**Corrigées dans un second temps :**
+
+9. **Vérification des dépendances Gradle** (`gradle/verification-metadata.xml`) :
+   l'empreinte SHA-256 de chaque bibliothèque, extension et outil d'Android, que
+   Gradle exige désormais — une archive altérée sur Maven ne s'exécute plus dans le
+   travail qui détient la clé de signature. Vérifié : une empreinte faussée fait
+   échouer la compilation. **Toute dépendance ajoutée ou montée de version impose de
+   régénérer ce fichier** (mode d'emploi en tête du fichier), sinon « Dependency
+   verification failed ». Sources et javadoc sont exemptées (téléchargées par l'IDE,
+   jamais exécutées). Si Android Studio refuse de synchroniser sur un poste, c'est
+   qu'il résout une configuration que la session n'a pas vue : régénérer depuis ce
+   poste, relire le diff, verser.
+10. Les deux points laissés ouverts par les audits précédents :
+    `distributionSha256Sum` dans `gradle-wrapper.properties` (empreinte officielle de
+    services.gradle.org, vérifiée par un téléchargement à neuf ; à changer avec
+    `distributionUrl`), et **le cache de tuiles passé dans le stockage interne**
+    (`OsmConfig.tileCacheDir`, `cacheDir/osmdroid`), l'ancien dossier externe étant
+    effacé au démarrage, hors du fil principal. Les tuiles déjà gardées sont donc
+    retéléchargées une fois.
 
 **Bugs corrigés :**
 
