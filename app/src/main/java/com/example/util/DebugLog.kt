@@ -103,7 +103,35 @@ object DebugLog {
         val now = System.currentTimeMillis()
         val thread = Thread.currentThread().name
         val trace = error?.let(::stackTrace)
-        runCatching { executor.execute { append(now, level, thread, tag, message, trace) } }
+        val line = oneLine(message)
+        runCatching { executor.execute { append(now, level, thread, tag, line, trace) } }
+    }
+
+    /**
+     * [message] tenu sur **une seule ligne**, et borné.
+     *
+     * Le journal mêle des textes venus de dehors : nom d'un fichier importé, contenu
+     * d'une intention reçue par `BootReceiver` (que toute application peut lui
+     * adresser). Un retour à la ligne y fabriquait une ligne de journal complète — une
+     * fausse « PLANTAGE » ou une fausse erreur, datée et étiquetée comme les vraies —
+     * et c'est sur ce journal que se fonde le diagnostic. Les retours à la ligne
+     * deviennent « ⏎ », les autres caractères de contrôle « � ». La longueur est
+     * bornée pour qu'un seul message démesuré ne chasse pas l'historique.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun oneLine(message: String): String {
+        val text = if (message.length > MAX_MESSAGE_CHARS) {
+            message.take(MAX_MESSAGE_CHARS) + "… (${message.length} caractères)"
+        } else message
+        if (text.none { it < ' ' || it == '\u007F' || it == '\u2028' || it == '\u2029' }) return text
+        return buildString(text.length) {
+            for (c in text) when {
+                c == '\n' || c == '\r' || c == '\u2028' || c == '\u2029' -> append(" ⏎ ")
+                c == '\t' -> append(' ')
+                c < ' ' || c == '\u007F' -> append('\uFFFD')
+                else -> append(c)
+            }
+        }
     }
 
     private fun append(time: Long, level: Char, thread: String, tag: String, message: String, trace: String?) {
@@ -264,4 +292,5 @@ object DebugLog {
     }
 
     private const val MB = 1024L * 1024
+    private const val MAX_MESSAGE_CHARS = 8_000
 }

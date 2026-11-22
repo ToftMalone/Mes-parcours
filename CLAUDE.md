@@ -966,10 +966,10 @@ réseau) et ombres peu fidèles.
 ## État actuel
 
 - `assembleDebug` et `testDebugUnitTest` passent.
-- 254 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
+- 256 tests unitaires en 29 suites : `ScreensScreenshotTest` (39, captures seules —
   voir « Refonte de l'interface »), `Iso8601Test` (16), `UpdateManifestTest` (16),
-  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (11), `DebugLogTest` (4), `TouchLogTest` (1), `BearingTest` (10),
-  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (14), `KmlRoundTripTest` (3),
+  `CleanTrackTest` (15), `SplitTrackTest` (13), `CutPortionTest` (19), `ExtendTrackTest` (5), `TrashTest` (11), `DebugLogTest` (5), `TouchLogTest` (1), `BearingTest` (10),
+  `SolarTimesTest` (9), `KmlColorTest` (8), `AltitudeSmootherTest` (7), `KmlExportTest` (14), `KmlRoundTripTest` (4),
   `RecordingGuardsTest` (7), `KmlStyleTableTest` (8), `TrackSegmentsTest` (7),
   `CoordinateTokenizerTest` (6), `DarkTilesColorFilterTest` (6),
   `DesignSystemScreenshotTest` (6, captures seules), `ElevationAccumulatorTest` (6),
@@ -1368,6 +1368,50 @@ second temps, à la demande de l'auteur). Quatre bugs, tous corrigés.
 
 `KmlExportTest`, `KmlStyleTableTest` et `KmlRoundTripTest` verrouillent les points 1, 2,
 et les bugs 2 et 3.
+
+### Failles de l'application elle-même, après la 2.3.17
+
+À la demande de l'auteur, une passe limitée au code de l'application (pas au dépôt ni
+à la publication). Trois corrigées, trois relevées et laissées en l'état.
+
+**Corrigées :**
+
+1. **Fausses lignes dans le journal de débogage.** Le journal mêle des textes venus de
+   dehors (nom d'un fichier importé, intention reçue par `BootReceiver`). Un retour à la
+   ligne y fabriquait une ligne complète — une fausse « PLANTAGE », datée et étiquetée
+   comme les vraies — alors que c'est sur ce journal que se fonde le diagnostic.
+   `DebugLog.oneLine` tient chaque message sur une ligne (« ⏎ » pour un retour, « � »
+   pour un autre caractère de contrôle) et le borne à 8 000 caractères.
+2. **Le journal remplissable par une autre application.** `BootReceiver`, exporté par
+   nécessité, notait toute intention reçue avant d'en vérifier l'action : n'importe
+   quelle application pouvait l'appeler en boucle et chasser l'historique réel des
+   50 Mo. Seules les deux actions protégées, que le système seul peut émettre, sont
+   notées.
+3. **Nom de fichier importé sans borne ni filtre.** Le nom vient du fournisseur de
+   documents, qui peut en proposer un de plusieurs mégaoctets, recopié en base et
+   affiché partout ; les caractères d'inversion du sens d'écriture (U+202E…) faisaient
+   lire à l'écran autre chose que le nom réel, jusque dans « Supprimer « … » ? ».
+   `cleanImportedName` (nom du fichier et `<name>` du GPX ou du KML) : une ligne,
+   sans contrôle ni inversion, 512 caractères au plus. Les noms des tracés et dossiers
+   KML ne passent pas par là : ils ressortent à l'export tels qu'ils sont entrés.
+
+`DebugLogTest` et `KmlRoundTripTest` verrouillent.
+
+**Relevées, laissées en l'état** (à arbitrer) :
+
+- **Détournement de toucher (« tapjacking »), Android 7 à 11.** Une application qui
+  dessine par-dessus les autres peut faire appuyer sur « Vider la corbeille » ou
+  « Installer » en croyant appuyer sur autre chose ; Android 12 et suivants bloquent
+  cela d'eux-mêmes. Le remède, `filterTouchesWhenObscured`, refuse aussi tout appui
+  quand un filtre d'écran, une bulle de discussion ou un outil d'accessibilité est
+  affiché : l'application deviendrait inutilisable pour qui en a un. À ne poser, si
+  l'auteur le veut, que sur les boutons irréversibles.
+- **Notification d'enregistrement visible sur l'écran verrouillé** (`VISIBILITY_PUBLIC`)
+  : distance et durée, pas de position. Pratique en marche ; dit seulement à qui tient
+  le téléphone verrouillé qu'un enregistrement est en cours.
+- **Pas de `FLAG_SECURE`** : la carte (et donc le domicile) apparaît dans l'aperçu des
+  applications récentes et sur les captures d'écran. Le poser interdirait aussi les
+  captures dont l'auteur et son père se servent pour signaler les défauts.
 
 ### Audit batterie de la 1.2
 

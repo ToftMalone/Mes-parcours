@@ -93,4 +93,17 @@ class DebugLogTest {
         assertTrue(!all.contains("à effacer"))
         assertEquals(true, all.contains("Journal effacé") || all.isEmpty())
     }
+
+    @Test
+    fun `un texte venu de dehors ne fabrique jamais une fausse ligne de journal`() {
+        // Nom d'un fichier importé, ou intention adressée par une autre application :
+        // un retour à la ligne y aurait écrit une fausse erreur, datée comme les vraies.
+        DebugLog.i("Import", "nom : piège\n2026-01-01 00:00:00.000 E [main] PLANTAGE : faux\r\u0007fin")
+        DebugLog.flushNow()
+        val lignes = logFiles().joinToString("") { it.readText() }.lines().filter { "piège" in it || "PLANTAGE" in it }
+
+        assertEquals("tout tient sur une ligne", 1, lignes.size)
+        assertTrue(lignes[0], lignes[0].contains("piège ⏎ 2026") && lignes[0].contains("\uFFFDfin"))
+        assertTrue(DebugLog.oneLine("x".repeat(20_000)).length < 9_000)
+    }
 }

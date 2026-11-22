@@ -157,4 +157,15 @@ class KmlRoundTripTest {
             .replace("</Folder>", "")
         assertEquals("Piège", import(context, ordinaire, "ordinaire.kml").name)
     }
+
+    @Test
+    fun `un nom importe est rendu sur et borne`() {
+        assertEquals("Tour du lac Annecy", com.example.util.cleanImportedName("  Tour\n du\u202E lac\u0007   Annecy  "))
+        assertEquals(512, com.example.util.cleanImportedName("a".repeat(5_000_000)).length)
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val kml = "<kml><Document><name>Ligne 1\nLigne\u2066 2</name><Placemark><LineString>" +
+            "<coordinates>6,45 6.001,45.001</coordinates></LineString></Placemark></Document></kml>"
+        assertEquals("Ligne 1 Ligne 2", import(context, kml, "noms.kml").name)
+    }
 }

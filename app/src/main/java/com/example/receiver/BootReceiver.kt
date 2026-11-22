@@ -13,8 +13,14 @@ import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        com.example.util.DebugLog.d("Démarrage", "onReceive(intent=$intent)")
+        // Le récepteur est exporté (obligatoire pour BOOT_COMPLETED) : n'importe quelle
+        // application peut lui adresser une intention explicite, avec l'action et les
+        // données qu'elle veut. Rien n'en est noté avant d'avoir vérifié l'action —
+        // ces deux-là sont protégées, seul le système peut les émettre. Sans cela, une
+        // autre application pouvait remplir le journal de débogage à volonté et en
+        // chasser l'historique réel.
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            com.example.util.DebugLog.d("Démarrage", "onReceive(action=${intent.action})")
             val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {

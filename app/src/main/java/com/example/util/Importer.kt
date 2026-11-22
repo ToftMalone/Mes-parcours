@@ -54,6 +54,36 @@ private const val MAX_STYLE_ID_LENGTH = 256
  */
 internal const val MAX_COORDINATE_TOKEN_LENGTH = 128
 
+/**
+ * Nom de parcours tiré d'un fichier importé (nom du fichier, `<name>` du GPX ou du KML),
+ * rendu sûr à afficher : sur une ligne, sans caractère de contrôle ni d'inversion du
+ * sens d'écriture, et borné.
+ *
+ * Le nom du fichier vient du fournisseur de documents qui le sert, sans aucune borne :
+ * une autre application pouvait proposer un nom de plusieurs mégaoctets, recopié tel
+ * quel dans la base et affiché dans chaque liste. Les caractères d'inversion (U+202E…)
+ * font lire à l'écran autre chose que ce qui est écrit — dans « Supprimer « … » ? »
+ * par exemple — et un retour à la ligne cassait la mise en page des cartes.
+ */
+internal fun cleanImportedName(raw: String): String {
+    val out = StringBuilder(minOf(raw.length, MAX_NAME_LENGTH))
+    var pendingSpace = false
+    for (c in raw) {
+        if (out.length >= MAX_NAME_LENGTH) break
+        when {
+            c.isWhitespace() || c < ' ' -> pendingSpace = out.isNotEmpty()
+            c == '\u007F' || c in '\u202A'..'\u202E' || c in '\u2066'..'\u2069' ||
+                c == '\u200E' || c == '\u200F' || c == '\u061C' -> Unit
+            else -> {
+                if (pendingSpace) out.append(' ')
+                pendingSpace = false
+                out.append(c)
+            }
+        }
+    }
+    return out.toString()
+}
+
 /** Profondeur d'imbrication des balises au-delà de laquelle un KML est refusé (voir KmlHandler). */
 internal const val MAX_KML_DEPTH = 64
 
@@ -124,7 +154,7 @@ object Importer {
         com.example.util.DebugLog.d("Import", "importFromUri(uri=$uri, trackId=$trackId)")
         val fileName = getFileName(context, uri)
         val extension = fileName.substringAfterLast('.', "").lowercase()
-        val defaultName = fileName.substringBeforeLast('.')
+        val defaultName = cleanImportedName(fileName.substringBeforeLast('.'))
         val isKml = extension == "kml" || isKMLContent(context, uri)
 
         val sink = PointSink(trackId, onBatch)
@@ -160,7 +190,7 @@ object Importer {
 
         val duration = (sink.endTime - sink.startTime) / 1000
         return ImportSummary(
-            name = meta.name,
+            name = cleanImportedName(meta.name),
             activityType = meta.activityType,
             startTime = sink.startTime,
             endTime = sink.endTime,
